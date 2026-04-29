@@ -1,0 +1,62 @@
+[
+  {
+    "id": "agriculture",
+    "name": "Agro-Industrial",
+    "description": "Negocios de animales, leche y caos rural con marketing moderno.",
+    "base_tags": ["animal", "milk", "agriculture", "family"],
+    "volatility_bias": -0.05,
+    "reputation_bias": 0.08,
+    "hype_bias": -0.02,
+    "legal_risk_bias": -0.04,
+    "debt_bias": 0.02,
+    "absurdity_bias": 0.08
+  },
+  {
+    "id": "tech",
+    "name": "Techno-Meme",
+    "description": "Tecnologia, promesas cuanticas y demos inacabables.",
+    "base_tags": ["tech", "ai", "quantum", "hype"],
+    "volatility_bias": 0.20,
+    "reputation_bias": 0.00,
+    "hype_bias": 0.25,
+    "legal_risk_bias": 0.05,
+    "debt_bias": 0.05,
+    "absurdity_bias": 0.18
+  },
+  {
+    "id": "logistics",
+    "name": "Logistica Mutante",
+    "description": "Mover cosas imposibles a lugares peores.",
+    "base_tags": ["transport", "energy", "chaos", "animal"],
+    "volatility_bias": 0.10,
+    "reputation_bias": -0.04,
+    "hype_bias": 0.05,
+    "legal_risk_bias": 0.04,
+    "debt_bias": 0.08,
+    "absurdity_bias": 0.14
+  },
+  {
+    "id": "food",
+    "name": "Alimentacion Dudosa",
+    "description": "Comida rapida, escandalos y productos cuestionables.",
+    "base_tags": ["fast_food", "scandal", "family", "meme"],
+    "volatility_bias": 0.06,
+    "reputation_bias": -0.08,
+    "hype_bias": 0.10,
+    "legal_risk_bias": 0.15,
+    "debt_bias": 0.10,
+    "absurdity_bias": 0.22
+  },
+  {
+    "id": "energy",
+    "name": "Energia y Servicios",
+    "description": "Electricidad, redes y promesas de eficiencia eterna.",
+    "base_tags": ["energy", "regulation", "tech", "finance"],
+    "volatility_bias": -0.02,
+    "reputation_bias": 0.05,
+    "hype_bias": 0.06,
+    "legal_risk_bias": 0.09,
+    "debt_bias": 0.12,
+    "absurdity_bias": 0.10
+  }
+]

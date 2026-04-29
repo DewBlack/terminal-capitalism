@@ -1,0 +1,14 @@
+[
+  {
+    "id": "space_agri",
+    "name": "Space Agro",
+    "description": "Cultivos orbitales, ganado en microgravedad y promesas a largo plazo.",
+    "base_tags": ["space", "agriculture", "tech", "meme"],
+    "volatility_bias": 0.16,
+    "reputation_bias": 0.01,
+    "hype_bias": 0.22,
+    "legal_risk_bias": 0.10,
+    "debt_bias": 0.08,
+    "absurdity_bias": 0.25
+  }
+]

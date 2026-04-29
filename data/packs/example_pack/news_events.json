@@ -1,0 +1,42 @@
+[
+  {
+    "id": "cyberfarm_market",
+    "title": "CyberFarm abre mercado de huertos con drones vaqueros",
+    "description": "Agro y tecnologia se mezclan en una feria con vacas holograficas.",
+    "positive_tags": ["agriculture", "tech", "meme"],
+    "negative_tags": ["regulation"],
+    "tag_effects": {"agriculture": 0.05, "tech": 0.05, "meme": 0.03, "regulation": 0.03},
+    "rarity": "uncommon",
+    "duration_days": 2,
+    "event_type": "headline",
+    "special_chances": {"create_company": 0.04, "bankruptcy": 0.00, "merge": 0.02},
+    "secondary_effects": ["pack_theme_boost"]
+  },
+  {
+    "id": "space_canteen_contract",
+    "title": "Contrato para comedores en estacion orbital",
+    "description": "Nuevas licencias para repartir sopa y burger en gravedad cero.",
+    "positive_tags": ["space", "fast_food", "transport"],
+    "negative_tags": ["legal_risk"],
+    "tag_effects": {"space": 0.07, "fast_food": 0.04, "transport": 0.04, "legal_risk": 0.03},
+    "rarity": "rare",
+    "duration_days": 2,
+    "event_type": "headline",
+    "special_chances": {"create_company": 0.03, "bankruptcy": 0.00, "merge": 0.03},
+    "secondary_effects": ["orbital_demand"]
+  },
+  {
+    "id": "food_crisis_forklift",
+    "title": "Crisis de montacargas en cadena alimentaria",
+    "description": "Falta de operadores dispara costos de logistica en supermercados.",
+    "positive_tags": ["finance"],
+    "negative_tags": ["fast_food", "transport", "chaos"],
+    "tag_effects": {"finance": 0.02, "transport": 0.06, "chaos": 0.05},
+    "rarity": "common",
+    "duration_days": 1,
+    "event_type": "scandal",
+    "special_chances": {"create_company": 0.00, "bankruptcy": 0.03, "merge": 0.00},
+    "secondary_effects": ["supply_pressure"]
+  }
+]
+

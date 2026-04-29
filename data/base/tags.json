@@ -1,0 +1,23 @@
+[
+  {"id": "animal", "name": "Animal", "description": "Exposicion a fauna comercial."},
+  {"id": "milk", "name": "Milk", "description": "Cadena lactea y derivados."},
+  {"id": "agriculture", "name": "Agriculture", "description": "Produccion rural y agro."},
+  {"id": "quantum", "name": "Quantum", "description": "Tecnologias cuanticas prometedoras."},
+  {"id": "superconductors", "name": "Superconductors", "description": "Materiales conductores extremos."},
+  {"id": "tech", "name": "Tech", "description": "Sector de tecnologia general."},
+  {"id": "energy", "name": "Energy", "description": "Servicios energeticos."},
+  {"id": "fast_food", "name": "Fast Food", "description": "Comida rapida y franquicias."},
+  {"id": "scandal", "name": "Scandal", "description": "Riesgo de escandalo corporativo."},
+  {"id": "transport", "name": "Transport", "description": "Logistica y transporte."},
+  {"id": "space", "name": "Space", "description": "Negocios orbitales."},
+  {"id": "pharma", "name": "Pharma", "description": "Biotecnologia y salud."},
+  {"id": "meme", "name": "Meme", "description": "Alta sensibilidad social y viral."},
+  {"id": "legal_risk", "name": "Legal Risk", "description": "Presion legal y litigios."},
+  {"id": "ai", "name": "AI", "description": "Modelos automaticos y asistentes."},
+  {"id": "family", "name": "Family", "description": "Mercados domesticos y consumo familiar."},
+  {"id": "chaos", "name": "Chaos", "description": "Operacion impredecible o caotica."},
+  {"id": "regulation", "name": "Regulation", "description": "Exposicion a cambios regulatorios."},
+  {"id": "hype", "name": "Hype", "description": "Sensibilidad a narrativas y promesas virales."},
+  {"id": "finance", "name": "Finance", "description": "Servicios financieros y crediticios."}
+]
+

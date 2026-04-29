@@ -1,0 +1,911 @@
+[
+    {
+        "id":  "kingmoo_server_cow",
+        "title":  "Una vaca de KingMoo enfria servidores con la mirada",
+        "description":  "Ganaderos y data centers celebran la nueva unidad de enfriamiento bovino.",
+        "positive_tags":  [
+                              "milk",
+                              "animal",
+                              "tech"
+                          ],
+        "negative_tags":  [
+                              "legal_risk"
+                          ],
+        "tag_effects":  {
+                            "milk":  0.07,
+                            "animal":  0.04,
+                            "tech":  0.03,
+                            "legal_risk":  0.03
+                        },
+        "rarity":  "common",
+        "duration_days":  2,
+        "event_type":  "absurd",
+        "special_chances":  {
+                                "create_company":  0.02,
+                                "bankruptcy":  0.00,
+                                "merge":  0.03
+                            },
+        "secondary_effects":  [
+                                  "meme_hype"
+                              ]
+    },
+    {
+        "id":  "spercond_cheese_superconductor",
+        "title":  "SperCond promete superconductores de queso",
+        "description":  "La empresa asegura resistencia cero a temperatura de pizza.",
+        "positive_tags":  [
+                              "superconductors",
+                              "quantum",
+                              "hype"
+                          ],
+        "negative_tags":  [
+                              "scandal"
+                          ],
+        "tag_effects":  {
+                            "superconductors":  0.08,
+                            "quantum":  0.06,
+                            "hype":  0.05,
+                            "scandal":  0.04
+                        },
+        "rarity":  "uncommon",
+        "duration_days":  2,
+        "event_type":  "headline",
+        "special_chances":  {
+                                "create_company":  0.03,
+                                "bankruptcy":  0.01,
+                                "merge":  0.02
+                            },
+        "secondary_effects":  [
+                                  "forum_frenzy"
+                              ]
+    },
+    {
+        "id":  "grimburger_not_furniture",
+        "title":  "GrimBurger aclara que sus hamburguesas no son muebles",
+        "description":  "El regulador pide etiquetas mas claras tras demandas colectivas.",
+        "positive_tags":  [
+                              "fast_food",
+                              "meme"
+                          ],
+        "negative_tags":  [
+                              "legal_risk",
+                              "regulation",
+                              "scandal"
+                          ],
+        "tag_effects":  {
+                            "fast_food":  0.03,
+                            "meme":  0.02,
+                            "legal_risk":  0.09,
+                            "regulation":  0.07,
+                            "scandal":  0.08
+                        },
+        "rarity":  "common",
+        "duration_days":  3,
+        "event_type":  "regulation",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.06,
+                                "merge":  0.00
+                            },
+        "secondary_effects":  [
+                                  "lawsuit_wave"
+                              ]
+    },
+    {
+        "id":  "pigeon_interdimensional",
+        "title":  "Pigeon Express anuncia envios interdimensionales",
+        "description":  "Las palomas desaparecen y reaparecen con paquetes premium.",
+        "positive_tags":  [
+                              "transport",
+                              "animal",
+                              "hype"
+                          ],
+        "negative_tags":  [
+                              "chaos"
+                          ],
+        "tag_effects":  {
+                            "transport":  0.06,
+                            "animal":  0.03,
+                            "hype":  0.03,
+                            "chaos":  0.05
+                        },
+        "rarity":  "uncommon",
+        "duration_days":  2,
+        "event_type":  "headline",
+        "special_chances":  {
+                                "create_company":  0.02,
+                                "bankruptcy":  0.01,
+                                "merge":  0.03
+                            },
+        "secondary_effects":  [
+                                  "delivery_hype"
+                              ]
+    },
+    {
+        "id":  "hyperlemon_ai_lemon",
+        "title":  "HyperLemon despide a su IA por comprar limones",
+        "description":  "El algoritmo confundio cobertura de riesgo con limonada.",
+        "positive_tags":  [
+                              "meme"
+                          ],
+        "negative_tags":  [
+                              "ai",
+                              "tech",
+                              "finance"
+                          ],
+        "tag_effects":  {
+                            "meme":  0.04,
+                            "ai":  0.09,
+                            "tech":  0.05,
+                            "finance":  0.04
+                        },
+        "rarity":  "common",
+        "duration_days":  2,
+        "event_type":  "scandal",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.04,
+                                "merge":  0.01
+                            },
+        "secondary_effects":  [
+                                  "investor_doubt"
+                              ]
+    },
+    {
+        "id":  "orbital_soup_orbit_can",
+        "title":  "Orbital Soup pone una lata en orbita baja",
+        "description":  "Sube en redes por transmision en vivo de sopa flotante.",
+        "positive_tags":  [
+                              "space",
+                              "meme",
+                              "hype"
+                          ],
+        "negative_tags":  [
+                              "finance"
+                          ],
+        "tag_effects":  {
+                            "space":  0.09,
+                            "meme":  0.06,
+                            "hype":  0.05,
+                            "finance":  0.03
+                        },
+        "rarity":  "rare",
+        "duration_days":  2,
+        "event_type":  "viral",
+        "special_chances":  {
+                                "create_company":  0.04,
+                                "bankruptcy":  0.00,
+                                "merge":  0.03
+                            },
+        "secondary_effects":  [
+                                  "social_boom"
+                              ]
+    },
+    {
+        "id":  "babyvolt_toaster_rebellion",
+        "title":  "Tostadoras BabyVolt exigen vacaciones",
+        "description":  "Millones de cocinas quedan en huelga energetica domestica.",
+        "positive_tags":  [
+                              "energy",
+                              "family"
+                          ],
+        "negative_tags":  [
+                              "chaos",
+                              "regulation"
+                          ],
+        "tag_effects":  {
+                            "energy":  0.03,
+                            "family":  0.02,
+                            "chaos":  0.07,
+                            "regulation":  0.05
+                        },
+        "rarity":  "uncommon",
+        "duration_days":  3,
+        "event_type":  "absurd",
+        "special_chances":  {
+                                "create_company":  0.01,
+                                "bankruptcy":  0.03,
+                                "merge":  0.00
+                            },
+        "secondary_effects":  [
+                                  "service_overload"
+                              ]
+    },
+    {
+        "id":  "dreamfuel_energy_vitamins",
+        "title":  "DreamFuel vende vitaminas de energia emocional",
+        "description":  "Prometen dos horas extra de optimismo financiero.",
+        "positive_tags":  [
+                              "pharma",
+                              "energy",
+                              "hype"
+                          ],
+        "negative_tags":  [
+                              "legal_risk"
+                          ],
+        "tag_effects":  {
+                            "pharma":  0.06,
+                            "energy":  0.04,
+                            "hype":  0.05,
+                            "legal_risk":  0.06
+                        },
+        "rarity":  "common",
+        "duration_days":  2,
+        "event_type":  "headline",
+        "special_chances":  {
+                                "create_company":  0.02,
+                                "bankruptcy":  0.01,
+                                "merge":  0.02
+                            },
+        "secondary_effects":  [
+                                  "retail_interest"
+                              ]
+    },
+    {
+        "id":  "regulator_memestock_warning",
+        "title":  "El regulador avisa sobre acciones meme inestables",
+        "description":  "Circular urgente contra manipulacion por foros nocturnos.",
+        "positive_tags":  [
+                              "finance"
+                          ],
+        "negative_tags":  [
+                              "meme",
+                              "regulation",
+                              "legal_risk"
+                          ],
+        "tag_effects":  {
+                            "finance":  0.02,
+                            "meme":  0.10,
+                            "regulation":  0.08,
+                            "legal_risk":  0.07
+                        },
+        "rarity":  "common",
+        "duration_days":  2,
+        "event_type":  "regulation",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.05,
+                                "merge":  0.00
+                            },
+        "secondary_effects":  [
+                                  "compliance_cost"
+                              ]
+    },
+    {
+        "id":  "quantum_farm_patent",
+        "title":  "Patente para granjas cuanticas de microchips lacteos",
+        "description":  "Se dispara el interes en agro-tech con sabor a laboratorio.",
+        "positive_tags":  [
+                              "agriculture",
+                              "quantum",
+                              "tech"
+                          ],
+        "negative_tags":  [
+                              "scandal"
+                          ],
+        "tag_effects":  {
+                            "agriculture":  0.04,
+                            "quantum":  0.07,
+                            "tech":  0.04,
+                            "scandal":  0.04
+                        },
+        "rarity":  "uncommon",
+        "duration_days":  2,
+        "event_type":  "headline",
+        "special_chances":  {
+                                "create_company":  0.05,
+                                "bankruptcy":  0.00,
+                                "merge":  0.03
+                            },
+        "secondary_effects":  [
+                                  "ip_race"
+                              ]
+    },
+    {
+        "id":  "canned_meteoric_soup",
+        "title":  "Nueva receta de Orbital Soup con polvo meteoritico",
+        "description":  "Influencers culinarios reportan sabor a rebote atmosferico.",
+        "positive_tags":  [
+                              "space",
+                              "fast_food",
+                              "meme"
+                          ],
+        "negative_tags":  [
+                              "legal_risk"
+                          ],
+        "tag_effects":  {
+                            "space":  0.06,
+                            "fast_food":  0.04,
+                            "meme":  0.04,
+                            "legal_risk":  0.04
+                        },
+        "rarity":  "common",
+        "duration_days":  1,
+        "event_type":  "viral",
+        "special_chances":  {
+                                "create_company":  0.01,
+                                "bankruptcy":  0.00,
+                                "merge":  0.01
+                            },
+        "secondary_effects":  [
+                                  "short_term_hype"
+                              ]
+    },
+    {
+        "id":  "logistics_pigeon_strike",
+        "title":  "Sindicatos de palomas convocan paro general",
+        "description":  "Retrasos masivos en envios sensibles al pan industrial.",
+        "positive_tags":  [
+                              "finance"
+                          ],
+        "negative_tags":  [
+                              "transport",
+                              "animal",
+                              "chaos"
+                          ],
+        "tag_effects":  {
+                            "finance":  0.02,
+                            "transport":  0.08,
+                            "animal":  0.04,
+                            "chaos":  0.06
+                        },
+        "rarity":  "common",
+        "duration_days":  2,
+        "event_type":  "scandal",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.04,
+                                "merge":  0.00
+                            },
+        "secondary_effects":  [
+                                  "supply_chain_damage"
+                              ]
+    },
+    {
+        "id":  "miracle_fridge_milk",
+        "title":  "Heladera de leche inteligente reduce facturas",
+        "description":  "Combinacion de IoT agricola y tarifa nocturna creativa.",
+        "positive_tags":  [
+                              "milk",
+                              "energy",
+                              "tech",
+                              "family"
+                          ],
+        "negative_tags":  [
+                              "legal_risk"
+                          ],
+        "tag_effects":  {
+                            "milk":  0.05,
+                            "energy":  0.04,
+                            "tech":  0.04,
+                            "family":  0.03,
+                            "legal_risk":  0.03
+                        },
+        "rarity":  "uncommon",
+        "duration_days":  2,
+        "event_type":  "headline",
+        "special_chances":  {
+                                "create_company":  0.03,
+                                "bankruptcy":  0.00,
+                                "merge":  0.02
+                            },
+        "secondary_effects":  [
+                                  "consumer_confidence"
+                              ]
+    },
+    {
+        "id":  "legal_scanner_found",
+        "title":  "Auditoria automatica detecta clausulas explosivas",
+        "description":  "Contratos de 14 empresas quedan bajo revision legal inmediata.",
+        "positive_tags":  [
+                              "regulation"
+                          ],
+        "negative_tags":  [
+                              "legal_risk",
+                              "finance",
+                              "scandal"
+                          ],
+        "tag_effects":  {
+                            "regulation":  0.02,
+                            "legal_risk":  0.10,
+                            "finance":  0.05,
+                            "scandal":  0.06
+                        },
+        "rarity":  "common",
+        "duration_days":  2,
+        "event_type":  "regulation",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.05,
+                                "merge":  0.00
+                            },
+        "secondary_effects":  [
+                                  "lawyer_fees"
+                              ]
+    },
+    {
+        "id":  "meme_forum_pump",
+        "title":  "Foro nocturno elige nueva accion favorita",
+        "description":  "Subida repentina por memes con analisis tecnicos dudosos.",
+        "positive_tags":  [
+                              "meme",
+                              "hype",
+                              "ai"
+                          ],
+        "negative_tags":  [
+                              "regulation"
+                          ],
+        "tag_effects":  {
+                            "meme":  0.10,
+                            "hype":  0.07,
+                            "ai":  0.03,
+                            "regulation":  0.05
+                        },
+        "rarity":  "common",
+        "duration_days":  1,
+        "event_type":  "meme",
+        "special_chances":  {
+                                "create_company":  0.01,
+                                "bankruptcy":  0.02,
+                                "merge":  0.02
+                            },
+        "secondary_effects":  [
+                                  "retail_rally"
+                              ]
+    },
+    {
+        "id":  "anti_hype_thread",
+        "title":  "Hilo viral denuncia promesas infladas",
+        "description":  "Analistas amateur publican comparativas con frutas y deuda.",
+        "positive_tags":  [
+                              "finance",
+                              "regulation"
+                          ],
+        "negative_tags":  [
+                              "hype",
+                              "meme",
+                              "tech"
+                          ],
+        "tag_effects":  {
+                            "finance":  0.03,
+                            "regulation":  0.02,
+                            "hype":  0.08,
+                            "meme":  0.06,
+                            "tech":  0.04
+                        },
+        "rarity":  "uncommon",
+        "duration_days":  2,
+        "event_type":  "scandal",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.03,
+                                "merge":  0.00
+                            },
+        "secondary_effects":  [
+                                  "valuation_reset"
+                              ]
+    },
+    {
+        "id":  "family_fund_invests",
+        "title":  "Fondo familiar entra fuerte en consumo domestico",
+        "description":  "Compras a largo plazo en energia de hogar y comida rapida.",
+        "positive_tags":  [
+                              "family",
+                              "energy",
+                              "fast_food"
+                          ],
+        "negative_tags":  [
+                              "finance"
+                          ],
+        "tag_effects":  {
+                            "family":  0.05,
+                            "energy":  0.03,
+                            "fast_food":  0.03,
+                            "finance":  0.02
+                        },
+        "rarity":  "common",
+        "duration_days":  2,
+        "event_type":  "headline",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.00,
+                                "merge":  0.01
+                            },
+        "secondary_effects":  [
+                                  "steady_demand"
+                              ]
+    },
+    {
+        "id":  "black_friday_food",
+        "title":  "Semana de descuentos extremos en comida dudosa",
+        "description":  "Volumen record de ventas con margenes comprimidos.",
+        "positive_tags":  [
+                              "fast_food",
+                              "meme"
+                          ],
+        "negative_tags":  [
+                              "finance",
+                              "scandal"
+                          ],
+        "tag_effects":  {
+                            "fast_food":  0.06,
+                            "meme":  0.03,
+                            "finance":  0.05,
+                            "scandal":  0.04
+                        },
+        "rarity":  "common",
+        "duration_days":  1,
+        "event_type":  "headline",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.02,
+                                "merge":  0.01
+                            },
+        "secondary_effects":  [
+                                  "margin_pressure"
+                              ]
+    },
+    {
+        "id":  "satellite_delivery_loss",
+        "title":  "Se pierde satelite con paquetes premium",
+        "description":  "Aseguradoras discuten si la orbita cuenta como almacen.",
+        "positive_tags":  [
+                              "finance"
+                          ],
+        "negative_tags":  [
+                              "space",
+                              "transport",
+                              "finance"
+                          ],
+        "tag_effects":  {
+                            "space":  0.08,
+                            "transport":  0.06,
+                            "finance":  0.04
+                        },
+        "rarity":  "rare",
+        "duration_days":  2,
+        "event_type":  "scandal",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.05,
+                                "merge":  0.00
+                            },
+        "secondary_effects":  [
+                                  "cargo_lost"
+                              ]
+    },
+    {
+        "id":  "cheese_battery_breakthrough",
+        "title":  "Bateria de queso supera prueba de 48 horas",
+        "description":  "Laboratorios reportan estabilidad con aroma intenso.",
+        "positive_tags":  [
+                              "energy",
+                              "superconductors",
+                              "quantum"
+                          ],
+        "negative_tags":  [
+                              "regulation"
+                          ],
+        "tag_effects":  {
+                            "energy":  0.07,
+                            "superconductors":  0.08,
+                            "quantum":  0.06,
+                            "regulation":  0.05
+                        },
+        "rarity":  "rare",
+        "duration_days":  3,
+        "event_type":  "headline",
+        "special_chances":  {
+                                "create_company":  0.05,
+                                "bankruptcy":  0.00,
+                                "merge":  0.04
+                            },
+        "secondary_effects":  [
+                                  "research_rally"
+                              ]
+    },
+    {
+        "id":  "scandalous_whistleblower",
+        "title":  "Ex directivo filtra chat interno comprometedor",
+        "description":  "Se habla de manipular encuestas con cupones de sopa.",
+        "positive_tags":  [
+                              "regulation"
+                          ],
+        "negative_tags":  [
+                              "scandal",
+                              "legal_risk",
+                              "hype"
+                          ],
+        "tag_effects":  {
+                            "regulation":  0.03,
+                            "scandal":  0.09,
+                            "legal_risk":  0.08,
+                            "hype":  0.04
+                        },
+        "rarity":  "uncommon",
+        "duration_days":  2,
+        "event_type":  "scandal",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.06,
+                                "merge":  0.00
+                            },
+        "secondary_effects":  [
+                                  "trust_drop"
+                              ]
+    },
+    {
+        "id":  "export_ban_quantum",
+        "title":  "Prohibicion temporal de exportar chips cuanticos",
+        "description":  "Fabricantes y logisticas reajustan contratos de emergencia.",
+        "positive_tags":  [
+                              "tech"
+                          ],
+        "negative_tags":  [
+                              "quantum",
+                              "tech",
+                              "transport",
+                              "regulation"
+                          ],
+        "tag_effects":  {
+                            "quantum":  0.10,
+                            "tech":  0.06,
+                            "transport":  0.04,
+                            "regulation":  0.05
+                        },
+        "rarity":  "rare",
+        "duration_days":  3,
+        "event_type":  "regulation",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.05,
+                                "merge":  0.01
+                            },
+        "secondary_effects":  [
+                                  "supply_shock"
+                              ]
+    },
+    {
+        "id":  "government_subsidy_energy",
+        "title":  "Subsidio estatal para energia domestica",
+        "description":  "Impulso directo a proyectos electricos familiares.",
+        "positive_tags":  [
+                              "energy",
+                              "family",
+                              "finance"
+                          ],
+        "negative_tags":  [
+                              "regulation"
+                          ],
+        "tag_effects":  {
+                            "energy":  0.08,
+                            "family":  0.05,
+                            "finance":  0.04,
+                            "regulation":  0.03
+                        },
+        "rarity":  "common",
+        "duration_days":  2,
+        "event_type":  "headline",
+        "special_chances":  {
+                                "create_company":  0.02,
+                                "bankruptcy":  0.00,
+                                "merge":  0.01
+                            },
+        "secondary_effects":  [
+                                  "demand_boost"
+                              ]
+    },
+    {
+        "id":  "health_agency_trial",
+        "title":  "Agencia sanitaria abre ensayo acelerado",
+        "description":  "Farmaceuticas de energia ganan visibilidad y riesgo legal.",
+        "positive_tags":  [
+                              "pharma",
+                              "hype"
+                          ],
+        "negative_tags":  [
+                              "legal_risk",
+                              "scandal"
+                          ],
+        "tag_effects":  {
+                            "pharma":  0.07,
+                            "hype":  0.04,
+                            "legal_risk":  0.05,
+                            "scandal":  0.04
+                        },
+        "rarity":  "uncommon",
+        "duration_days":  2,
+        "event_type":  "headline",
+        "special_chances":  {
+                                "create_company":  0.02,
+                                "bankruptcy":  0.02,
+                                "merge":  0.01
+                            },
+        "secondary_effects":  [
+                                  "trial_volatility"
+                              ]
+    },
+    {
+        "id":  "interstellar_food_ipo",
+        "title":  "Nueva startup de comida espacial sale a bolsa",
+        "description":  "La oferta publica se agota en 12 segundos.",
+        "positive_tags":  [
+                              "space",
+                              "fast_food",
+                              "hype",
+                              "meme"
+                          ],
+        "negative_tags":  [
+                              "finance"
+                          ],
+        "tag_effects":  {
+                            "space":  0.08,
+                            "fast_food":  0.04,
+                            "hype":  0.06,
+                            "meme":  0.05,
+                            "finance":  0.03
+                        },
+        "rarity":  "rare",
+        "duration_days":  1,
+        "event_type":  "viral",
+        "special_chances":  {
+                                "create_company":  0.08,
+                                "bankruptcy":  0.00,
+                                "merge":  0.02
+                            },
+        "secondary_effects":  [
+                                  "ipo_mania"
+                              ]
+    },
+    {
+        "id":  "reverse_split_panic",
+        "title":  "Varias companias anuncian reverse split de emergencia",
+        "description":  "Mercado interpreta la medida como senal de debilidad.",
+        "positive_tags":  [
+                              "finance"
+                          ],
+        "negative_tags":  [
+                              "finance",
+                              "hype",
+                              "meme"
+                          ],
+        "tag_effects":  {
+                            "finance":  0.09,
+                            "hype":  0.05,
+                            "meme":  0.04
+                        },
+        "rarity":  "uncommon",
+        "duration_days":  2,
+        "event_type":  "headline",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.07,
+                                "merge":  0.00
+                            },
+        "secondary_effects":  [
+                                  "price_compression"
+                              ]
+    },
+    {
+        "id":  "merger_rumor_wave",
+        "title":  "Oleada de rumores de fusiones imposibles",
+        "description":  "Se habla de vacas cuanticas, sopa bancaria y drones de mostaza.",
+        "positive_tags":  [
+                              "hype",
+                              "meme",
+                              "finance"
+                          ],
+        "negative_tags":  [
+                              "legal_risk"
+                          ],
+        "tag_effects":  {
+                            "hype":  0.07,
+                            "meme":  0.05,
+                            "finance":  0.03,
+                            "legal_risk":  0.03
+                        },
+        "rarity":  "common",
+        "duration_days":  1,
+        "event_type":  "meme",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.01,
+                                "merge":  0.10
+                            },
+        "secondary_effects":  [
+                                  "deal_speculation"
+                              ]
+    },
+    {
+        "id":  "chaos_storm_transport",
+        "title":  "Tormenta geomagnetica bloquea rutas de transporte",
+        "description":  "Camiones, palomas y satelites quedan fuera de cobertura.",
+        "positive_tags":  [
+                              "finance"
+                          ],
+        "negative_tags":  [
+                              "transport",
+                              "space",
+                              "energy",
+                              "chaos"
+                          ],
+        "tag_effects":  {
+                            "transport":  0.10,
+                            "space":  0.06,
+                            "energy":  0.04,
+                            "chaos":  0.07
+                        },
+        "rarity":  "uncommon",
+        "duration_days":  2,
+        "event_type":  "headline",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.06,
+                                "merge":  0.00
+                            },
+        "secondary_effects":  [
+                                  "delivery_crisis"
+                              ]
+    },
+    {
+        "id":  "ai_union_manifesto",
+        "title":  "Sindicato de IA publica manifiesto anti-limon",
+        "description":  "Bots piden salarios en electricidad y sopa orbital.",
+        "positive_tags":  [
+                              "ai",
+                              "meme",
+                              "tech"
+                          ],
+        "negative_tags":  [
+                              "finance",
+                              "regulation"
+                          ],
+        "tag_effects":  {
+                            "ai":  0.06,
+                            "meme":  0.05,
+                            "tech":  0.04,
+                            "finance":  0.04,
+                            "regulation":  0.03
+                        },
+        "rarity":  "rare",
+        "duration_days":  2,
+        "event_type":  "absurd",
+        "special_chances":  {
+                                "create_company":  0.03,
+                                "bankruptcy":  0.02,
+                                "merge":  0.03
+                            },
+        "secondary_effects":  [
+                                  "automation_debate"
+                              ]
+    },
+    {
+        "id":  "community_boycott_noise",
+        "title":  "Boicot comunitario por marketing demasiado agresivo",
+        "description":  "Consumidores castigan marcas con promesas hiperbolicas.",
+        "positive_tags":  [
+                              "family"
+                          ],
+        "negative_tags":  [
+                              "hype",
+                              "scandal",
+                              "meme"
+                          ],
+        "tag_effects":  {
+                            "hype":  0.08,
+                            "scandal":  0.07,
+                            "meme":  0.04
+                        },
+        "rarity":  "common",
+        "duration_days":  2,
+        "event_type":  "scandal",
+        "special_chances":  {
+                                "create_company":  0.00,
+                                "bankruptcy":  0.03,
+                                "merge":  0.00
+                            },
+        "secondary_effects":  [
+                                  "brand_damage"
+                              ]
+    }
+]

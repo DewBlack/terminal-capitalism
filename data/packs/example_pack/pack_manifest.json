@@ -1,0 +1,8 @@
+{
+  "id": "example_pack",
+  "name": "Example Pack",
+  "version": "0.1.0",
+  "enabled": true,
+  "description": "Pack de ejemplo para probar carga modular de contenido.",
+  "author": "Terminal Capitalism Team"
+}

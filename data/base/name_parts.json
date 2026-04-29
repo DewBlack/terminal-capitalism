@@ -1,0 +1,7 @@
+{
+  "prefixes": ["Hyper", "Neo", "Ultra", "King", "Dream", "Turbo", "Mega", "Nano", "Orbital", "Lucky"],
+  "cores": ["Moo", "Volt", "Lemon", "Pigeon", "Soup", "Burger", "Cond", "Fuel", "Pixel", "Crate"],
+  "suffixes": ["Tech", "Dynamics", "Foods", "Works", "Group", "Systems", "Holdings", "Industries", "Labs", "Express"],
+  "sector_words": ["Agro", "Quantum", "Transit", "Energy", "Finance", "Cosmic", "Kitchen", "Factory"],
+  "fusion_suffixes": ["Alliance", "Conglomerate", "Syndicate", "Collective", "Mutual", "Megacorp"]
+}
