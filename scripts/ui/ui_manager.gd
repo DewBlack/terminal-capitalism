@@ -276,6 +276,7 @@ func _update_selected_company_details() -> void:
 		_details_logo_text.text = "??"
 		_details_logo_swatch.color = Color(0.2, 0.2, 0.2, 1.0)
 		_price_chart.set_price_history([])
+		_price_chart.set_trade_markers([])
 		return
 
 	_details_logo_text.text = company.logo_text
@@ -307,6 +308,7 @@ func _update_selected_company_details() -> void:
 	_history_text.text = _build_history_text(company)
 	_history_text.visible = _history_visible
 	_price_chart.set_price_history(company.price_history)
+	_price_chart.set_trade_markers(_player_portfolio.get_trade_markers_for_ticker(company.ticker))
 
 
 func _build_history_text(company: Company) -> String:

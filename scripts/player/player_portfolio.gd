@@ -7,6 +7,7 @@ var starting_cash: float = 1000.0
 var cash: float = 1000.0
 var debt: float = 0.0
 var holdings: Dictionary = {}
+var trade_markers_by_ticker: Dictionary = {}
 
 
 func reset_for_new_run(initial_cash: float = 1000.0) -> void:
@@ -14,10 +15,11 @@ func reset_for_new_run(initial_cash: float = 1000.0) -> void:
 	cash = starting_cash
 	debt = 0.0
 	holdings.clear()
+	trade_markers_by_ticker.clear()
 	emit_signal("portfolio_updated")
 
 
-func buy_shares(company: Company, amount: int, price_multiplier: float = 1.0) -> Dictionary:
+func buy_shares(company: Company, amount: int, price_multiplier: float = 1.0, day_index: int = 1) -> Dictionary:
 	if company == null or not company.is_tradeable():
 		return {"success": false, "message": "No puedes comprar esta empresa ahora mismo."}
 	if amount <= 0:
@@ -34,6 +36,7 @@ func buy_shares(company: Company, amount: int, price_multiplier: float = 1.0) ->
 
 	var previous_shares := int(holdings.get(company.ticker, 0))
 	holdings[company.ticker] = previous_shares + amount
+	_register_trade_marker(company.ticker, "buy", day_index, amount, company.current_price)
 	emit_signal("portfolio_updated")
 	return {
 		"success": true,
@@ -41,7 +44,7 @@ func buy_shares(company: Company, amount: int, price_multiplier: float = 1.0) ->
 	}
 
 
-func sell_shares(company: Company, amount: int, price_multiplier: float = 1.0) -> Dictionary:
+func sell_shares(company: Company, amount: int, price_multiplier: float = 1.0, day_index: int = 1) -> Dictionary:
 	if company == null:
 		return {"success": false, "message": "Empresa no valida."}
 	if amount <= 0:
@@ -63,6 +66,7 @@ func sell_shares(company: Company, amount: int, price_multiplier: float = 1.0) -
 		debt -= repayment
 		cash -= repayment
 
+	_register_trade_marker(company.ticker, "sell", day_index, amount, company.current_price)
 	emit_signal("portfolio_updated")
 	return {
 		"success": true,
@@ -90,6 +94,19 @@ func get_holding_amount(ticker: String) -> int:
 	return int(holdings.get(ticker, 0))
 
 
+func get_trade_markers_for_ticker(ticker: String) -> Array[Dictionary]:
+	if not trade_markers_by_ticker.has(ticker):
+		return []
+	var raw_markers: Variant = trade_markers_by_ticker[ticker]
+	if typeof(raw_markers) != TYPE_ARRAY:
+		return []
+	var markers: Array[Dictionary] = []
+	for marker in raw_markers:
+		if typeof(marker) == TYPE_DICTIONARY:
+			markers.append((marker as Dictionary).duplicate(true))
+	return markers
+
+
 func get_holdings_value(market_manager: MarketManager) -> float:
 	var total: float = 0.0
 	for ticker in holdings.keys():
@@ -109,6 +126,29 @@ func get_snapshot() -> Dictionary:
 		"debt": debt,
 		"holdings": holdings.duplicate(true)
 	}
+
+
+func _register_trade_marker(ticker: String, marker_type: String, day_index: int, amount: int, price: float) -> void:
+	if ticker.is_empty():
+		return
+	if not trade_markers_by_ticker.has(ticker):
+		trade_markers_by_ticker[ticker] = []
+
+	var marker_list: Variant = trade_markers_by_ticker[ticker]
+	if typeof(marker_list) != TYPE_ARRAY:
+		trade_markers_by_ticker[ticker] = []
+		marker_list = trade_markers_by_ticker[ticker]
+
+	var typed_marker_list: Array = marker_list
+	typed_marker_list.append({
+		"type": marker_type,
+		"day": maxi(1, day_index),
+		"amount": maxi(1, amount),
+		"price": maxf(0.0, price)
+	})
+	if typed_marker_list.size() > 60:
+		typed_marker_list.remove_at(0)
+	trade_markers_by_ticker[ticker] = typed_marker_list
 
 
 func _money(amount: float) -> String:

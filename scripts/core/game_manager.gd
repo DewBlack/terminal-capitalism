@@ -92,7 +92,7 @@ func _on_buy_requested(ticker: String, amount: int) -> void:
 		return
 	var company := _market_manager.get_company_by_ticker(ticker)
 	var multiplier := _upgrade_manager.get_buy_price_multiplier()
-	var result := _player_portfolio.buy_shares(company, amount, multiplier)
+	var result := _player_portfolio.buy_shares(company, amount, multiplier, _run_manager.current_day)
 	_last_status_message = str(result.get("message", "Operacion ejecutada."))
 	print("[DEBUG][GameManager] compra completada | ticker=%s cantidad=%d mensaje=%s" % [ticker, amount, _last_status_message])
 	_refresh_all_ui()
@@ -103,7 +103,7 @@ func _on_sell_requested(ticker: String, amount: int) -> void:
 		return
 	var company := _market_manager.get_company_by_ticker(ticker)
 	var multiplier := _upgrade_manager.get_sell_price_multiplier()
-	var result := _player_portfolio.sell_shares(company, amount, multiplier)
+	var result := _player_portfolio.sell_shares(company, amount, multiplier, _run_manager.current_day)
 	_last_status_message = str(result.get("message", "Operacion ejecutada."))
 	print("[DEBUG][GameManager] venta completada | ticker=%s cantidad=%d mensaje=%s" % [ticker, amount, _last_status_message])
 	_refresh_all_ui()
