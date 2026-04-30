@@ -80,10 +80,19 @@ size_flags_horizontal = 1
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="NewsTitle" type="Label" parent="MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox"]
+[node name="NewsTopRow" type="HBoxContainer" parent="MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox"]
 layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="NewsTitle" type="Label" parent="MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsTopRow"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 20
 text = "Periodico del Dia"
+
+[node name="NewsHistoryButton" type="Button" parent="MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsTopRow"]
+layout_mode = 2
+text = "Ver historico"
 
 [node name="NewsScroll" type="ScrollContainer" parent="MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox"]
 layout_mode = 2
@@ -296,4 +305,38 @@ layout_mode = 2
 horizontal_alignment = 1
 text = "El mercado te espera, pero primero decide tu ventaja."
 
+[node name="WeeklyRecapPanel" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.2
+anchor_top = 0.2
+anchor_right = 0.8
+anchor_bottom = 0.84
+grow_horizontal = 2
+grow_vertical = 2
 
+[node name="RecapCenter" type="CenterContainer" parent="WeeklyRecapPanel"]
+layout_mode = 2
+
+[node name="RecapVBox" type="VBoxContainer" parent="WeeklyRecapPanel/RecapCenter"]
+layout_mode = 2
+custom_minimum_size = Vector2(600, 0)
+theme_override_constants/separation = 10
+
+[node name="RecapTitle" type="Label" parent="WeeklyRecapPanel/RecapCenter/RecapVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+horizontal_alignment = 1
+text = "Resumen Semanal"
+
+[node name="RecapBody" type="RichTextLabel" parent="WeeklyRecapPanel/RecapCenter/RecapVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 280)
+bbcode_enabled = false
+text = ""
+
+[node name="RecapContinueButton" type="Button" parent="WeeklyRecapPanel/RecapCenter/RecapVBox"]
+layout_mode = 2
+text = "Continuar"
