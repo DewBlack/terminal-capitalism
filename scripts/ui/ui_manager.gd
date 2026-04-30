@@ -6,6 +6,7 @@ signal sell_requested(ticker: String, amount: int)
 signal end_day_requested
 signal return_to_menu_requested
 signal weekly_upgrade_selected(upgrade_id: String)
+signal weekly_recap_closed
 
 var _run_manager: RunManager
 var _player_portfolio: PlayerPortfolio
@@ -15,6 +16,7 @@ var _upgrade_manager: UpgradeManager
 
 var _selected_ticker: String = ""
 var _history_visible: bool = false
+var _news_history_visible: bool = false
 var _last_status_message: String = ""
 
 @onready var _day_label: Label = $MainMargin/MainVBox/HeaderBar/DayLabel
@@ -24,6 +26,8 @@ var _last_status_message: String = ""
 @onready var _net_worth_label: Label = $MainMargin/MainVBox/HeaderBar/NetWorthLabel
 @onready var _upgrade_label: Label = $MainMargin/MainVBox/HeaderBar/UpgradeLabel
 
+@onready var _news_title: Label = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsTopRow/NewsTitle
+@onready var _news_history_button: Button = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsTopRow/NewsHistoryButton
 @onready var _news_content: VBoxContainer = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsScroll/NewsContent
 @onready var _market_rows: VBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketScroll/MarketRows
 @onready var _company_details_label: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/CompanyDetailsLabel
@@ -47,6 +51,10 @@ var _last_status_message: String = ""
 @onready var _upgrade_choice_panel: PanelContainer = $UpgradeChoicePanel
 @onready var _upgrade_subtitle: Label = $UpgradeChoicePanel/UpgradeCenter/UpgradeVBox/UpgradeSubtitle
 @onready var _upgrade_options: VBoxContainer = $UpgradeChoicePanel/UpgradeCenter/UpgradeVBox/UpgradeOptions
+@onready var _weekly_recap_panel: PanelContainer = $WeeklyRecapPanel
+@onready var _weekly_recap_title: Label = $WeeklyRecapPanel/RecapCenter/RecapVBox/RecapTitle
+@onready var _weekly_recap_body: RichTextLabel = $WeeklyRecapPanel/RecapCenter/RecapVBox/RecapBody
+@onready var _weekly_recap_continue_button: Button = $WeeklyRecapPanel/RecapCenter/RecapVBox/RecapContinueButton
 
 
 func _ready() -> void:
@@ -54,10 +62,14 @@ func _ready() -> void:
 	_sell_button.pressed.connect(_on_sell_button_pressed)
 	_end_day_button.pressed.connect(_on_end_day_button_pressed)
 	_history_button.pressed.connect(_on_history_button_pressed)
+	_news_history_button.pressed.connect(_on_news_history_button_pressed)
 	_back_to_menu_button.pressed.connect(_on_back_to_menu_pressed)
+	_weekly_recap_continue_button.pressed.connect(_on_weekly_recap_continue_pressed)
 	_end_run_panel.visible = false
 	_upgrade_choice_panel.visible = false
+	_weekly_recap_panel.visible = false
 	_history_text.visible = false
+	_refresh_news_panel_header()
 
 
 func bind_managers(
@@ -74,6 +86,7 @@ func bind_managers(
 	_upgrade_manager = upgrade_manager
 
 	_connect_manager_signals()
+	_news_history_visible = false
 	refresh_all_ui("Run preparada. Elige una empresa y empieza a operar.")
 
 
@@ -97,6 +110,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 
 func show_run_end(title: String, description: String) -> void:
 	hide_weekly_upgrade_choices()
+	hide_weekly_recap()
 	_end_run_panel.visible = true
 	_end_run_title.text = title
 	_end_run_description.text = description
@@ -139,8 +153,22 @@ func show_weekly_upgrade_choices(choices: Array[RunUpgrade]) -> void:
 
 func hide_weekly_upgrade_choices() -> void:
 	_upgrade_choice_panel.visible = false
-	_set_action_buttons_enabled(true)
+	if not _weekly_recap_panel.visible and not _end_run_panel.visible:
+		_set_action_buttons_enabled(true)
 	_clear_container(_upgrade_options)
+
+
+func show_weekly_recap(week_index: int, summary_text: String) -> void:
+	_weekly_recap_panel.visible = true
+	_weekly_recap_title.text = "Resumen Semana %d" % week_index
+	_weekly_recap_body.text = summary_text
+	_set_action_buttons_enabled(false)
+
+
+func hide_weekly_recap() -> void:
+	_weekly_recap_panel.visible = false
+	if not _upgrade_choice_panel.visible and not _end_run_panel.visible:
+		_set_action_buttons_enabled(true)
 
 
 func _connect_manager_signals() -> void:
@@ -168,6 +196,14 @@ func _update_header() -> void:
 
 func _update_news_panel() -> void:
 	_clear_container(_news_content)
+	_refresh_news_panel_header()
+	if _news_history_visible:
+		_update_news_history_panel()
+		return
+
+	if _run_manager.current_day <= 1:
+		_add_run_context_card()
+
 	if _news_manager.latest_headlines.is_empty():
 		var placeholder := Label.new()
 		placeholder.text = "Sin titulares nuevos hoy."
@@ -175,22 +211,81 @@ func _update_news_panel() -> void:
 		return
 
 	for news_event in _news_manager.latest_headlines:
-		var card_panel := PanelContainer.new()
-		card_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var card := VBoxContainer.new()
-		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		card.add_theme_constant_override("separation", 4)
-		var title := Label.new()
-		title.text = news_event.title
-		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		title.add_theme_color_override("font_color", Color(0.95, 0.89, 0.35))
-		var body := Label.new()
-		body.text = news_event.description
-		body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		card.add_child(title)
-		card.add_child(body)
-		card_panel.add_child(card)
-		_news_content.add_child(card_panel)
+		_add_news_card(news_event.title, news_event.description, Color(0.95, 0.89, 0.35))
+
+
+func _update_news_history_panel() -> void:
+	var history_entries := _news_manager.get_news_history_entries(60)
+	if history_entries.is_empty():
+		var placeholder := Label.new()
+		placeholder.text = "Todavia no hay historico de noticias."
+		_news_content.add_child(placeholder)
+		return
+
+	for entry in history_entries:
+		var day_value := int(entry.get("day", 0))
+		var title := str(entry.get("title", "Sin titular"))
+		var description := str(entry.get("description", ""))
+		var card_title := "D%02d | %s" % [day_value, title]
+		_add_news_card(card_title, description, Color(0.80, 0.88, 0.96))
+
+
+func _add_run_context_card() -> void:
+	var context_lines: Array[String] = []
+	context_lines.append("Empresas: %s" % _company_profile_text())
+	context_lines.append("Mercado: %s" % _market_profile_text())
+	context_lines.append("Noticias: %s" % _news_profile_text())
+	_add_news_card(
+		"Briefing de run (Dia 1)",
+		"\n".join(context_lines),
+		Color(0.66, 0.93, 0.83)
+	)
+
+
+func _company_profile_text() -> String:
+	if _market_manager == null:
+		return "-"
+	return _market_manager.get_run_company_profile_text()
+
+
+func _market_profile_text() -> String:
+	if _market_manager == null:
+		return "-"
+	return _market_manager.get_run_regime_text()
+
+
+func _news_profile_text() -> String:
+	if _news_manager == null:
+		return "-"
+	return _news_manager.get_run_news_profile_text()
+
+
+func _add_news_card(title_text: String, body_text: String, title_color: Color) -> void:
+	var card_panel := PanelContainer.new()
+	card_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var card := VBoxContainer.new()
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_constant_override("separation", 4)
+	var title := Label.new()
+	title.text = title_text
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.add_theme_color_override("font_color", title_color)
+	var body := Label.new()
+	body.text = body_text
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	card.add_child(title)
+	card.add_child(body)
+	card_panel.add_child(card)
+	_news_content.add_child(card_panel)
+
+
+func _refresh_news_panel_header() -> void:
+	if _news_history_visible:
+		_news_title.text = "Historico de Noticias"
+		_news_history_button.text = "Ver hoy"
+		return
+	_news_title.text = "Periodico del Dia"
+	_news_history_button.text = "Ver historico"
 
 
 func _update_market_table() -> void:
@@ -336,6 +431,16 @@ func _on_sell_button_pressed() -> void:
 
 func _on_end_day_button_pressed() -> void:
 	emit_signal("end_day_requested")
+
+
+func _on_news_history_button_pressed() -> void:
+	_news_history_visible = not _news_history_visible
+	refresh_all_ui()
+
+
+func _on_weekly_recap_continue_pressed() -> void:
+	hide_weekly_recap()
+	emit_signal("weekly_recap_closed")
 
 
 func _on_history_button_pressed() -> void:
