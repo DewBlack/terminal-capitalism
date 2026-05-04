@@ -25,28 +25,13 @@ func reset_for_new_run(initial_cash: float = 1000.0) -> void:
 
 
 func buy_shares(company: Company, amount: int, price_multiplier: float = 1.0, day_index: int = 1) -> Dictionary:
-	if company == null or not company.is_tradeable():
-		return {"success": false, "message": "No puedes comprar esta empresa ahora mismo."}
-	if amount <= 0:
-		return {"success": false, "message": "La cantidad debe ser mayor que cero."}
+	var preview := estimate_buy_order(company, amount, price_multiplier)
+	if not bool(preview.get("success", false)):
+		return {"success": false, "message": str(preview.get("message", "No se pudo completar la compra."))}
 
-	var unit_price: float = company.current_price * maxf(0.1, price_multiplier)
-	var effective_buy_unit_price := unit_price * (1.0 + BUY_TRANSACTION_FEE_RATE)
-	var requested_amount := amount
-	var available_debt_capacity := maxf(0.0, MAX_TRADING_DEBT - debt)
-	var max_affordable_budget := cash + available_debt_capacity
-	if max_affordable_budget < effective_buy_unit_price:
-		return {
-			"success": false,
-			"message": "No tienes margen disponible para comprar (limite de deuda: %s)." % _money(MAX_TRADING_DEBT)
-		}
-	var max_affordable_amount := int(floor(max_affordable_budget / effective_buy_unit_price))
-	amount = mini(amount, max_affordable_amount)
-	if amount <= 0:
-		return {"success": false, "message": "No tienes capital suficiente para comprar esta posicion."}
-
-	var gross_total_cost: float = unit_price * float(amount)
-	var total_cost: float = gross_total_cost * (1.0 + BUY_TRANSACTION_FEE_RATE)
+	var requested_amount := int(preview.get("requested_amount", amount))
+	amount = int(preview.get("amount", amount))
+	var total_cost: float = float(preview.get("total_cost", 0.0))
 	if cash >= total_cost:
 		cash -= total_cost
 	else:
@@ -70,29 +55,13 @@ func buy_shares(company: Company, amount: int, price_multiplier: float = 1.0, da
 
 
 func sell_shares(company: Company, amount: int, price_multiplier: float = 1.0, day_index: int = 1) -> Dictionary:
-	if company == null:
-		return {"success": false, "message": "Empresa no valida."}
-	if amount <= 0:
-		return {"success": false, "message": "La cantidad debe ser mayor que cero."}
+	var preview := estimate_sell_order(company, amount, price_multiplier, day_index)
+	if not bool(preview.get("success", false)):
+		return {"success": false, "message": str(preview.get("message", "No se pudo completar la venta."))}
 
+	var intraday_amount := int(preview.get("intraday_amount", 0))
+	var gross_value: float = float(preview.get("net_value", 0.0))
 	var owned := int(holdings.get(company.ticker, 0))
-	if owned < amount:
-		return {"success": false, "message": "No tienes suficientes acciones para vender."}
-
-	var sell_unit_price: float = company.current_price * maxf(0.1, price_multiplier)
-	var today_trade_amounts := _get_today_trade_amounts(company.ticker, day_index)
-	var bought_today := int(today_trade_amounts.get("buy", 0))
-	var sold_today := int(today_trade_amounts.get("sell", 0))
-	var intraday_remaining := maxi(0, bought_today - sold_today)
-	var old_shares_remaining := maxi(0, owned - intraday_remaining)
-	var sell_from_old := mini(amount, old_shares_remaining)
-	var intraday_amount := mini(amount - sell_from_old, intraday_remaining)
-	var regular_amount := amount - intraday_amount
-
-	var gross_value_regular := sell_unit_price * float(regular_amount)
-	var gross_value_intraday := sell_unit_price * float(intraday_amount) * (1.0 - INTRADAY_EXIT_PENALTY_RATE)
-	var gross_value_before_fees := gross_value_regular + gross_value_intraday
-	var gross_value: float = gross_value_before_fees * (1.0 - SELL_TRANSACTION_FEE_RATE)
 	cash += gross_value
 	holdings[company.ticker] = owned - amount
 	if int(holdings[company.ticker]) <= 0:
@@ -135,6 +104,82 @@ func apply_weekly_expense(amount: float, expense_multiplier: float = 1.0) -> Dic
 
 func get_holding_amount(ticker: String) -> int:
 	return int(holdings.get(ticker, 0))
+
+
+func get_intraday_unsold_amount(ticker: String, day_index: int) -> int:
+	var today_trade_amounts := _get_today_trade_amounts(ticker, day_index)
+	return maxi(0, int(today_trade_amounts.get("buy", 0)) - int(today_trade_amounts.get("sell", 0)))
+
+
+func estimate_buy_order(company: Company, requested_amount: int, price_multiplier: float = 1.0) -> Dictionary:
+	if company == null or not company.is_tradeable():
+		return {"success": false, "message": "No puedes comprar esta empresa ahora mismo."}
+	if requested_amount <= 0:
+		return {"success": false, "message": "La cantidad debe ser mayor que cero."}
+
+	var unit_price: float = company.current_price * maxf(0.1, price_multiplier)
+	var effective_buy_unit_price := unit_price * (1.0 + BUY_TRANSACTION_FEE_RATE)
+	var available_debt_capacity := maxf(0.0, MAX_TRADING_DEBT - debt)
+	var max_affordable_budget := cash + available_debt_capacity
+	if max_affordable_budget < effective_buy_unit_price:
+		return {
+			"success": false,
+			"message": "No tienes margen disponible para comprar (limite de deuda: %s)." % _money(MAX_TRADING_DEBT)
+		}
+
+	var max_affordable_amount := int(floor(max_affordable_budget / effective_buy_unit_price))
+	var final_amount := mini(requested_amount, max_affordable_amount)
+	if final_amount <= 0:
+		return {"success": false, "message": "No tienes capital suficiente para comprar esta posicion."}
+
+	var gross_total_cost: float = unit_price * float(final_amount)
+	var total_cost: float = gross_total_cost * (1.0 + BUY_TRANSACTION_FEE_RATE)
+	var fee_amount: float = total_cost - gross_total_cost
+	return {
+		"success": true,
+		"requested_amount": requested_amount,
+		"amount": final_amount,
+		"unit_price": unit_price,
+		"gross_cost": gross_total_cost,
+		"fee_amount": fee_amount,
+		"total_cost": total_cost,
+		"adjusted_by_debt_limit": final_amount < requested_amount,
+		"max_affordable_amount": max_affordable_amount
+	}
+
+
+func estimate_sell_order(company: Company, requested_amount: int, price_multiplier: float = 1.0, day_index: int = 1) -> Dictionary:
+	if company == null:
+		return {"success": false, "message": "Empresa no valida."}
+	if requested_amount <= 0:
+		return {"success": false, "message": "La cantidad debe ser mayor que cero."}
+
+	var owned := int(holdings.get(company.ticker, 0))
+	if owned < requested_amount:
+		return {"success": false, "message": "No tienes suficientes acciones para vender."}
+
+	var sell_unit_price: float = company.current_price * maxf(0.1, price_multiplier)
+	var intraday_remaining := get_intraday_unsold_amount(company.ticker, day_index)
+	var old_shares_remaining := maxi(0, owned - intraday_remaining)
+	var sell_from_old := mini(requested_amount, old_shares_remaining)
+	var intraday_amount := mini(requested_amount - sell_from_old, intraday_remaining)
+	var regular_amount := requested_amount - intraday_amount
+
+	var gross_value_regular := sell_unit_price * float(regular_amount)
+	var gross_value_intraday := sell_unit_price * float(intraday_amount) * (1.0 - INTRADAY_EXIT_PENALTY_RATE)
+	var gross_value_before_fees := gross_value_regular + gross_value_intraday
+	var net_value: float = gross_value_before_fees * (1.0 - SELL_TRANSACTION_FEE_RATE)
+	var fee_amount: float = gross_value_before_fees - net_value
+	return {
+		"success": true,
+		"amount": requested_amount,
+		"unit_price": sell_unit_price,
+		"intraday_amount": intraday_amount,
+		"regular_amount": regular_amount,
+		"gross_value_before_fees": gross_value_before_fees,
+		"fee_amount": fee_amount,
+		"net_value": net_value
+	}
 
 
 func get_trade_markers_for_ticker(ticker: String) -> Array[Dictionary]:

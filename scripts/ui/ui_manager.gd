@@ -8,6 +8,11 @@ signal return_to_menu_requested
 signal weekly_upgrade_selected(upgrade_id: String)
 signal weekly_recap_closed
 
+const WEEKLY_ACTIVITY_NOTIONAL_FLOOR := 170.0
+const WEEKLY_ACTIVITY_NOTIONAL_RATIO := 0.28
+const WEEKLY_LOW_ACTIVITY_RATIO := 0.50
+const MIN_WEEKLY_HOLDINGS_FOR_ACTIVITY := 180.0
+
 var _run_manager: RunManager
 var _player_portfolio: PlayerPortfolio
 var _market_manager: MarketManager
@@ -32,6 +37,7 @@ var _last_status_message: String = ""
 @onready var _market_rows: VBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketScroll/MarketRows
 @onready var _company_details_label: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/CompanyDetailsLabel
 @onready var _movement_reasons_label: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/MovementReasonsLabel
+@onready var _details_vbox: VBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox
 @onready var _details_logo_swatch: ColorRect = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/LogoRow/LogoSwatch
 @onready var _details_logo_text: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/LogoRow/LogoText
 @onready var _price_chart = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/PriceChart
@@ -56,11 +62,14 @@ var _last_status_message: String = ""
 @onready var _weekly_recap_body: RichTextLabel = $WeeklyRecapPanel/RecapCenter/RecapVBox/RecapBody
 @onready var _weekly_recap_continue_button: Button = $WeeklyRecapPanel/RecapCenter/RecapVBox/RecapContinueButton
 
+var _trade_preview_label: Label
+
 
 func _ready() -> void:
 	_buy_button.pressed.connect(_on_buy_button_pressed)
 	_sell_button.pressed.connect(_on_sell_button_pressed)
 	_end_day_button.pressed.connect(_on_end_day_button_pressed)
+	_quantity_input.value_changed.connect(_on_quantity_value_changed)
 	_history_button.pressed.connect(_on_history_button_pressed)
 	_news_history_button.pressed.connect(_on_news_history_button_pressed)
 	_back_to_menu_button.pressed.connect(_on_back_to_menu_pressed)
@@ -69,6 +78,7 @@ func _ready() -> void:
 	_upgrade_choice_panel.visible = false
 	_weekly_recap_panel.visible = false
 	_history_text.visible = false
+	_setup_trade_preview_label()
 	_refresh_news_panel_header()
 
 
@@ -105,6 +115,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 	_update_news_panel()
 	_update_market_table()
 	_update_selected_company_details()
+	_update_trade_preview()
 	_status_label.text = _last_status_message
 
 
@@ -186,8 +197,36 @@ func _update_header() -> void:
 	var week := _run_manager.get_week_index()
 	var holdings_value := _player_portfolio.get_holdings_value(_market_manager)
 	var net_worth := _player_portfolio.get_net_worth(_market_manager)
+	var week_start_day := ((_run_manager.days_per_week * (week - 1)) + 1)
+	var week_end_day := _run_manager.current_day
+	var weekly_notional := _player_portfolio.get_effective_trade_notional_in_day_range(week_start_day, week_end_day)
+	var raw_weekly_notional := _player_portfolio.get_trade_notional_in_day_range(week_start_day, week_end_day)
+	var weekly_target_notional := _weekly_activity_notional_target(net_worth)
+	var low_activity_threshold := weekly_target_notional * WEEKLY_LOW_ACTIVITY_RATIO
+	var traded_meaningful := _player_portfolio.has_meaningful_trade_in_day_range(week_start_day, week_end_day)
+	var full_activity := traded_meaningful and (
+		weekly_notional >= weekly_target_notional
+		or holdings_value >= MIN_WEEKLY_HOLDINGS_FOR_ACTIVITY
+	)
+	var low_activity := traded_meaningful and not full_activity and weekly_notional >= low_activity_threshold
+	var activity_label := "Nula"
+	if full_activity:
+		activity_label = "Alta"
+	elif low_activity:
+		activity_label = "Media"
+	elif traded_meaningful:
+		activity_label = "Baja"
+
 	_day_label.text = "Dia: %d/%d" % [_run_manager.current_day, _run_manager.max_days]
-	_week_label.text = "Semana: %d | Gasto semanal: %s" % [week, _money(_run_manager.weekly_expense)]
+	_week_label.text = "Semana: %d | Gasto semanal: %s\nActividad valida: %s/%s (%s)" % [
+		week,
+		_money(_run_manager.weekly_expense),
+		_money(weekly_notional),
+		_money(weekly_target_notional),
+		activity_label
+	]
+	if raw_weekly_notional > weekly_notional + 0.01:
+		_week_label.text += " | Intradia no cuenta: %s" % _money(raw_weekly_notional - weekly_notional)
 	_cash_label.text = "Dinero: %s" % _money(_player_portfolio.cash)
 	_debt_label.text = "Deuda: %s" % _money(_player_portfolio.debt)
 	_net_worth_label.text = "Patrimonio: %s (acciones %s)" % [_money(net_worth), _money(holdings_value)]
@@ -474,6 +513,10 @@ func _on_day_advanced(_day: int, _week: int) -> void:
 	refresh_all_ui()
 
 
+func _on_quantity_value_changed(_value: float) -> void:
+	refresh_all_ui()
+
+
 func _ensure_selected_company_is_valid() -> void:
 	var companies := _market_manager.get_sorted_active_companies()
 	if companies.is_empty():
@@ -533,6 +576,73 @@ func _build_company_logo_badge(company: Company, side_size: int) -> Control:
 	text_label.add_theme_color_override("font_color", Color(0.07, 0.07, 0.07, 0.95))
 	badge.add_child(text_label)
 	return badge
+
+
+func _setup_trade_preview_label() -> void:
+	_trade_preview_label = Label.new()
+	_trade_preview_label.name = "TradePreviewLabel"
+	_trade_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_trade_preview_label.text = "Selecciona una empresa para ver coste estimado de compra/venta."
+	_details_vbox.add_child(_trade_preview_label)
+	_details_vbox.move_child(_trade_preview_label, _details_vbox.get_child_count() - 3)
+
+
+func _update_trade_preview() -> void:
+	if _trade_preview_label == null:
+		return
+	if _run_manager == null or _player_portfolio == null or _market_manager == null or _upgrade_manager == null:
+		_trade_preview_label.text = ""
+		return
+	var company := _market_manager.get_company_by_ticker(_selected_ticker)
+	if company == null:
+		_trade_preview_label.text = "Selecciona una empresa para ver coste estimado de compra/venta."
+		return
+
+	var quantity := maxi(1, int(_quantity_input.value))
+	var buy_preview := _player_portfolio.estimate_buy_order(
+		company,
+		quantity,
+		_upgrade_manager.get_buy_price_multiplier()
+	)
+	var sell_preview := _player_portfolio.estimate_sell_order(
+		company,
+		quantity,
+		_upgrade_manager.get_sell_price_multiplier(),
+		_run_manager.current_day
+	)
+
+	var buy_line := ""
+	if bool(buy_preview.get("success", false)):
+		buy_line = "Compra estimada: %d x %s -> %s (comision %s)." % [
+			int(buy_preview.get("amount", quantity)),
+			_money(float(buy_preview.get("unit_price", company.current_price))),
+			_money(float(buy_preview.get("total_cost", 0.0))),
+			_money(float(buy_preview.get("fee_amount", 0.0)))
+		]
+		if bool(buy_preview.get("adjusted_by_debt_limit", false)):
+			buy_line += " Ajuste por limite de deuda."
+	else:
+		buy_line = "Compra estimada: %s" % str(buy_preview.get("message", "No disponible."))
+
+	var sell_line := ""
+	if bool(sell_preview.get("success", false)):
+		var intraday_amount := int(sell_preview.get("intraday_amount", 0))
+		sell_line = "Venta estimada: %d -> %s (comision %s)." % [
+			quantity,
+			_money(float(sell_preview.get("net_value", 0.0))),
+			_money(float(sell_preview.get("fee_amount", 0.0)))
+		]
+		if intraday_amount > 0:
+			sell_line += " %d intradia con penalizacion." % intraday_amount
+	else:
+		sell_line = "Venta estimada: %s" % str(sell_preview.get("message", "No disponible."))
+
+	_trade_preview_label.text = "%s\n%s" % [buy_line, sell_line]
+
+
+func _weekly_activity_notional_target(net_worth: float) -> float:
+	var scaled_target := maxf(0.0, net_worth) * WEEKLY_ACTIVITY_NOTIONAL_RATIO
+	return maxf(WEEKLY_ACTIVITY_NOTIONAL_FLOOR, scaled_target)
 
 
 func _money(value: float) -> String:
