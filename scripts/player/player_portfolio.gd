@@ -107,6 +107,70 @@ func get_trade_markers_for_ticker(ticker: String) -> Array[Dictionary]:
 	return markers
 
 
+func get_trade_count_in_day_range(day_start: int, day_end: int) -> int:
+	var from_day := mini(day_start, day_end)
+	var to_day := maxi(day_start, day_end)
+	var total_trades := 0
+	for ticker in trade_markers_by_ticker.keys():
+		var raw_markers: Variant = trade_markers_by_ticker[ticker]
+		if typeof(raw_markers) != TYPE_ARRAY:
+			continue
+		for marker in raw_markers:
+			if typeof(marker) != TYPE_DICTIONARY:
+				continue
+			var marker_day := int(marker.get("day", 0))
+			if marker_day < from_day or marker_day > to_day:
+				continue
+			total_trades += 1
+	return total_trades
+
+
+func has_traded_in_day_range(day_start: int, day_end: int) -> bool:
+	return get_trade_count_in_day_range(day_start, day_end) > 0
+
+
+func get_trade_notional_in_day_range(day_start: int, day_end: int) -> float:
+	var from_day := mini(day_start, day_end)
+	var to_day := maxi(day_start, day_end)
+	var notional := 0.0
+	for ticker in trade_markers_by_ticker.keys():
+		var raw_markers: Variant = trade_markers_by_ticker[ticker]
+		if typeof(raw_markers) != TYPE_ARRAY:
+			continue
+		for marker in raw_markers:
+			if typeof(marker) != TYPE_DICTIONARY:
+				continue
+			var marker_day := int(marker.get("day", 0))
+			if marker_day < from_day or marker_day > to_day:
+				continue
+			var amount := int(marker.get("amount", 0))
+			var price := float(marker.get("price", 0.0))
+			notional += float(amount) * maxf(0.0, price)
+	return notional
+
+
+func get_traded_tickers_in_day_range(day_start: int, day_end: int) -> Array[String]:
+	var from_day := mini(day_start, day_end)
+	var to_day := maxi(day_start, day_end)
+	var tickers: Array[String] = []
+	for ticker in trade_markers_by_ticker.keys():
+		var raw_markers: Variant = trade_markers_by_ticker[ticker]
+		if typeof(raw_markers) != TYPE_ARRAY:
+			continue
+		var ticker_had_trade := false
+		for marker in raw_markers:
+			if typeof(marker) != TYPE_DICTIONARY:
+				continue
+			var marker_day := int(marker.get("day", 0))
+			if marker_day < from_day or marker_day > to_day:
+				continue
+			ticker_had_trade = true
+			break
+		if ticker_had_trade:
+			tickers.append(str(ticker))
+	return tickers
+
+
 func get_holdings_value(market_manager: MarketManager) -> float:
 	var total: float = 0.0
 	for ticker in holdings.keys():
