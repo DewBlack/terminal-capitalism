@@ -3,6 +3,8 @@
         "id":  "kingmoo_server_cow",
         "title":  "Una vaca de KingMoo enfria servidores con la mirada",
         "description":  "Ganaderos y data centers celebran la nueva unidad de enfriamiento bovino.",
+        "title_template":  "{company} enfria servidores con una vaca estrategica",
+        "description_template":  "El equipo de {company} mezcla {positive_tag} con {sector} y el regulador vigila {negative_tag}.",
         "positive_tags":  [
                               "milk",
                               "animal",
@@ -33,6 +35,8 @@
         "id":  "spercond_cheese_superconductor",
         "title":  "SperCond promete superconductores de queso",
         "description":  "La empresa asegura resistencia cero a temperatura de pizza.",
+        "title_template":  "{company} promete superconductores de queso",
+        "description_template":  "{company} asegura resistencia cero y enciende {trend} entre empresas de {positive_tag}.",
         "positive_tags":  [
                               "superconductors",
                               "quantum",
@@ -63,6 +67,8 @@
         "id":  "grimburger_not_furniture",
         "title":  "GrimBurger aclara que sus hamburguesas no son muebles",
         "description":  "El regulador pide etiquetas mas claras tras demandas colectivas.",
+        "title_template":  "{company} aclara que sus productos no son muebles",
+        "description_template":  "La regulacion golpea a {company} por temas de {negative_tag} y etiquetas confusas.",
         "positive_tags":  [
                               "fast_food",
                               "meme"
@@ -95,6 +101,8 @@
         "id":  "pigeon_interdimensional",
         "title":  "Pigeon Express anuncia envios interdimensionales",
         "description":  "Las palomas desaparecen y reaparecen con paquetes premium.",
+        "title_template":  "{company} anuncia envios interdimensionales",
+        "description_template":  "{company} y {rival_company} compiten por rutas de {sector} mientras crece el {trend}.",
         "positive_tags":  [
                               "transport",
                               "animal",
@@ -125,6 +133,8 @@
         "id":  "hyperlemon_ai_lemon",
         "title":  "HyperLemon despide a su IA por comprar limones",
         "description":  "El algoritmo confundio cobertura de riesgo con limonada.",
+        "title_template":  "{company} despide a su IA por comprar limones",
+        "description_template":  "La mesa de {company} sufre ruido de {negative_tag} y foros cargados de {hot_tag}.",
         "positive_tags":  [
                               "meme"
                           ],
@@ -155,6 +165,8 @@
         "id":  "orbital_soup_orbit_can",
         "title":  "Orbital Soup pone una lata en orbita baja",
         "description":  "Sube en redes por transmision en vivo de sopa flotante.",
+        "title_template":  "{company} pone una lata en orbita baja",
+        "description_template":  "{company} se vuelve viral y arrastra a {rival_company} en un rally de {positive_tag}.",
         "positive_tags":  [
                               "space",
                               "meme",
@@ -185,6 +197,8 @@
         "id":  "babyvolt_toaster_rebellion",
         "title":  "Tostadoras BabyVolt exigen vacaciones",
         "description":  "Millones de cocinas quedan en huelga energetica domestica.",
+        "title_template":  "Tostadoras de {company} exigen vacaciones",
+        "description_template":  "{company} enfrenta caos operativo por {negative_tag} en el sector {sector}.",
         "positive_tags":  [
                               "energy",
                               "family"
@@ -215,6 +229,8 @@
         "id":  "dreamfuel_energy_vitamins",
         "title":  "DreamFuel vende vitaminas de energia emocional",
         "description":  "Prometen dos horas extra de optimismo financiero.",
+        "title_template":  "{company} vende vitaminas de energia emocional",
+        "description_template":  "El hype de {company} crece en {positive_tag}, pero aparece riesgo de {negative_tag}.",
         "positive_tags":  [
                               "pharma",
                               "energy",

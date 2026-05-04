@@ -3,6 +3,8 @@
     "id": "cyberfarm_market",
     "title": "CyberFarm abre mercado de huertos con drones vaqueros",
     "description": "Agro y tecnologia se mezclan en una feria con vacas holograficas.",
+    "title_template": "{company} abre mercado de huertos con drones vaqueros",
+    "description_template": "{company} mezcla {positive_tag} con {sector} y desata {trend} en foros de {hot_tag}.",
     "positive_tags": ["agriculture", "tech", "meme"],
     "negative_tags": ["regulation"],
     "tag_effects": {"agriculture": 0.05, "tech": 0.05, "meme": 0.03, "regulation": 0.03},
@@ -16,6 +18,8 @@
     "id": "space_canteen_contract",
     "title": "Contrato para comedores en estacion orbital",
     "description": "Nuevas licencias para repartir sopa y burger en gravedad cero.",
+    "title_template": "{company} firma contrato para comedores en estacion orbital",
+    "description_template": "{company} y {rival_company} disputan licencias de {sector} con foco en {positive_tag}.",
     "positive_tags": ["space", "fast_food", "transport"],
     "negative_tags": ["legal_risk"],
     "tag_effects": {"space": 0.07, "fast_food": 0.04, "transport": 0.04, "legal_risk": 0.03},
@@ -29,6 +33,8 @@
     "id": "food_crisis_forklift",
     "title": "Crisis de montacargas en cadena alimentaria",
     "description": "Falta de operadores dispara costos de logistica en supermercados.",
+    "title_template": "Crisis de montacargas golpea a {company}",
+    "description_template": "{company} sufre costos por {negative_tag} mientras el mercado entra en {trend}.",
     "positive_tags": ["finance"],
     "negative_tags": ["fast_food", "transport", "chaos"],
     "tag_effects": {"finance": 0.02, "transport": 0.06, "chaos": 0.05},
@@ -39,4 +45,3 @@
     "secondary_effects": ["supply_pressure"]
   }
 ]
-

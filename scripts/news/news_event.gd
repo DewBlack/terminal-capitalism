@@ -4,6 +4,8 @@ extends RefCounted
 var id: String = ""
 var title: String = ""
 var description: String = ""
+var title_template: String = ""
+var description_template: String = ""
 var positive_tags: Array[String] = []
 var negative_tags: Array[String] = []
 var tag_effects: Dictionary = {}
@@ -19,6 +21,8 @@ static func from_dict(data: Dictionary) -> NewsEvent:
 	event.id = str(data.get("id", "news_%s" % randi()))
 	event.title = str(data.get("title", "Untitled Event"))
 	event.description = str(data.get("description", ""))
+	event.title_template = str(data.get("title_template", ""))
+	event.description_template = str(data.get("description_template", ""))
 	event.positive_tags = []
 	for tag in data.get("positive_tags", []):
 		event.positive_tags.append(str(tag))
@@ -36,11 +40,17 @@ static func from_dict(data: Dictionary) -> NewsEvent:
 	return event
 
 
+func clone() -> NewsEvent:
+	return NewsEvent.from_dict(to_dict())
+
+
 func to_dict() -> Dictionary:
 	return {
 		"id": id,
 		"title": title,
 		"description": description,
+		"title_template": title_template,
+		"description_template": description_template,
 		"positive_tags": positive_tags.duplicate(),
 		"negative_tags": negative_tags.duplicate(),
 		"tag_effects": tag_effects.duplicate(true),
@@ -50,4 +60,3 @@ func to_dict() -> Dictionary:
 		"special_chances": special_chances.duplicate(true),
 		"secondary_effects": secondary_effects.duplicate()
 	}
-

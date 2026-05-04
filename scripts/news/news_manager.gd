@@ -225,8 +225,8 @@ func _market_relevance_weight(news_event: NewsEvent, active_companies: Array) ->
 			continue
 		sampled += 1
 		var company_hits := 0
-		for event_tag in event_tags:
-			if company.tags.has(event_tag):
+		for tag in event_tags:
+			if company.tags.has(tag):
 				company_hits += 1
 		if company_hits <= 0:
 			continue
