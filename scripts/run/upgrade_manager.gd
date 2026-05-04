@@ -98,29 +98,29 @@ func _build_default_upgrades() -> Array[RunUpgrade]:
 		{
 			"id": "landlord_coupon",
 			"name": "Cupon Anti-Casero",
-			"description": "Un sindicato de caseros arrepentidos te recorta gastos semanales un 20%.",
+			"description": "Un sindicato de caseros arrepentidos te recorta gastos semanales un 14%.",
 			"duration_days": 7,
-			"weekly_expense_multiplier": 0.8,
+			"weekly_expense_multiplier": 0.86,
 			"buy_price_multiplier": 1.0,
 			"sell_price_multiplier": 1.0
 		},
 		{
 			"id": "bulk_buying_bot",
 			"name": "Bot de Compra Mayorista",
-			"description": "Un script ilegal te consigue compras con descuento del 8%.",
+			"description": "Un script ilegal te consigue compras con descuento del 5%.",
 			"duration_days": 7,
 			"weekly_expense_multiplier": 1.0,
-			"buy_price_multiplier": 0.92,
+			"buy_price_multiplier": 0.95,
 			"sell_price_multiplier": 1.0
 		},
 		{
 			"id": "auction_hype_mic",
 			"name": "Microfono de Hype",
-			"description": "Tus ventas salen en prime-time absurdo y ganan +10% en ejecucion.",
+			"description": "Tus ventas salen en prime-time absurdo y ganan +7% en ejecucion.",
 			"duration_days": 7,
 			"weekly_expense_multiplier": 1.0,
 			"buy_price_multiplier": 1.0,
-			"sell_price_multiplier": 1.10
+			"sell_price_multiplier": 1.07
 		}
 	]
 

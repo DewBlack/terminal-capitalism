@@ -4,13 +4,13 @@ extends Node
 const MENU_SCENE := preload("res://scenes/ui/main_menu.tscn")
 const GAME_SCENE := preload("res://scenes/game/game_screen.tscn")
 const RUN_STARTING_CASH := 960.0
-const RUN_BASE_WEEKLY_EXPENSE := 255.0
-const INACTIVITY_WEEKLY_SURCHARGE := 100.0
-const LOW_ACTIVITY_WEEKLY_SURCHARGE := 20.0
-const WEEKLY_ACTIVITY_NOTIONAL_FLOOR := 120.0
-const WEEKLY_ACTIVITY_NOTIONAL_RATIO := 0.20
-const WEEKLY_LOW_ACTIVITY_RATIO := 0.40
-const MIN_WEEKLY_HOLDINGS_FOR_ACTIVITY := 120.0
+const RUN_BASE_WEEKLY_EXPENSE := 280.0
+const INACTIVITY_WEEKLY_SURCHARGE := 130.0
+const LOW_ACTIVITY_WEEKLY_SURCHARGE := 45.0
+const WEEKLY_ACTIVITY_NOTIONAL_FLOOR := 170.0
+const WEEKLY_ACTIVITY_NOTIONAL_RATIO := 0.28
+const WEEKLY_LOW_ACTIVITY_RATIO := 0.50
+const MIN_WEEKLY_HOLDINGS_FOR_ACTIVITY := 180.0
 const WEEKLY_RECAP_NEWS_LIMIT := 3
 
 var _content_pack_loader := ContentPackLoader.new()
@@ -170,8 +170,9 @@ func _on_end_day_requested() -> void:
 		var week_index: int = _run_manager.get_week_index()
 		var net_worth_before_expense := _player_portfolio.get_net_worth(_market_manager)
 		var grace_week := week_index == 1
-		var traded_this_week := _player_portfolio.has_traded_in_day_range(week_start_day, week_end_day)
-		var weekly_notional := _player_portfolio.get_trade_notional_in_day_range(week_start_day, week_end_day)
+		var raw_weekly_notional := _player_portfolio.get_trade_notional_in_day_range(week_start_day, week_end_day)
+		var weekly_notional := _player_portfolio.get_effective_trade_notional_in_day_range(week_start_day, week_end_day)
+		var traded_this_week := _player_portfolio.has_meaningful_trade_in_day_range(week_start_day, week_end_day)
 		var holdings_value := _player_portfolio.get_holdings_value(_market_manager)
 		var weekly_target_notional := _weekly_activity_notional_target()
 		var low_activity_threshold := weekly_target_notional * WEEKLY_LOW_ACTIVITY_RATIO
@@ -207,6 +208,11 @@ func _on_end_day_requested() -> void:
 			_money(holdings_value),
 			_money(_player_portfolio.debt)
 		])
+		if raw_weekly_notional > weekly_notional:
+			print("[DEBUG][GameManager] notional intradia excluido | bruto=%s efectivo=%s" % [
+				_money(raw_weekly_notional),
+				_money(weekly_notional)
+			])
 		var activity_label := "Nula"
 		if full_activity:
 			should_offer_weekly_upgrade = true
@@ -253,6 +259,7 @@ func _on_end_day_requested() -> void:
 			"inactivity_surcharge": inactivity_surcharge,
 			"activity_label": activity_label,
 			"weekly_notional": weekly_notional,
+			"raw_weekly_notional": raw_weekly_notional,
 			"weekly_target_notional": weekly_target_notional,
 			"holdings_value": holdings_value,
 			"grace_week": grace_week,
@@ -415,6 +422,7 @@ func _build_weekly_recap_text(recap_data: Dictionary) -> String:
 	var inactivity_surcharge := float(recap_data.get("inactivity_surcharge", 0.0))
 	var activity_label := str(recap_data.get("activity_label", "Nula"))
 	var weekly_notional := float(recap_data.get("weekly_notional", 0.0))
+	var raw_weekly_notional := float(recap_data.get("raw_weekly_notional", weekly_notional))
 	var weekly_target_notional := float(recap_data.get("weekly_target_notional", 0.0))
 	var holdings_value := float(recap_data.get("holdings_value", 0.0))
 	var grace_week := bool(recap_data.get("grace_week", false))
@@ -450,6 +458,11 @@ func _build_weekly_recap_text(recap_data: Dictionary) -> String:
 		_money(weekly_target_notional),
 		_money(holdings_value)
 	])
+	if raw_weekly_notional > weekly_notional + 0.01:
+		lines.append("Notional bruto (intradia): %s | Notional valido: %s" % [
+			_money(raw_weekly_notional),
+			_money(weekly_notional)
+		])
 	if grace_week:
 		lines.append("Semana de gracia: no aplica recargo de inactividad.")
 
