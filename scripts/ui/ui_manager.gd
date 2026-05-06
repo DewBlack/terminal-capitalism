@@ -12,6 +12,19 @@ const WEEKLY_ACTIVITY_NOTIONAL_FLOOR := 170.0
 const WEEKLY_ACTIVITY_NOTIONAL_RATIO := 0.28
 const WEEKLY_LOW_ACTIVITY_RATIO := 0.50
 const MIN_WEEKLY_HOLDINGS_FOR_ACTIVITY := 180.0
+const STATUS_MAX_CHARS := 220
+const WEEK_LABEL_MAX_CHARS := 180
+const MOVEMENT_REASONS_MAX_ITEMS := 3
+const MOVEMENT_REASON_MAX_CHARS := 88
+const EVENT_LOG_VISIBLE_MAX := 12
+const TOAST_DURATION_SEC := 3.2
+const MARKET_TAGS_VISIBLE := 3
+const MARKET_TAGS_MAX_CHARS := 24
+const COMPANY_TAGS_VISIBLE := 6
+const ROW_NAME_MIN_WIDTH := 176.0
+const ROW_PRICE_MIN_WIDTH := 84.0
+const ROW_CHANGE_MIN_WIDTH := 74.0
+const HOTKEYS_HINT := "Atajos: ↑/↓ empresa · B comprar · V vender · Enter pasar dia"
 
 var _run_manager: RunManager
 var _player_portfolio: PlayerPortfolio
@@ -23,6 +36,12 @@ var _selected_ticker: String = ""
 var _history_visible: bool = false
 var _news_history_visible: bool = false
 var _last_status_message: String = ""
+var _event_log_entries: Array[String] = []
+var _debt_feedback_snapshot: Dictionary = {}
+var _toast_queue: Array[Dictionary] = []
+var _toast_showing: bool = false
+var _toast_timer: Timer = null
+var _market_ticker_order: Array[String] = []
 
 @onready var _day_label: Label = $MainMargin/MainVBox/HeaderBar/DayLabel
 @onready var _week_label: Label = $MainMargin/MainVBox/HeaderBar/WeekLabel
@@ -30,13 +49,16 @@ var _last_status_message: String = ""
 @onready var _debt_label: Label = $MainMargin/MainVBox/HeaderBar/DebtLabel
 @onready var _net_worth_label: Label = $MainMargin/MainVBox/HeaderBar/NetWorthLabel
 @onready var _upgrade_label: Label = $MainMargin/MainVBox/HeaderBar/UpgradeLabel
+@onready var _market_title: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketTitle
+@onready var _market_header: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketHeader
+@onready var _details_title: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/DetailsTitle
 
 @onready var _news_title: Label = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsTopRow/NewsTitle
 @onready var _news_history_button: Button = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsTopRow/NewsHistoryButton
 @onready var _news_content: VBoxContainer = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsScroll/NewsContent
 @onready var _market_rows: VBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketScroll/MarketRows
-@onready var _company_details_label: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/CompanyDetailsLabel
-@onready var _movement_reasons_label: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/MovementReasonsLabel
+@onready var _company_details_label: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/CompanyDetailsScroll/CompanyDetailsLabel
+@onready var _movement_reasons_label: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/ReasonsScroll/MovementReasonsLabel
 @onready var _details_vbox: VBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox
 @onready var _details_logo_swatch: ColorRect = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/LogoRow/LogoSwatch
 @onready var _details_logo_text: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/LogoRow/LogoText
@@ -48,7 +70,19 @@ var _last_status_message: String = ""
 @onready var _buy_button: Button = $MainMargin/MainVBox/BottomPanel/BottomBar/BuyButton
 @onready var _sell_button: Button = $MainMargin/MainVBox/BottomPanel/BottomBar/SellButton
 @onready var _end_day_button: Button = $MainMargin/MainVBox/BottomPanel/BottomBar/EndDayButton
+@onready var _selection_label: Label = $MainMargin/MainVBox/BottomPanel/BottomBar/SelectionLabel
 @onready var _status_label: Label = $MainMargin/MainVBox/BottomPanel/BottomBar/StatusLabel
+@onready var _bottom_bar: HBoxContainer = $MainMargin/MainVBox/BottomPanel/BottomBar
+@onready var _news_panel: PanelContainer = $MainMargin/MainVBox/BodySplit/NewsPanel
+@onready var _market_panel: PanelContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel
+@onready var _details_panel: PanelContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel
+@onready var _feedback_panel: PanelContainer = $MainMargin/MainVBox/FeedbackPanel
+@onready var _bottom_panel: PanelContainer = $MainMargin/MainVBox/BottomPanel
+@onready var _debt_risk_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel/DebtVBox/DebtRiskLabel
+@onready var _invoice_preview_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel/DebtVBox/InvoicePreviewLabel
+@onready var _event_log_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/EventLogPanel/EventLogVBox/EventLogScroll/EventLogLabel
+@onready var _toast_panel: PanelContainer = $ToastPanel
+@onready var _toast_label: Label = $ToastPanel/ToastMargin/ToastLabel
 
 @onready var _end_run_panel: PanelContainer = $EndRunPanel
 @onready var _end_run_title: Label = $EndRunPanel/EndRunCenter/EndRunVBox/EndRunTitle
@@ -78,7 +112,12 @@ func _ready() -> void:
 	_upgrade_choice_panel.visible = false
 	_weekly_recap_panel.visible = false
 	_history_text.visible = false
+	_toast_panel.visible = false
+	set_process_unhandled_key_input(true)
+	_apply_ui_tone()
+	_setup_toast_timer()
 	_setup_trade_preview_label()
+	_apply_action_hints()
 	_refresh_news_panel_header()
 
 
@@ -115,8 +154,13 @@ func refresh_all_ui(status_message: String = "") -> void:
 	_update_news_panel()
 	_update_market_table()
 	_update_selected_company_details()
+	_update_selection_context()
 	_update_trade_preview()
-	_status_label.text = _last_status_message
+	_update_feedback_panel()
+	var compact_status := _compact_status_text(_last_status_message)
+	_status_label.text = compact_status
+	_status_label.tooltip_text = _last_status_message
+	_apply_status_tone(compact_status)
 
 
 func show_run_end(title: String, description: String) -> void:
@@ -128,6 +172,29 @@ func show_run_end(title: String, description: String) -> void:
 	_buy_button.disabled = true
 	_sell_button.disabled = true
 	_end_day_button.disabled = true
+
+
+func set_event_log_entries(entries: Array[String]) -> void:
+	_event_log_entries.clear()
+	for entry in entries:
+		_event_log_entries.append(str(entry))
+
+
+func set_debt_feedback_snapshot(snapshot: Dictionary) -> void:
+	_debt_feedback_snapshot = snapshot.duplicate(true)
+
+
+func enqueue_runtime_alerts(alerts: Array[Dictionary]) -> void:
+	for alert_data in alerts:
+		var message := str(alert_data.get("message", "")).strip_edges()
+		if message.is_empty():
+			continue
+		var severity := str(alert_data.get("severity", "info")).to_lower()
+		_toast_queue.append({
+			"message": message,
+			"severity": severity
+		})
+	_show_next_runtime_alert()
 
 
 func show_weekly_upgrade_choices(choices: Array[RunUpgrade]) -> void:
@@ -217,19 +284,27 @@ func _update_header() -> void:
 	elif traded_meaningful:
 		activity_label = "Baja"
 
-	_day_label.text = "Dia: %d/%d" % [_run_manager.current_day, _run_manager.max_days]
-	_week_label.text = "Semana: %d | Gasto semanal: %s\nActividad valida: %s/%s (%s)" % [
-		week,
-		_money(_run_manager.weekly_expense),
+	_day_label.text = "Dia %02d/%02d" % [_run_manager.current_day, _run_manager.max_days]
+	var objective_display := _run_manager.get_weekly_objective_display()
+	var objective_brief := str(objective_display.get("brief", ""))
+	var week_text := "Semana %d | Actividad %s" % [week, activity_label]
+	if not objective_brief.is_empty():
+		week_text += " | Objetivos %s" % objective_brief
+	_week_label.text = _compact_week_label(week_text)
+	_week_label.tooltip_text = "Notional valido %s / objetivo %s%s" % [
 		_money(weekly_notional),
 		_money(weekly_target_notional),
-		activity_label
+		" | intradia excluido %s" % _money(raw_weekly_notional - weekly_notional) if raw_weekly_notional > weekly_notional + 0.01 else ""
 	]
-	if raw_weekly_notional > weekly_notional + 0.01:
-		_week_label.text += " | Intradia no cuenta: %s" % _money(raw_weekly_notional - weekly_notional)
-	_cash_label.text = "Dinero: %s" % _money(_player_portfolio.cash)
-	_debt_label.text = "Deuda: %s" % _money(_player_portfolio.debt)
-	_net_worth_label.text = "Patrimonio: %s (acciones %s)" % [_money(net_worth), _money(holdings_value)]
+	_cash_label.text = "Caja %s" % _money(_player_portfolio.cash)
+	var debt_limit := float(_debt_feedback_snapshot.get("debt_limit", 1000.0))
+	var debt_usage := (_player_portfolio.debt / maxf(1.0, debt_limit)) * 100.0
+	_debt_label.text = "Deuda %s / %s (%.0f%%)" % [
+		_money(_player_portfolio.debt),
+		_money(debt_limit),
+		debt_usage
+	]
+	_net_worth_label.text = "Patrimonio %s | Cartera %s" % [_money(net_worth), _money(holdings_value)]
 	_upgrade_label.text = "Mejora: %s" % _upgrade_manager.get_active_upgrade_text()
 
 
@@ -274,6 +349,7 @@ func _add_run_context_card() -> void:
 	context_lines.append("Empresas: %s" % _company_profile_text())
 	context_lines.append("Mercado: %s" % _market_profile_text())
 	context_lines.append("Noticias: %s" % _news_profile_text())
+	context_lines.append("Objetivos semana: %s" % _weekly_objective_context_text())
 	_add_news_card(
 		"Briefing de run (Dia 1)",
 		"\n".join(context_lines),
@@ -297,6 +373,29 @@ func _news_profile_text() -> String:
 	if _news_manager == null:
 		return "-"
 	return _news_manager.get_run_news_profile_text()
+
+
+func _weekly_objective_context_text() -> String:
+	if _run_manager == null:
+		return "-"
+	var objective_display := _run_manager.get_weekly_objective_display()
+	var title := str(objective_display.get("title", ""))
+	var brief := str(objective_display.get("brief", ""))
+	var lines_variant: Variant = objective_display.get("lines", [])
+	if title.is_empty() and brief.is_empty():
+		return "sin objetivos activos"
+	var context := ""
+	if not title.is_empty():
+		context += title
+	if not brief.is_empty():
+		if not context.is_empty():
+			context += " | "
+		context += brief
+	if lines_variant is Array:
+		var lines_array: Array = lines_variant
+		if not lines_array.is_empty():
+			context += " | " + str(lines_array[0])
+	return context
 
 
 func _add_news_card(title_text: String, body_text: String, title_color: Color) -> void:
@@ -329,7 +428,11 @@ func _refresh_news_panel_header() -> void:
 
 func _update_market_table() -> void:
 	_clear_container(_market_rows)
+	_market_ticker_order.clear()
 	var companies := _market_manager.get_sorted_active_companies()
+	_market_title.text = "Mercado (%d activas)" % companies.size()
+	_market_header.text = "Selecciona una empresa para operar. %s" % HOTKEYS_HINT
+	_market_header.tooltip_text = HOTKEYS_HINT
 	if companies.is_empty():
 		var empty_label := Label.new()
 		empty_label.text = "No quedan empresas cotizando."
@@ -338,14 +441,19 @@ func _update_market_table() -> void:
 
 	for row_index in range(companies.size()):
 		var company: Company = companies[row_index]
+		_market_ticker_order.append(company.ticker)
 		var row_card := PanelContainer.new()
 		row_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var row_style := StyleBoxFlat.new()
-		row_style.bg_color = Color(0.16, 0.17, 0.20, 1.0) if row_index % 2 == 0 else Color(0.13, 0.14, 0.17, 1.0)
+		row_style.bg_color = Color(0.16, 0.17, 0.20, 0.96) if row_index % 2 == 0 else Color(0.13, 0.14, 0.17, 0.96)
 		row_style.corner_radius_top_left = 6
 		row_style.corner_radius_top_right = 6
 		row_style.corner_radius_bottom_left = 6
 		row_style.corner_radius_bottom_right = 6
+		row_style.content_margin_left = 8
+		row_style.content_margin_right = 8
+		row_style.content_margin_top = 6
+		row_style.content_margin_bottom = 6
 		if company.ticker == _selected_ticker:
 			row_style.border_width_left = 2
 			row_style.border_width_top = 2
@@ -353,48 +461,73 @@ func _update_market_table() -> void:
 			row_style.border_width_bottom = 2
 			row_style.border_color = Color(0.99, 0.80, 0.23, 1.0)
 		row_card.add_theme_stylebox_override("panel", row_style)
-		var row := HBoxContainer.new()
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_theme_constant_override("separation", 8)
-		row_card.add_child(row)
 
-		var badge := _build_company_logo_badge(company, 34)
-		row.add_child(badge)
+		var row_vbox := VBoxContainer.new()
+		row_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row_vbox.add_theme_constant_override("separation", 2)
+		row_card.add_child(row_vbox)
+
+		var top_row := HBoxContainer.new()
+		top_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		top_row.add_theme_constant_override("separation", 8)
+		row_vbox.add_child(top_row)
+
+		var badge := _build_company_logo_badge(company, 30)
+		top_row.add_child(badge)
 
 		var select_button := Button.new()
-		select_button.custom_minimum_size = Vector2(220, 0)
+		select_button.custom_minimum_size = Vector2(ROW_NAME_MIN_WIDTH, 0)
 		select_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		select_button.text = "%s (%s)" % [company.name, company.ticker]
+		select_button.text = "%s · %s" % [company.ticker, company.name]
 		select_button.flat = true
+		select_button.clip_text = true
+		select_button.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+		select_button.focus_mode = Control.FOCUS_NONE
 		if company.ticker == _selected_ticker:
 			select_button.text = "> %s" % select_button.text
-		select_button.pressed.connect(_on_company_selected.bind(company.ticker))
-		row.add_child(select_button)
+		select_button.tooltip_text = "Ver detalle de %s" % company.name
+		select_button.button_down.connect(_on_company_selected.bind(company.ticker))
+		top_row.add_child(select_button)
 
 		var price_label := Label.new()
-		price_label.custom_minimum_size = Vector2(90, 0)
+		price_label.custom_minimum_size = Vector2(ROW_PRICE_MIN_WIDTH, 0)
 		price_label.text = _money(company.current_price)
-		row.add_child(price_label)
+		price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		top_row.add_child(price_label)
 
 		var change_label := Label.new()
-		change_label.custom_minimum_size = Vector2(90, 0)
+		change_label.custom_minimum_size = Vector2(ROW_CHANGE_MIN_WIDTH, 0)
 		change_label.text = _percent(company.last_daily_change)
+		change_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		if company.last_daily_change > 0.0:
 			change_label.add_theme_color_override("font_color", Color(0.45, 0.92, 0.45))
 		elif company.last_daily_change < 0.0:
 			change_label.add_theme_color_override("font_color", Color(0.95, 0.45, 0.45))
-		row.add_child(change_label)
+		top_row.add_child(change_label)
 
-		var tags_label := Label.new()
-		tags_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		tags_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		tags_label.text = company.to_short_tag_text(4)
-		row.add_child(tags_label)
+		var bottom_info_label := Label.new()
+		bottom_info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bottom_info_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+		bottom_info_label.clip_text = true
+		var owned_amount := _player_portfolio.get_holding_amount(company.ticker)
+		var owned_value := float(owned_amount) * company.current_price
+		bottom_info_label.text = "Tags: %s | Posicion: x%d (%s)" % [
+			_truncate_text(company.to_short_tag_text(MARKET_TAGS_VISIBLE), MARKET_TAGS_MAX_CHARS),
+			owned_amount,
+			_money(owned_value)
+		]
+		bottom_info_label.tooltip_text = "Tags: %s\nPosicion: x%d (%s)" % [
+			", ".join(company.tags),
+			owned_amount,
+			_money(owned_value)
+		]
+		row_vbox.add_child(bottom_info_label)
+		_bind_company_row_click(row_card, company.ticker)
+		_bind_company_row_click(badge, company.ticker)
+		_bind_company_row_click(price_label, company.ticker)
+		_bind_company_row_click(change_label, company.ticker)
+		_bind_company_row_click(bottom_info_label, company.ticker)
 
-		var owned_label := Label.new()
-		owned_label.custom_minimum_size = Vector2(70, 0)
-		owned_label.text = "x%d" % _player_portfolio.get_holding_amount(company.ticker)
-		row.add_child(owned_label)
 		_market_rows.add_child(row_card)
 
 
@@ -404,6 +537,7 @@ func _update_selected_company_details() -> void:
 	_ensure_selected_company_is_valid()
 	var company := _market_manager.get_company_by_ticker(_selected_ticker)
 	if company == null:
+		_details_title.text = "Detalle de Empresa"
 		_company_details_label.text = "Selecciona una empresa."
 		_movement_reasons_label.text = ""
 		_history_text.text = ""
@@ -413,31 +547,39 @@ func _update_selected_company_details() -> void:
 		_price_chart.set_trade_markers([])
 		return
 
+	_details_title.text = "Detalle · %s" % company.ticker
 	_details_logo_text.text = company.logo_text
 	_details_logo_swatch.color = company.logo_color
 
+	var position_amount := _player_portfolio.get_holding_amount(company.ticker)
+	var position_value := float(position_amount) * company.current_price
+	var primary_sector := company.sectors[0] if not company.sectors.is_empty() else "sin sector"
 	var details_lines := [
-		"Nombre: %s" % company.name,
-		"Ticker: %s" % company.ticker,
-		"Precio: %s" % _money(company.current_price),
-		"Sectores: %s" % ", ".join(company.sectors),
-		"Tags: %s" % ", ".join(company.tags),
-		"Volatilidad: %.2f" % company.volatility,
-		"Reputacion: %.2f" % company.reputation,
-		"Hype: %.2f" % company.hype,
-		"Riesgo legal: %.2f" % company.legal_risk,
-		"Deuda corporativa: %.2f" % company.debt,
-		"Absurdo: %.2f" % company.absurdity
+		"%s" % company.name,
+		"Sector: %s" % primary_sector,
+		"Tags: %s" % _compact_tag_line(company.tags),
+		"Precio: %s | Cambio hoy: %s" % [_money(company.current_price), _percent(company.last_daily_change)],
+		"Tu posicion: x%d (%s)" % [position_amount, _money(position_value)],
+		"Ritmo: vol %.2f · hype %.2f · rep %.2f" % [company.volatility, company.hype, company.reputation],
+		"Riesgo: legal %.2f · deuda %.2f · absurdo %.2f" % [company.legal_risk, company.debt, company.absurdity]
 	]
 	if not company.focus_text.is_empty():
-		details_lines.append("Focus: %s" % company.focus_text)
+		details_lines.append("Narrativa: %s" % company.focus_text)
 	_company_details_label.text = "\n".join(details_lines)
 
 	if company.last_reasons.is_empty():
 		_movement_reasons_label.text = "Sin razones de movimiento registradas hoy."
+		_movement_reasons_label.tooltip_text = ""
 	else:
-		var reason_lines := company.last_reasons.slice(0, min(4, company.last_reasons.size()))
-		_movement_reasons_label.text = "Motivos:\n- %s" % "\n- ".join(reason_lines)
+		var visible_lines: Array[String] = []
+		var full_lines: Array[String] = []
+		var max_reasons: int = mini(MOVEMENT_REASONS_MAX_ITEMS, company.last_reasons.size())
+		for reason_index in range(max_reasons):
+			var reason_text := str(company.last_reasons[reason_index])
+			full_lines.append(reason_text)
+			visible_lines.append(_truncate_text(reason_text, MOVEMENT_REASON_MAX_CHARS))
+		_movement_reasons_label.text = "Motivos de hoy:\n- %s" % "\n- ".join(visible_lines)
+		_movement_reasons_label.tooltip_text = "Motivos completos:\n- %s" % "\n- ".join(full_lines)
 
 	_history_text.text = _build_history_text(company)
 	_history_text.visible = _history_visible
@@ -456,14 +598,16 @@ func _build_history_text(company: Company) -> String:
 
 func _on_buy_button_pressed() -> void:
 	if _selected_ticker.is_empty():
-		_status_label.text = "Selecciona una empresa para comprar."
+		_last_status_message = "Selecciona una empresa para comprar."
+		refresh_all_ui()
 		return
 	emit_signal("buy_requested", _selected_ticker, int(_quantity_input.value))
 
 
 func _on_sell_button_pressed() -> void:
 	if _selected_ticker.is_empty():
-		_status_label.text = "Selecciona una empresa para vender."
+		_last_status_message = "Selecciona una empresa para vender."
+		refresh_all_ui()
 		return
 	emit_signal("sell_requested", _selected_ticker, int(_quantity_input.value))
 
@@ -489,8 +633,30 @@ func _on_history_button_pressed() -> void:
 
 
 func _on_company_selected(ticker: String) -> void:
+	if ticker == _selected_ticker:
+		return
 	_selected_ticker = ticker
 	refresh_all_ui()
+
+
+func _bind_company_row_click(control: Control, ticker: String) -> void:
+	if control == null:
+		return
+	control.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	control.gui_input.connect(_on_company_row_gui_input.bind(ticker))
+
+
+func _on_company_row_gui_input(event: InputEvent, ticker: String) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mouse_event := event as InputEventMouseButton
+	if mouse_event == null:
+		return
+	if mouse_event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	if not mouse_event.pressed:
+		return
+	_on_company_selected(ticker)
 
 
 func _on_back_to_menu_pressed() -> void:
@@ -514,6 +680,65 @@ func _on_day_advanced(_day: int, _week: int) -> void:
 
 
 func _on_quantity_value_changed(_value: float) -> void:
+	refresh_all_ui()
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not (event is InputEventKey):
+		return
+	var key_event := event as InputEventKey
+	if key_event == null or not key_event.pressed or key_event.echo:
+		return
+	if _are_actions_locked():
+		return
+
+	match key_event.keycode:
+		KEY_UP:
+			_select_relative_company(-1)
+			accept_event()
+		KEY_DOWN:
+			_select_relative_company(1)
+			accept_event()
+		KEY_B:
+			if not _buy_button.disabled:
+				_on_buy_button_pressed()
+				accept_event()
+		KEY_V:
+			if not _sell_button.disabled:
+				_on_sell_button_pressed()
+				accept_event()
+		KEY_ENTER, KEY_KP_ENTER:
+			if not _end_day_button.disabled:
+				_on_end_day_button_pressed()
+				accept_event()
+		_:
+			pass
+
+
+func _select_relative_company(direction: int) -> void:
+	if direction == 0:
+		return
+	if _market_ticker_order.is_empty():
+		_update_market_table()
+	if _market_ticker_order.is_empty():
+		return
+	if _selected_ticker.is_empty():
+		_selected_ticker = _market_ticker_order[0]
+		refresh_all_ui()
+		return
+
+	var current_index := _market_ticker_order.find(_selected_ticker)
+	if current_index == -1:
+		_selected_ticker = _market_ticker_order[0]
+		refresh_all_ui()
+		return
+
+	var next_index := current_index + direction
+	if next_index < 0:
+		next_index = _market_ticker_order.size() - 1
+	elif next_index >= _market_ticker_order.size():
+		next_index = 0
+	_selected_ticker = _market_ticker_order[next_index]
 	refresh_all_ui()
 
 
@@ -541,6 +766,140 @@ func _set_action_buttons_enabled(enabled: bool) -> void:
 	_buy_button.disabled = not enabled
 	_sell_button.disabled = not enabled
 	_end_day_button.disabled = not enabled
+
+
+func _are_actions_locked() -> bool:
+	return _upgrade_choice_panel.visible or _weekly_recap_panel.visible or _end_run_panel.visible
+
+
+func _update_feedback_panel() -> void:
+	_update_debt_risk_panel()
+	_update_event_log_panel()
+
+
+func _update_debt_risk_panel() -> void:
+	if _player_portfolio == null:
+		_debt_risk_label.text = "Sin datos de deuda."
+		_invoice_preview_label.text = "Sin datos de factura semanal."
+		return
+	var debt_limit := float(_debt_feedback_snapshot.get("debt_limit", PlayerPortfolio.MAX_TRADING_DEBT))
+	var debt_value := float(_debt_feedback_snapshot.get("debt", _player_portfolio.debt))
+	var usage_ratio := float(_debt_feedback_snapshot.get("debt_usage_ratio", debt_value / maxf(1.0, debt_limit)))
+	var margin := float(_debt_feedback_snapshot.get("debt_margin", debt_limit - debt_value))
+	var risk_label := str(_debt_feedback_snapshot.get("risk_label", "Bajo"))
+	var risk_hint := str(_debt_feedback_snapshot.get("risk_hint", "Sin alertas."))
+	var margin_text := _money_with_sign(margin)
+	if margin >= 0.0:
+		margin_text = _money(margin)
+	_debt_risk_label.text = "Deuda: %s / %s | Uso: %.0f%% | Margen: %s | Riesgo: %s\n%s" % [
+		_money(debt_value),
+		_money(debt_limit),
+		usage_ratio * 100.0,
+		margin_text,
+		risk_label,
+		risk_hint
+	]
+	_debt_risk_label.remove_theme_color_override("font_color")
+	if usage_ratio >= 0.95:
+		_debt_risk_label.add_theme_color_override("font_color", Color(0.98, 0.39, 0.39))
+	elif usage_ratio >= 0.75:
+		_debt_risk_label.add_theme_color_override("font_color", Color(0.99, 0.80, 0.35))
+	else:
+		_debt_risk_label.add_theme_color_override("font_color", Color(0.73, 0.93, 0.76))
+
+	var estimated_charge := float(_debt_feedback_snapshot.get("estimated_next_weekly_charge", 0.0))
+	var base_expense := float(_debt_feedback_snapshot.get("base_weekly_expense", 0.0))
+	var estimated_surcharge := float(_debt_feedback_snapshot.get("estimated_inactivity_surcharge", 0.0))
+	var weekly_multiplier := float(_debt_feedback_snapshot.get("weekly_multiplier", 1.0))
+	var activity_label := str(_debt_feedback_snapshot.get("activity_label", "-"))
+	var grace_week := bool(_debt_feedback_snapshot.get("grace_week", false))
+	var days_until_charge := int(_debt_feedback_snapshot.get("days_until_weekly_charge", 0))
+	var charge_timing := "hoy"
+	if days_until_charge > 0:
+		charge_timing = "en %d dia(s)" % days_until_charge
+	_invoice_preview_label.text = "Factura semanal estimada: %s (%s base + %s actividad, x%.2f). Proximo cobro %s. Actividad: %s%s." % [
+		_money(estimated_charge),
+		_money(base_expense),
+		_money(estimated_surcharge),
+		weekly_multiplier,
+		charge_timing,
+		activity_label,
+		" | Semana de gracia" if grace_week else ""
+	]
+
+
+func _update_event_log_panel() -> void:
+	if _event_log_entries.is_empty():
+		_event_log_label.text = "Sin eventos importantes todavia."
+		_event_log_label.tooltip_text = ""
+		return
+	var visible_entries: Array[String] = []
+	var start_index := maxi(0, _event_log_entries.size() - EVENT_LOG_VISIBLE_MAX)
+	for index in range(_event_log_entries.size() - 1, start_index - 1, -1):
+		visible_entries.append("- %s" % _event_log_entries[index])
+	_event_log_label.text = "\n".join(visible_entries)
+	_event_log_label.tooltip_text = "\n".join(_event_log_entries)
+
+
+func _setup_toast_timer() -> void:
+	_toast_timer = Timer.new()
+	_toast_timer.one_shot = true
+	_toast_timer.wait_time = TOAST_DURATION_SEC
+	_toast_timer.timeout.connect(_on_toast_timeout)
+	add_child(_toast_timer)
+
+
+func _show_next_runtime_alert() -> void:
+	if _toast_showing:
+		return
+	if _toast_queue.is_empty():
+		_toast_panel.visible = false
+		return
+	var alert_payload: Dictionary = _toast_queue[0]
+	_toast_queue.remove_at(0)
+	var message := str(alert_payload.get("message", ""))
+	if message.is_empty():
+		_show_next_runtime_alert()
+		return
+	var severity := str(alert_payload.get("severity", "info"))
+	_apply_toast_style(severity)
+	_toast_label.text = message
+	_toast_panel.visible = true
+	_toast_showing = true
+	if _toast_timer != null:
+		_toast_timer.start(TOAST_DURATION_SEC)
+
+
+func _apply_toast_style(severity: String) -> void:
+	var normalized := severity.to_lower()
+	var background := Color(0.17, 0.22, 0.28, 0.95)
+	var font_color := Color(0.90, 0.96, 1.0, 1.0)
+	match normalized:
+		"success":
+			background = Color(0.12, 0.30, 0.19, 0.95)
+			font_color = Color(0.80, 0.97, 0.85, 1.0)
+		"warning":
+			background = Color(0.39, 0.30, 0.08, 0.95)
+			font_color = Color(1.0, 0.92, 0.62, 1.0)
+		"danger":
+			background = Color(0.36, 0.10, 0.10, 0.95)
+			font_color = Color(1.0, 0.78, 0.78, 1.0)
+		_:
+			pass
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = background
+	panel_style.corner_radius_top_left = 10
+	panel_style.corner_radius_top_right = 10
+	panel_style.corner_radius_bottom_left = 10
+	panel_style.corner_radius_bottom_right = 10
+	_toast_panel.add_theme_stylebox_override("panel", panel_style)
+	_toast_label.add_theme_color_override("font_color", font_color)
+
+
+func _on_toast_timeout() -> void:
+	_toast_showing = false
+	_toast_panel.visible = false
+	_show_next_runtime_alert()
 
 
 func _build_upgrade_details(upgrade: RunUpgrade) -> String:
@@ -573,6 +932,7 @@ func _build_company_logo_badge(company: Company, side_size: int) -> Control:
 	text_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	text_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	text_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	text_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	text_label.add_theme_color_override("font_color", Color(0.07, 0.07, 0.07, 0.95))
 	badge.add_child(text_label)
 	return badge
@@ -581,8 +941,8 @@ func _build_company_logo_badge(company: Company, side_size: int) -> Control:
 func _setup_trade_preview_label() -> void:
 	_trade_preview_label = Label.new()
 	_trade_preview_label.name = "TradePreviewLabel"
-	_trade_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_trade_preview_label.text = "Selecciona una empresa para ver coste estimado de compra/venta."
+	_trade_preview_label.clip_text = true
+	_trade_preview_label.text = "Coste estimado de operacion."
 	_details_vbox.add_child(_trade_preview_label)
 	_details_vbox.move_child(_trade_preview_label, _details_vbox.get_child_count() - 3)
 
@@ -592,10 +952,12 @@ func _update_trade_preview() -> void:
 		return
 	if _run_manager == null or _player_portfolio == null or _market_manager == null or _upgrade_manager == null:
 		_trade_preview_label.text = ""
+		_update_action_buttons_state(null, maxi(1, int(_quantity_input.value)))
 		return
 	var company := _market_manager.get_company_by_ticker(_selected_ticker)
 	if company == null:
 		_trade_preview_label.text = "Selecciona una empresa para ver coste estimado de compra/venta."
+		_update_action_buttons_state(null, maxi(1, int(_quantity_input.value)))
 		return
 
 	var quantity := maxi(1, int(_quantity_input.value))
@@ -637,7 +999,73 @@ func _update_trade_preview() -> void:
 	else:
 		sell_line = "Venta estimada: %s" % str(sell_preview.get("message", "No disponible."))
 
-	_trade_preview_label.text = "%s\n%s" % [buy_line, sell_line]
+	_trade_preview_label.text = "Preview (%s): %s | %s" % [company.ticker, buy_line, sell_line]
+	_trade_preview_label.tooltip_text = "%s\n%s" % [buy_line, sell_line]
+	_update_action_buttons_state(company, quantity, buy_preview, sell_preview)
+
+
+func _update_action_buttons_state(
+	company: Company,
+	quantity: int,
+	buy_preview: Dictionary = {},
+	sell_preview: Dictionary = {}
+) -> void:
+	var buy_text := "Comprar x%d" % quantity
+	var sell_text := "Vender x%d" % quantity
+	_buy_button.text = buy_text
+	_sell_button.text = sell_text
+	_end_day_button.text = "Pasar Dia"
+
+	if company == null:
+		_buy_button.tooltip_text = "Selecciona una empresa para comprar."
+		_sell_button.tooltip_text = "Selecciona una empresa para vender."
+		if not _are_actions_locked():
+			_buy_button.disabled = true
+			_sell_button.disabled = true
+		return
+
+	var can_buy := bool(buy_preview.get("success", false))
+	var can_sell := bool(sell_preview.get("success", false))
+
+	if can_buy:
+		_buy_button.tooltip_text = "Coste estimado: %s" % _money(float(buy_preview.get("total_cost", 0.0)))
+	else:
+		_buy_button.tooltip_text = str(buy_preview.get("message", "Compra no disponible."))
+
+	if can_sell:
+		_sell_button.tooltip_text = "Ingreso neto estimado: %s" % _money(float(sell_preview.get("net_value", 0.0)))
+	else:
+		_sell_button.tooltip_text = str(sell_preview.get("message", "Venta no disponible."))
+
+	if _are_actions_locked():
+		return
+	_buy_button.disabled = not can_buy
+	_sell_button.disabled = not can_sell
+
+
+func _update_selection_context() -> void:
+	if _selection_label == null:
+		return
+	if _selected_ticker.is_empty():
+		_selection_label.text = "Selecciona una empresa para operar."
+		_selection_label.tooltip_text = HOTKEYS_HINT
+		return
+	var company := _market_manager.get_company_by_ticker(_selected_ticker)
+	if company == null:
+		_selection_label.text = "Selecciona una empresa para operar."
+		_selection_label.tooltip_text = HOTKEYS_HINT
+		return
+	var amount := _player_portfolio.get_holding_amount(company.ticker)
+	var value := float(amount) * company.current_price
+	var summary := "%s | %s | %s hoy | Pos x%d (%s)" % [
+		company.ticker,
+		_money(company.current_price),
+		_percent(company.last_daily_change),
+		amount,
+		_money(value)
+	]
+	_selection_label.text = summary
+	_selection_label.tooltip_text = "Empresa seleccionada: %s\n%s\n%s" % [company.name, summary, HOTKEYS_HINT]
 
 
 func _weekly_activity_notional_target(net_worth: float) -> float:
@@ -649,5 +1077,118 @@ func _money(value: float) -> String:
 	return "$%.2f" % value
 
 
+func _money_with_sign(value: float) -> String:
+	var prefix := "+" if value >= 0.0 else ""
+	return "%s%s" % [prefix, _money(value)]
+
+
 func _percent(value: float) -> String:
 	return "%+.2f%%" % (value * 100.0)
+
+
+func _compact_status_text(raw_text: String) -> String:
+	var compact := raw_text.replace("\n", " ").strip_edges()
+	if compact.is_empty():
+		return "Listo para operar."
+	if compact.contains("."):
+		compact = compact.split(".", false, 1)[0].strip_edges() + "."
+	if compact.length() <= STATUS_MAX_CHARS:
+		return compact
+	return "%s..." % compact.substr(0, STATUS_MAX_CHARS - 3)
+
+
+func _compact_week_label(raw_text: String) -> String:
+	var compact := raw_text.replace("\n", " ").strip_edges()
+	if compact.length() <= WEEK_LABEL_MAX_CHARS:
+		return compact
+	return "%s..." % compact.substr(0, WEEK_LABEL_MAX_CHARS - 3)
+
+
+func _truncate_text(value: String, max_chars: int) -> String:
+	if max_chars <= 3:
+		return value
+	if value.length() <= max_chars:
+		return value
+	return "%s..." % value.substr(0, max_chars - 3)
+
+
+func _compact_tag_line(tags: Array[String]) -> String:
+	if tags.is_empty():
+		return "-"
+	var visible: Array[String] = []
+	var max_tags := mini(COMPANY_TAGS_VISIBLE, tags.size())
+	for idx in range(max_tags):
+		visible.append(str(tags[idx]))
+	if tags.size() <= max_tags:
+		return ", ".join(visible)
+	return "%s, +%d" % [", ".join(visible), tags.size() - max_tags]
+
+
+func _apply_ui_tone() -> void:
+	var shell_style := _build_shell_style(Color(0.10, 0.11, 0.14, 0.96), Color(0.24, 0.29, 0.36, 1.0))
+	_news_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
+	_market_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
+	_details_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
+	_feedback_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
+	_bottom_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
+
+	_market_header.add_theme_color_override("font_color", Color(0.75, 0.81, 0.88))
+	_week_label.add_theme_color_override("font_color", Color(0.90, 0.93, 0.99))
+	_upgrade_label.add_theme_color_override("font_color", Color(0.84, 0.96, 0.85))
+	_status_label.add_theme_color_override("font_color", Color(0.90, 0.96, 0.99))
+	_selection_label.add_theme_color_override("font_color", Color(0.93, 0.93, 0.84))
+	_bottom_bar.add_theme_constant_override("separation", 8)
+
+
+func _build_shell_style(background: Color, border_color: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = border_color
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.corner_radius_top_left = 10
+	style.corner_radius_top_right = 10
+	style.corner_radius_bottom_left = 10
+	style.corner_radius_bottom_right = 10
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	return style
+
+
+func _apply_action_hints() -> void:
+	_quantity_input.tooltip_text = "Cantidad de acciones para comprar o vender."
+	_end_day_button.tooltip_text = "Cierra el dia y procesa precios/noticias."
+	_selection_label.tooltip_text = "Selecciona una empresa en la tabla de mercado."
+	_market_header.tooltip_text = HOTKEYS_HINT
+
+
+func _apply_status_tone(status_text: String) -> void:
+	var color := Color(0.90, 0.96, 0.99)
+	var lowered := status_text.to_lower()
+	if (
+		lowered.contains("derrota")
+		or lowered.contains("deuda")
+		or lowered.contains("limite")
+		or lowered.contains("quiebra")
+		or lowered.contains("no puedes")
+	):
+		color = Color(0.98, 0.48, 0.48)
+	elif (
+		lowered.contains("riesgo")
+		or lowered.contains("penalizacion")
+		or lowered.contains("ajuste")
+		or lowered.contains("warning")
+	):
+		color = Color(0.99, 0.84, 0.45)
+	elif (
+		lowered.contains("compraste")
+		or lowered.contains("vendiste")
+		or lowered.contains("victoria")
+		or lowered.contains("mejora")
+	):
+		color = Color(0.77, 0.96, 0.80)
+	_status_label.add_theme_color_override("font_color", color)

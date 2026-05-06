@@ -24,14 +24,19 @@ const DEFAULT_STRATEGIES := [
 
 # Mirror de GameManager para balance masivo en modo headless.
 const RUN_STARTING_CASH := 960.0
-const RUN_BASE_WEEKLY_EXPENSE := 280.0
-const INACTIVITY_WEEKLY_SURCHARGE := 130.0
-const LOW_ACTIVITY_WEEKLY_SURCHARGE := 45.0
+const RUN_BASE_WEEKLY_EXPENSE := 260.0
+const INACTIVITY_WEEKLY_SURCHARGE := 110.0
+const LOW_ACTIVITY_WEEKLY_SURCHARGE := 35.0
 const WEEKLY_ACTIVITY_NOTIONAL_FLOOR := 170.0
 const WEEKLY_ACTIVITY_NOTIONAL_RATIO := 0.28
 const WEEKLY_LOW_ACTIVITY_RATIO := 0.50
 const MIN_WEEKLY_HOLDINGS_FOR_ACTIVITY := 180.0
 const DEBT_DEFEAT_THRESHOLD := 1000.0
+const UPGRADE_OFFER_MIN_DAYS_BETWEEN := 3
+const UPGRADE_OFFER_TRIGGER_LOOKBACK_DAYS := 2
+const UPGRADE_OFFER_REQUIRE_MARKET_TRIGGER := true
+const UPGRADE_OFFER_TRIGGER_ON_BANKRUPTCY := true
+const UPGRADE_OFFER_TRIGGER_ON_MERGER := true
 
 
 func _initialize() -> void:
@@ -169,11 +174,12 @@ func _simulate_run(
 
 		var active_companies := market_manager.get_active_companies()
 		var effective_news := news_manager.roll_daily_news(day_index, active_companies)
-		market_manager.apply_day_events(effective_news, day_index)
+		var market_report := market_manager.apply_day_events(effective_news, day_index)
 		days_simulated = day_index
 
 		for strategy_name in strategy_names:
 			var strategy_state: Dictionary = strategy_states[strategy_name]
+			_register_strategy_upgrade_offer_trigger_day(strategy_state, day_index, market_report)
 			_process_weekly_economy(strategy_state, market_manager, day_index)
 			_record_strategy_day_metrics(strategy_state, market_manager)
 			_check_defeat(strategy_state, market_manager, day_index)
@@ -277,6 +283,8 @@ func _build_strategy_states(strategy_names: Array[String], seed_base: int) -> Di
 			"weeks_low_activity": 0,
 			"weeks_no_activity": 0,
 			"upgrades_taken": 0,
+			"last_upgrade_offer_day": -1000,
+			"upgrade_offer_trigger_days": [],
 			"daily_net_worths": [],
 			"daily_exposures": [],
 			"daily_hhis": [],
@@ -745,6 +753,10 @@ func _process_weekly_economy(strategy_state: Dictionary, market_manager: MarketM
 	elif low_activity:
 		should_offer_upgrade = true
 		offered_count = 2
+	if should_offer_upgrade:
+		var gate := _evaluate_strategy_upgrade_offer_gate(strategy_state, current_day)
+		if not bool(gate.get("allowed", false)):
+			should_offer_upgrade = false
 
 	if should_offer_upgrade:
 		var offered_choices := upgrade_manager.get_weekly_upgrade_choices(offered_count)
@@ -753,8 +765,71 @@ func _process_weekly_economy(strategy_state: Dictionary, market_manager: MarketM
 			var picked_upgrade := upgrade_manager.choose_weekly_upgrade(selected_id, offered_choices)
 			if picked_upgrade != null:
 				strategy_state["upgrades_taken"] = int(strategy_state["upgrades_taken"]) + 1
+				strategy_state["last_upgrade_offer_day"] = current_day
 
 	strategy_state["week_open_net_worth"] = portfolio.get_net_worth(market_manager)
+
+
+func _register_strategy_upgrade_offer_trigger_day(
+	strategy_state: Dictionary,
+	day_index: int,
+	market_report: Dictionary
+) -> void:
+	var trigger_hits := _market_report_upgrade_trigger_hits(market_report)
+	if trigger_hits <= 0:
+		return
+	var trigger_days: Array = strategy_state.get("upgrade_offer_trigger_days", [])
+	if not trigger_days.has(day_index):
+		trigger_days.append(day_index)
+	var keep_window := maxi(UPGRADE_OFFER_TRIGGER_LOOKBACK_DAYS, UPGRADE_OFFER_MIN_DAYS_BETWEEN) + 8
+	var min_day_to_keep := day_index - keep_window
+	for idx in range(trigger_days.size() - 1, -1, -1):
+		if int(trigger_days[idx]) >= min_day_to_keep:
+			continue
+		trigger_days.remove_at(idx)
+	strategy_state["upgrade_offer_trigger_days"] = trigger_days
+
+
+func _evaluate_strategy_upgrade_offer_gate(strategy_state: Dictionary, current_day: int) -> Dictionary:
+	var last_offer_day := int(strategy_state.get("last_upgrade_offer_day", -1000))
+	if UPGRADE_OFFER_MIN_DAYS_BETWEEN > 0 and last_offer_day > 0:
+		var days_since_last_offer := current_day - last_offer_day
+		if days_since_last_offer < UPGRADE_OFFER_MIN_DAYS_BETWEEN:
+			return {"allowed": false}
+	if not UPGRADE_OFFER_REQUIRE_MARKET_TRIGGER:
+		return {"allowed": true}
+	var trigger_days: Array = strategy_state.get("upgrade_offer_trigger_days", [])
+	var trigger_count := _count_recent_trigger_days(trigger_days, current_day, UPGRADE_OFFER_TRIGGER_LOOKBACK_DAYS)
+	if trigger_count <= 0:
+		return {"allowed": false}
+	return {"allowed": true}
+
+
+func _count_recent_trigger_days(trigger_days: Array, current_day: int, lookback_days: int) -> int:
+	var safe_lookback := maxi(1, lookback_days)
+	var from_day := current_day - safe_lookback + 1
+	var count := 0
+	for trigger_day_variant in trigger_days:
+		var trigger_day := int(trigger_day_variant)
+		if trigger_day < from_day or trigger_day > current_day:
+			continue
+		count += 1
+	return count
+
+
+func _market_report_upgrade_trigger_hits(market_report: Dictionary) -> int:
+	var trigger_hits := 0
+	if UPGRADE_OFFER_TRIGGER_ON_BANKRUPTCY:
+		var bankruptcies_variant: Variant = market_report.get("bankruptcies", [])
+		if bankruptcies_variant is Array:
+			var bankruptcies: Array = bankruptcies_variant
+			trigger_hits += bankruptcies.size()
+	if UPGRADE_OFFER_TRIGGER_ON_MERGER:
+		var mergers_variant: Variant = market_report.get("mergers", [])
+		if mergers_variant is Array:
+			var mergers: Array = mergers_variant
+			trigger_hits += mergers.size()
+	return trigger_hits
 
 
 func _pick_upgrade_id(strategy_name: String, offered_choices: Array[RunUpgrade]) -> String:

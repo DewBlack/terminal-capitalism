@@ -156,7 +156,7 @@ func _build_tag_affinity_weights(content_data: Dictionary) -> Dictionary:
 		graph[tag_id] = {}
 
 	var raw_sectors: Variant = content_data.get("sectors", [])
-	if typeof(raw_sectors) == TYPE_ARRAY:
+	if raw_sectors is Array:
 		for sector_item in raw_sectors:
 			if typeof(sector_item) != TYPE_DICTIONARY:
 				continue
@@ -164,7 +164,7 @@ func _build_tag_affinity_weights(content_data: Dictionary) -> Dictionary:
 			_add_group_affinity(graph, sector_tags, 1.90)
 
 	var raw_companies: Variant = content_data.get("companies", [])
-	if typeof(raw_companies) == TYPE_ARRAY:
+	if raw_companies is Array:
 		for company_item in raw_companies:
 			if typeof(company_item) != TYPE_DICTIONARY:
 				continue
@@ -172,7 +172,7 @@ func _build_tag_affinity_weights(content_data: Dictionary) -> Dictionary:
 			_add_group_affinity(graph, company_tags, 1.30)
 
 	var raw_news_events: Variant = content_data.get("news_events", [])
-	if typeof(raw_news_events) == TYPE_ARRAY:
+	if raw_news_events is Array:
 		for news_item in raw_news_events:
 			if typeof(news_item) != TYPE_DICTIONARY:
 				continue
@@ -581,7 +581,7 @@ func _to_readable_label(raw_text: String) -> String:
 func _pick_name_part(key: String, fallback: String) -> String:
 	if not _name_parts.has(key):
 		return fallback
-	if typeof(_name_parts[key]) != TYPE_ARRAY:
+	if not (_name_parts[key] is Array):
 		return fallback
 	var values: Array = _name_parts[key]
 	if values.is_empty():
@@ -591,7 +591,7 @@ func _pick_name_part(key: String, fallback: String) -> String:
 
 func _dictionary_to_string_array(raw_values: Variant) -> Array[String]:
 	var values: Array[String] = []
-	if typeof(raw_values) != TYPE_ARRAY:
+	if not (raw_values is Array):
 		return values
 	for value in raw_values:
 		values.append(str(value))

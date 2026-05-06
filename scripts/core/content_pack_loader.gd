@@ -95,7 +95,7 @@ func _merge_name_parts(base_parts: Dictionary, incoming_parts: Dictionary) -> Di
 	for key in incoming_parts.keys():
 		if not merged.has(key):
 			merged[key] = []
-		if typeof(merged[key]) != TYPE_ARRAY or typeof(incoming_parts[key]) != TYPE_ARRAY:
+		if not (merged[key] is Array) or not (incoming_parts[key] is Array):
 			continue
 		var known_values := {}
 		for value in merged[key]:
@@ -123,7 +123,7 @@ func _read_dictionary_if_exists(path: String) -> Dictionary:
 
 func _read_array(path: String) -> Array:
 	var parsed: Variant = _read_json(path)
-	if typeof(parsed) != TYPE_ARRAY:
+	if not (parsed is Array):
 		push_warning("Expected Array JSON file: %s" % path)
 		return []
 	return parsed

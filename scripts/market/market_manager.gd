@@ -91,14 +91,21 @@ func apply_day_events(news_events: Array, day_index: int) -> Dictionary:
 		var old_price := company.current_price
 		var cumulative_delta := 0.0
 		var reasons: Array[String] = []
+		var impactful_events := 0
 		for news_event in news_events:
 			var impact := _tag_effect_system.evaluate_news_impact(company, news_event)
 			var event_delta := float(impact.get("percent_change", 0.0))
 			if absf(event_delta) <= 0.0001:
 				continue
-			cumulative_delta += event_delta
+			impactful_events += 1
+			var stacking_mult := _event_stacking_multiplier(impactful_events)
+			var adjusted_delta := event_delta * stacking_mult
+			cumulative_delta += adjusted_delta
 			var compact_reason := _compact_reasons(impact.get("reasons", []))
-			reasons.append("%s -> %s" % [news_event.title, compact_reason])
+			if stacking_mult < 0.999:
+				reasons.append("%s -> %s (x%.2f por saturacion de titulares)" % [news_event.title, compact_reason, stacking_mult])
+			else:
+				reasons.append("%s -> %s" % [news_event.title, compact_reason])
 
 		var regime_delta := _market_regime_delta(company)
 		if absf(regime_delta) > 0.0001:
@@ -113,7 +120,7 @@ func apply_day_events(news_events: Array, day_index: int) -> Dictionary:
 		var noise := _tag_effect_system.market_noise(company, _rng)
 		cumulative_delta += noise
 		reasons.append("Ruido diario: %s" % _percent_text(noise))
-		cumulative_delta = clamp(cumulative_delta, -0.28, 0.28)
+		cumulative_delta = clamp(cumulative_delta, -0.22, 0.22)
 		company.apply_price_change(cumulative_delta, reasons)
 		if absf(cumulative_delta) > 0.0001:
 			print("[DEBUG][MarketManager] precio modificado | %s %s -> %s (%s)" % [
@@ -313,7 +320,7 @@ func _configure_run_regime(content_data: Dictionary) -> void:
 
 func _extract_tag_ids(raw_tags: Variant) -> Array[String]:
 	var tag_ids: Array[String] = []
-	if typeof(raw_tags) != TYPE_ARRAY:
+	if not (raw_tags is Array):
 		return tag_ids
 	for item in raw_tags:
 		if typeof(item) != TYPE_DICTIONARY:
@@ -339,7 +346,7 @@ func _market_regime_delta(company: Company) -> float:
 
 	delta += tag_push
 	delta *= (0.92 + company.volatility * 0.18)
-	return clamp(delta, -0.020, 0.020)
+	return clamp(delta, -0.016, 0.016)
 
 
 func _valuation_reversion_delta(company: Company) -> float:
@@ -350,14 +357,24 @@ func _valuation_reversion_delta(company: Company) -> float:
 	var valuation_ratio := company.current_price / anchor_price
 	var delta := 0.0
 
-	if valuation_ratio > 3.0:
-		var overheated := valuation_ratio - 3.0
-		delta -= minf(0.08, overheated * 0.012 * (1.0 + company.volatility * 0.4))
-	elif valuation_ratio < 0.55 and company.reputation > 0.35:
-		var depressed := 0.55 - valuation_ratio
-		delta += minf(0.05, depressed * 0.06 * (0.8 + company.reputation * 0.4))
+	if valuation_ratio > 2.6:
+		var overheated := valuation_ratio - 2.6
+		delta -= minf(0.11, overheated * 0.020 * (1.0 + company.volatility * 0.45))
+	elif valuation_ratio < 0.60 and company.reputation > 0.35:
+		var depressed := 0.60 - valuation_ratio
+		delta += minf(0.04, depressed * 0.05 * (0.8 + company.reputation * 0.35))
 
 	return delta
+
+
+func _event_stacking_multiplier(event_index: int) -> float:
+	if event_index <= 1:
+		return 1.0
+	if event_index == 2:
+		return 0.78
+	if event_index == 3:
+		return 0.62
+	return 0.50
 
 
 func _shuffle_string_array(values: Array[String]) -> void:

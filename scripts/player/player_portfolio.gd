@@ -186,7 +186,7 @@ func get_trade_markers_for_ticker(ticker: String) -> Array[Dictionary]:
 	if not trade_markers_by_ticker.has(ticker):
 		return []
 	var raw_markers: Variant = trade_markers_by_ticker[ticker]
-	if typeof(raw_markers) != TYPE_ARRAY:
+	if not (raw_markers is Array):
 		return []
 	var markers: Array[Dictionary] = []
 	for marker in raw_markers:
@@ -201,7 +201,7 @@ func get_trade_count_in_day_range(day_start: int, day_end: int) -> int:
 	var total_trades := 0
 	for ticker in trade_markers_by_ticker.keys():
 		var raw_markers: Variant = trade_markers_by_ticker[ticker]
-		if typeof(raw_markers) != TYPE_ARRAY:
+		if not (raw_markers is Array):
 			continue
 		for marker in raw_markers:
 			if typeof(marker) != TYPE_DICTIONARY:
@@ -227,7 +227,7 @@ func get_trade_notional_in_day_range(day_start: int, day_end: int) -> float:
 	var notional := 0.0
 	for ticker in trade_markers_by_ticker.keys():
 		var raw_markers: Variant = trade_markers_by_ticker[ticker]
-		if typeof(raw_markers) != TYPE_ARRAY:
+		if not (raw_markers is Array):
 			continue
 		for marker in raw_markers:
 			if typeof(marker) != TYPE_DICTIONARY:
@@ -248,7 +248,7 @@ func get_effective_trade_notional_in_day_range(day_start: int, day_end: int) -> 
 
 	for ticker in trade_markers_by_ticker.keys():
 		var raw_markers: Variant = trade_markers_by_ticker[ticker]
-		if typeof(raw_markers) != TYPE_ARRAY:
+		if not (raw_markers is Array):
 			continue
 		for marker in raw_markers:
 			if typeof(marker) != TYPE_DICTIONARY:
@@ -307,7 +307,7 @@ func get_traded_tickers_in_day_range(day_start: int, day_end: int) -> Array[Stri
 	var tickers: Array[String] = []
 	for ticker in trade_markers_by_ticker.keys():
 		var raw_markers: Variant = trade_markers_by_ticker[ticker]
-		if typeof(raw_markers) != TYPE_ARRAY:
+		if not (raw_markers is Array):
 			continue
 		var ticker_had_trade := false
 		for marker in raw_markers:
@@ -348,7 +348,7 @@ func _get_today_trade_amounts(ticker: String, day_index: int) -> Dictionary:
 	if ticker.is_empty() or not trade_markers_by_ticker.has(ticker):
 		return {"buy": 0, "sell": 0}
 	var raw_markers: Variant = trade_markers_by_ticker[ticker]
-	if typeof(raw_markers) != TYPE_ARRAY:
+	if not (raw_markers is Array):
 		return {"buy": 0, "sell": 0}
 	var bought_today := 0
 	var sold_today := 0
@@ -379,7 +379,7 @@ func _register_trade_marker(ticker: String, marker_type: String, day_index: int,
 		trade_markers_by_ticker[ticker] = []
 
 	var marker_list: Variant = trade_markers_by_ticker[ticker]
-	if typeof(marker_list) != TYPE_ARRAY:
+	if not (marker_list is Array):
 		trade_markers_by_ticker[ticker] = []
 		marker_list = trade_markers_by_ticker[ticker]
 

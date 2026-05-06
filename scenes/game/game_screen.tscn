@@ -33,8 +33,8 @@ theme_override_constants/separation = 8
 [node name="HeaderBar" type="GridContainer" parent="MainMargin/MainVBox"]
 layout_mode = 2
 columns = 3
-theme_override_constants/h_separation = 18
-theme_override_constants/v_separation = 6
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 4
 
 [node name="DayLabel" type="Label" parent="MainMargin/MainVBox/HeaderBar"]
 layout_mode = 2
@@ -44,6 +44,7 @@ text = "Dia: 1/30"
 [node name="WeekLabel" type="Label" parent="MainMargin/MainVBox/HeaderBar"]
 layout_mode = 2
 size_flags_horizontal = 3
+clip_text = true
 text = "Semana: 1"
 
 [node name="CashLabel" type="Label" parent="MainMargin/MainVBox/HeaderBar"]
@@ -126,7 +127,8 @@ text = "Mercado"
 
 [node name="MarketHeader" type="Label" parent="MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox"]
 layout_mode = 2
-text = "Logo | Empresa | Precio | Variacion | Tags | Acciones"
+clip_text = true
+text = "Empresas activas"
 
 [node name="MarketScroll" type="ScrollContainer" parent="MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox"]
 layout_mode = 2
@@ -167,20 +169,30 @@ theme_override_font_sizes/font_size = 18
 text = "??"
 vertical_alignment = 1
 
-[node name="CompanyDetailsLabel" type="Label" parent="MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox"]
+[node name="CompanyDetailsScroll" type="ScrollContainer" parent="MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox"]
+custom_minimum_size = Vector2(0, 90)
 layout_mode = 2
-size_flags_vertical = 3
+size_flags_vertical = 1
+
+[node name="CompanyDetailsLabel" type="Label" parent="MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/CompanyDetailsScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
 autowrap_mode = 3
 text = "Selecciona una empresa."
 
-[node name="MovementReasonsLabel" type="Label" parent="MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox"]
+[node name="ReasonsScroll" type="ScrollContainer" parent="MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox"]
+custom_minimum_size = Vector2(0, 70)
 layout_mode = 2
-size_flags_vertical = 3
+size_flags_vertical = 1
+
+[node name="MovementReasonsLabel" type="Label" parent="MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/ReasonsScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
 autowrap_mode = 3
 text = "Motivos de variacion diaria."
 
 [node name="PriceChart" type="Control" parent="MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox"]
-custom_minimum_size = Vector2(0, 160)
+custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
 size_flags_horizontal = 3
 script = ExtResource("2")
@@ -195,12 +207,77 @@ size_flags_vertical = 3
 bbcode_enabled = false
 text = ""
 
+[node name="FeedbackPanel" type="PanelContainer" parent="MainMargin/MainVBox"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+
+[node name="FeedbackSplit" type="HBoxContainer" parent="MainMargin/MainVBox/FeedbackPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="DebtPanel" type="PanelContainer" parent="MainMargin/MainVBox/FeedbackPanel/FeedbackSplit"]
+custom_minimum_size = Vector2(280, 0)
+layout_mode = 2
+size_flags_horizontal = 1
+
+[node name="DebtVBox" type="VBoxContainer" parent="MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="DebtTitle" type="Label" parent="MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel/DebtVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Riesgo de Deuda"
+
+[node name="DebtRiskLabel" type="Label" parent="MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel/DebtVBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Deuda actual, limite y margen."
+
+[node name="InvoicePreviewLabel" type="Label" parent="MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel/DebtVBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Factura semanal estimada."
+
+[node name="EventLogPanel" type="PanelContainer" parent="MainMargin/MainVBox/FeedbackPanel/FeedbackSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="EventLogVBox" type="VBoxContainer" parent="MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/EventLogPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="EventLogTitle" type="Label" parent="MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/EventLogPanel/EventLogVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Bitacora de Eventos"
+
+[node name="EventLogScroll" type="ScrollContainer" parent="MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/EventLogPanel/EventLogVBox"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="EventLogLabel" type="Label" parent="MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/EventLogPanel/EventLogVBox/EventLogScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+autowrap_mode = 3
+text = "Sin eventos importantes todavia."
+
 [node name="BottomPanel" type="PanelContainer" parent="MainMargin/MainVBox"]
 layout_mode = 2
 
 [node name="BottomBar" type="HBoxContainer" parent="MainMargin/MainVBox/BottomPanel"]
 layout_mode = 2
-theme_override_constants/separation = 10
+alignment = 0
+theme_override_constants/separation = 8
+
+[node name="SelectionLabel" type="Label" parent="MainMargin/MainVBox/BottomPanel/BottomBar"]
+layout_mode = 2
+custom_minimum_size = Vector2(220, 0)
+size_flags_horizontal = 1
+clip_text = true
+text = "Selecciona una empresa."
 
 [node name="QtyLabel" type="Label" parent="MainMargin/MainVBox/BottomPanel/BottomBar"]
 layout_mode = 2
@@ -227,9 +304,36 @@ text = "Pasar Dia"
 
 [node name="StatusLabel" type="Label" parent="MainMargin/MainVBox/BottomPanel/BottomBar"]
 layout_mode = 2
+custom_minimum_size = Vector2(300, 0)
 size_flags_horizontal = 3
-autowrap_mode = 3
+size_flags_vertical = 1
+clip_text = true
 text = "Estado de la run."
+
+[node name="ToastPanel" type="PanelContainer" parent="."]
+visible = false
+custom_minimum_size = Vector2(340, 0)
+layout_mode = 1
+anchors_preset = 10
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -360.0
+offset_top = 10.0
+offset_right = -14.0
+offset_bottom = 110.0
+grow_horizontal = 0
+
+[node name="ToastMargin" type="MarginContainer" parent="ToastPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="ToastLabel" type="Label" parent="ToastPanel/ToastMargin"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Alerta"
 
 [node name="EndRunPanel" type="PanelContainer" parent="."]
 visible = false
@@ -297,7 +401,7 @@ text = "Selecciona una mejora para los proximos dias."
 
 [node name="UpgradeOptions" type="VBoxContainer" parent="UpgradeChoicePanel/UpgradeCenter/UpgradeVBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(520, 0)
+custom_minimum_size = Vector2(420, 0)
 theme_override_constants/separation = 8
 
 [node name="UpgradeHint" type="Label" parent="UpgradeChoicePanel/UpgradeCenter/UpgradeVBox"]
@@ -321,7 +425,7 @@ layout_mode = 2
 
 [node name="RecapVBox" type="VBoxContainer" parent="WeeklyRecapPanel/RecapCenter"]
 layout_mode = 2
-custom_minimum_size = Vector2(600, 0)
+custom_minimum_size = Vector2(480, 0)
 theme_override_constants/separation = 10
 
 [node name="RecapTitle" type="Label" parent="WeeklyRecapPanel/RecapCenter/RecapVBox"]
@@ -334,6 +438,7 @@ text = "Resumen Semanal"
 layout_mode = 2
 size_flags_vertical = 3
 custom_minimum_size = Vector2(0, 280)
+autowrap_mode = 3
 bbcode_enabled = false
 text = ""
 

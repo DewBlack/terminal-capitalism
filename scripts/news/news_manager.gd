@@ -4,6 +4,10 @@ extends Node
 signal daily_news_generated(new_headlines: Array, effective_events: Array)
 
 const MAX_NEWS_HISTORY_ENTRIES := 180
+const DAILY_FOCUS_MAX_TAGS := 6
+const DAILY_FOCUS_ARC_BONUS := 1.35
+const DAILY_FOCUS_CONTINUITY_BONUS := 1.22
+const DAILY_FOCUS_MISS_PENALTY := 0.84
 
 var _rng := RandomNumberGenerator.new()
 var _news_pool: Array[NewsEvent] = []
@@ -56,7 +60,14 @@ func roll_daily_news(day_index: int, active_companies: Array) -> Array[NewsEvent
 	latest_headlines.clear()
 	latest_effective_events.clear()
 
-	var new_event_count := _rng.randi_range(1, 3)
+	# Peso de titulares para reducir dias de sobrecarga narrativa:
+	# 1 titular (30%), 2 titulares (62%), 3 titulares (8%).
+	var roll := _rng.randf()
+	var new_event_count := 1
+	if roll > 0.30:
+		new_event_count = 2
+	if roll > 0.92:
+		new_event_count = 3
 	var new_events := _pick_new_events(new_event_count, active_companies)
 
 	for news_event in new_events:
@@ -146,18 +157,27 @@ func _pick_new_events(count: int, active_companies: Array) -> Array[NewsEvent]:
 	for item in _active_effects:
 		var active_event: NewsEvent = item["event"]
 		blocked_ids[active_event.id] = true
+	var daily_focus_tags := _build_daily_focus_tags()
+	var first_event := true
 
 	while selected.size() < count:
-		var candidate_template := _weighted_pick_event(blocked_ids, active_companies)
+		var candidate_template := _weighted_pick_event(blocked_ids, active_companies, daily_focus_tags, first_event)
 		if candidate_template == null:
 			break
 		var materialized := _materialize_news_event(candidate_template, active_companies)
 		selected.append(materialized)
 		blocked_ids[candidate_template.id] = true
+		_merge_daily_focus_tags(daily_focus_tags, _event_tags(candidate_template))
+		first_event = false
 	return selected
 
 
-func _weighted_pick_event(blocked_ids: Dictionary, active_companies: Array) -> NewsEvent:
+func _weighted_pick_event(
+	blocked_ids: Dictionary,
+	active_companies: Array,
+	daily_focus_tags: Array[String],
+	first_event: bool
+) -> NewsEvent:
 	var weighted_candidates: Array[Dictionary] = []
 	var total_weight := 0.0
 
@@ -173,6 +193,7 @@ func _weighted_pick_event(blocked_ids: Dictionary, active_companies: Array) -> N
 		event_weight *= _continuity_multiplier(news_event)
 		event_weight *= _event_type_fatigue_multiplier(news_event.event_type)
 		event_weight *= _recent_id_multiplier(news_event.id)
+		event_weight *= _daily_focus_multiplier(news_event, daily_focus_tags, first_event)
 		if market_relevance <= 0.05 and not active_companies.is_empty():
 			event_weight *= 0.55
 		if event_weight <= 0.0:
@@ -190,6 +211,55 @@ func _weighted_pick_event(blocked_ids: Dictionary, active_companies: Array) -> N
 		if roll <= running:
 			return candidate["event"]
 	return weighted_candidates.back()["event"]
+
+
+func _build_daily_focus_tags() -> Array[String]:
+	var focus_tags: Array[String] = []
+	_merge_daily_focus_tags(focus_tags, _run_story_arc_tags)
+	_merge_daily_focus_tags(focus_tags, _run_hot_tags)
+	_merge_daily_focus_tags(focus_tags, _recent_story_tags.slice(0, 3))
+	return focus_tags
+
+
+func _merge_daily_focus_tags(target: Array[String], source: Array[String]) -> void:
+	if source.is_empty():
+		return
+	for tag_id in source:
+		var normalized := str(tag_id)
+		if normalized.is_empty():
+			continue
+		if target.has(normalized):
+			continue
+		target.append(normalized)
+		if target.size() >= DAILY_FOCUS_MAX_TAGS:
+			return
+
+
+func _daily_focus_multiplier(news_event: NewsEvent, daily_focus_tags: Array[String], first_event: bool) -> float:
+	var event_tags := _event_tags(news_event)
+	if event_tags.is_empty():
+		return 0.92 if first_event else 0.86
+
+	var arc_hits := 0
+	for arc_tag in _run_story_arc_tags:
+		if event_tags.has(arc_tag):
+			arc_hits += 1
+
+	var focus_hits := 0
+	for focus_tag in daily_focus_tags:
+		if event_tags.has(focus_tag):
+			focus_hits += 1
+
+	if first_event:
+		if arc_hits > 0:
+			return clamp(DAILY_FOCUS_ARC_BONUS + float(arc_hits - 1) * 0.12, 1.0, 1.8)
+		if focus_hits > 0:
+			return clamp(DAILY_FOCUS_CONTINUITY_BONUS + float(focus_hits - 1) * 0.10, 1.0, 1.6)
+		return 0.96
+
+	if focus_hits > 0:
+		return clamp(DAILY_FOCUS_CONTINUITY_BONUS + float(focus_hits - 1) * 0.08, 1.0, 1.55)
+	return DAILY_FOCUS_MISS_PENALTY
 
 
 func _base_weight_for_rarity(rarity: String) -> float:
@@ -329,7 +399,7 @@ func _configure_run_story_arc(content_data: Dictionary) -> void:
 func _extract_tag_ids_from_content(content_data: Dictionary) -> Array[String]:
 	var tag_ids: Array[String] = []
 	var raw_tags: Variant = content_data.get("tags", [])
-	if typeof(raw_tags) != TYPE_ARRAY:
+	if not (raw_tags is Array):
 		return tag_ids
 	for item in raw_tags:
 		if typeof(item) != TYPE_DICTIONARY:
@@ -652,7 +722,7 @@ func _pick_text(values: Array[String], fallback: String) -> String:
 
 func _dictionary_to_string_array(raw_values: Variant) -> Array[String]:
 	var values: Array[String] = []
-	if typeof(raw_values) != TYPE_ARRAY:
+	if not (raw_values is Array):
 		return values
 	for value in raw_values:
 		values.append(str(value))
@@ -695,7 +765,7 @@ func _replace_legacy_company_mentions(text: String, primary_company: Company, ri
 
 func _extract_company_mentions(raw_companies: Variant) -> Array[String]:
 	var aliases: Array[String] = []
-	if typeof(raw_companies) != TYPE_ARRAY:
+	if not (raw_companies is Array):
 		return aliases
 
 	for item in raw_companies:
