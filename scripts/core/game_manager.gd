@@ -3,6 +3,12 @@ extends Node
 
 const MENU_SCENE := preload("res://scenes/ui/main_menu.tscn")
 const GAME_SCENE := preload("res://scenes/game/game_screen.tscn")
+const TUTORIAL_MANAGER_SCRIPT := preload("res://scripts/run/tutorial_manager.gd")
+const TUTORIAL_ACTION_CONTINUE := "continue"
+const TUTORIAL_ACTION_SELECT_TICKER := "select_ticker"
+const TUTORIAL_ACTION_BUY := "buy"
+const TUTORIAL_ACTION_SELL := "sell"
+const TUTORIAL_ACTION_END_DAY := "end_day"
 const RUN_STARTING_CASH := 960.0
 const RUN_BASE_WEEKLY_EXPENSE := 260.0
 const INACTIVITY_WEEKLY_SURCHARGE := 110.0
@@ -35,6 +41,7 @@ var _upgrade_manager := UpgradeManager.new()
 var _tag_effect_system := TagEffectSystem.new()
 var _company_generator := CompanyGenerator.new()
 var _save_manager := SaveManager.new()
+var _tutorial_manager = TUTORIAL_MANAGER_SCRIPT.new()
 
 var _current_screen: Node = null
 var _game_ui: UIManager = null
@@ -52,6 +59,7 @@ var _pending_runtime_alerts: Array[Dictionary] = []
 var _last_debt_risk_label: String = ""
 var _last_upgrade_offer_day: int = -1000
 var _upgrade_offer_trigger_days: Array[int] = []
+var _is_tutorial_run: bool = false
 
 
 func _ready() -> void:
@@ -70,11 +78,13 @@ func _register_managers() -> void:
 	add_child(_tag_effect_system)
 	add_child(_company_generator)
 	add_child(_save_manager)
+	add_child(_tutorial_manager)
 
 
 func _show_main_menu() -> void:
 	_run_active = false
 	_run_ended = false
+	_is_tutorial_run = false
 	_game_ui = null
 	_pending_upgrade_choices.clear()
 	_awaiting_upgrade_choice = false
@@ -86,11 +96,15 @@ func _show_main_menu() -> void:
 	_last_debt_risk_label = ""
 	_last_upgrade_offer_day = -1000
 	_upgrade_offer_trigger_days.clear()
+	_tutorial_manager.reset_tutorial()
+	_news_manager.clear_tutorial_scripted_news()
+	_market_manager.clear_tutorial_scripted_market()
 	_run_manager.clear_weekly_objective_display()
 	_swap_screen(MENU_SCENE)
 	if _current_screen is MainMenuUI:
 		var menu: MainMenuUI = _current_screen
 		menu.start_run_requested.connect(_on_start_run_requested)
+		menu.start_tutorial_requested.connect(_on_start_tutorial_requested)
 		menu.quit_requested.connect(_on_quit_requested)
 
 
@@ -105,6 +119,8 @@ func _show_game_screen() -> void:
 		_game_ui.return_to_menu_requested.connect(_on_return_to_menu_requested)
 		_game_ui.weekly_upgrade_selected.connect(_on_weekly_upgrade_selected)
 		_game_ui.weekly_recap_closed.connect(_on_weekly_recap_closed)
+		_game_ui.company_selected.connect(_on_company_selected)
+		_game_ui.tutorial_continue_requested.connect(_on_tutorial_continue_requested)
 		_game_ui.refresh_all_ui(_last_status_message)
 
 
@@ -112,6 +128,7 @@ func _on_start_run_requested() -> void:
 	var content := _content_pack_loader.load_all_content()
 	var seed_value := randi()
 	var initial_company_count := randi_range(7, 11)
+	_is_tutorial_run = false
 	_run_active = true
 	_run_ended = false
 	_pending_upgrade_choices.clear()
@@ -122,6 +139,9 @@ func _on_start_run_requested() -> void:
 	_last_debt_risk_label = ""
 	_last_upgrade_offer_day = -1000
 	_upgrade_offer_trigger_days.clear()
+	_tutorial_manager.reset_tutorial()
+	_news_manager.clear_tutorial_scripted_news()
+	_market_manager.clear_tutorial_scripted_market()
 
 	_run_manager.reset_for_new_run(30, RUN_BASE_WEEKLY_EXPENSE)
 	_player_portfolio.reset_for_new_run(RUN_STARTING_CASH)
@@ -163,14 +183,63 @@ func _on_start_run_requested() -> void:
 	_refresh_all_ui()
 
 
+func _on_start_tutorial_requested() -> void:
+	var content := _content_pack_loader.load_all_content()
+	var tutorial_seed := 424242
+	_is_tutorial_run = true
+	_run_active = true
+	_run_ended = false
+	_pending_upgrade_choices.clear()
+	_awaiting_upgrade_choice = false
+	_awaiting_weekly_recap_ack = false
+	_event_log_entries.clear()
+	_pending_runtime_alerts.clear()
+	_last_debt_risk_label = ""
+	_last_upgrade_offer_day = -1000
+	_upgrade_offer_trigger_days.clear()
+
+	_tutorial_manager.start_tutorial()
+	_run_manager.reset_for_new_run(_tutorial_manager.get_max_days(), 0.0)
+	_player_portfolio.reset_for_new_run(_tutorial_manager.get_starting_cash())
+	_upgrade_manager.setup(tutorial_seed + 3301)
+	_company_generator.setup(content, tutorial_seed + 41)
+	_news_manager.setup(content, tutorial_seed + 77)
+	_market_manager.setup(content, _company_generator, _tag_effect_system, tutorial_seed + 123, 3)
+	_news_manager.configure_tutorial_scripted_news(_tutorial_manager.get_scripted_news_by_day())
+	_market_manager.configure_tutorial_scripted_market(_tutorial_manager.get_scripted_market_changes_by_day())
+	_market_manager.replace_companies_from_dicts(_tutorial_manager.get_tutorial_company_dicts())
+
+	_week_open_net_worth = _player_portfolio.get_net_worth(_market_manager)
+	_weekly_objective_plan.clear()
+	_run_manager.clear_weekly_objective_display()
+	_last_status_message = _tutorial_manager.get_current_step_message()
+	_append_event_log_entry("D01 | Tutorial guiado iniciado.")
+	_queue_runtime_alert("Tutorial activo: sigue los pasos resaltados.", "info")
+
+	_show_game_screen()
+	_news_manager.roll_daily_news(_run_manager.current_day, _market_manager.get_active_companies())
+	_refresh_all_ui()
+
+
 func _on_buy_requested(ticker: String, amount: int) -> void:
 	if not _run_active or _run_ended:
 		return
+	if _is_tutorial_run:
+		var tutorial_check: Dictionary = _tutorial_manager.validate_action(TUTORIAL_ACTION_BUY, ticker, amount, _run_manager.current_day)
+		if not bool(tutorial_check.get("allowed", false)):
+			_last_status_message = str(tutorial_check.get("message", "Sigue el paso actual del tutorial."))
+			_refresh_all_ui()
+			return
 	var company := _market_manager.get_company_by_ticker(ticker)
 	var multiplier := _upgrade_manager.get_buy_price_multiplier()
 	var result := _player_portfolio.buy_shares(company, amount, multiplier, _run_manager.current_day)
 	_last_status_message = str(result.get("message", "Operacion ejecutada."))
 	print("[DEBUG][GameManager] compra completada | ticker=%s cantidad=%d mensaje=%s" % [ticker, amount, _last_status_message])
+	if _is_tutorial_run and bool(result.get("success", false)):
+		var tutorial_step: Dictionary = _tutorial_manager.handle_buy_completed(ticker, amount)
+		if bool(tutorial_step.get("advanced", false)):
+			_last_status_message = str(tutorial_step.get("message", _last_status_message))
+			print("[DEBUG][GameManager][Tutorial] paso completado por compra | ticker=%s cantidad=%d" % [ticker, amount])
 	_update_weekly_objective_display()
 	_refresh_all_ui()
 
@@ -178,17 +247,31 @@ func _on_buy_requested(ticker: String, amount: int) -> void:
 func _on_sell_requested(ticker: String, amount: int) -> void:
 	if not _run_active or _run_ended:
 		return
+	if _is_tutorial_run:
+		var tutorial_check: Dictionary = _tutorial_manager.validate_action(TUTORIAL_ACTION_SELL, ticker, amount, _run_manager.current_day)
+		if not bool(tutorial_check.get("allowed", false)):
+			_last_status_message = str(tutorial_check.get("message", "Sigue el paso actual del tutorial."))
+			_refresh_all_ui()
+			return
 	var company := _market_manager.get_company_by_ticker(ticker)
 	var multiplier := _upgrade_manager.get_sell_price_multiplier()
 	var result := _player_portfolio.sell_shares(company, amount, multiplier, _run_manager.current_day)
 	_last_status_message = str(result.get("message", "Operacion ejecutada."))
 	print("[DEBUG][GameManager] venta completada | ticker=%s cantidad=%d mensaje=%s" % [ticker, amount, _last_status_message])
+	if _is_tutorial_run and bool(result.get("success", false)):
+		var tutorial_step: Dictionary = _tutorial_manager.handle_sell_completed(ticker, amount)
+		if bool(tutorial_step.get("advanced", false)):
+			_last_status_message = str(tutorial_step.get("message", _last_status_message))
+			print("[DEBUG][GameManager][Tutorial] paso completado por venta | ticker=%s cantidad=%d" % [ticker, amount])
 	_update_weekly_objective_display()
 	_refresh_all_ui()
 
 
 func _on_end_day_requested() -> void:
 	if not _run_active or _run_ended:
+		return
+	if _is_tutorial_run:
+		_process_tutorial_end_day()
 		return
 	if _awaiting_weekly_recap_ack:
 		_last_status_message = "Revisa el resumen semanal antes de continuar."
@@ -407,7 +490,52 @@ func _on_end_day_requested() -> void:
 	_refresh_all_ui()
 
 
+func _process_tutorial_end_day() -> void:
+	var tutorial_check: Dictionary = _tutorial_manager.validate_action(
+		TUTORIAL_ACTION_END_DAY,
+		"",
+		0,
+		_run_manager.current_day
+	)
+	if not bool(tutorial_check.get("allowed", false)):
+		_last_status_message = str(tutorial_check.get("message", "Sigue el paso actual del tutorial."))
+		_refresh_all_ui()
+		return
+
+	var previous_day := _run_manager.current_day
+	_upgrade_manager.tick_day()
+	_run_manager.advance_day()
+	print("[DEBUG][GameManager][Tutorial] dia avanzado | %d -> %d" % [previous_day, _run_manager.current_day])
+
+	var active_companies := _market_manager.get_active_companies()
+	var effective_news := _news_manager.roll_daily_news(_run_manager.current_day, active_companies)
+	var market_report := _market_manager.apply_day_events(effective_news, _run_manager.current_day)
+	_record_market_report_events(_run_manager.current_day, market_report)
+
+	var tutorial_step: Dictionary = _tutorial_manager.handle_end_day_completed()
+	if bool(tutorial_step.get("advanced", false)):
+		_last_status_message = str(tutorial_step.get("message", "Dia cerrado en tutorial."))
+	else:
+		_last_status_message = "Dia %d cerrado en tutorial." % _run_manager.current_day
+
+	if _tutorial_manager.is_tutorial_completed():
+		_finish_run(true, "Tutorial completado.")
+		return
+
+	if _run_manager.has_reached_run_limit():
+		_finish_run(true, "Tutorial completado por limite de dias.")
+		return
+
+	_refresh_all_ui()
+
+
 func _check_run_end_conditions() -> void:
+	if _is_tutorial_run:
+		if _tutorial_manager.is_tutorial_completed():
+			_finish_run(true, "Tutorial completado.")
+		elif _run_manager.has_reached_run_limit():
+			_finish_run(true, "Tutorial completado por limite de dias.")
+		return
 	var net_worth := _player_portfolio.get_net_worth(_market_manager)
 	if _player_portfolio.debt > 1000.0:
 		_finish_run(false, "Derrota: la deuda supero $1000.")
@@ -420,11 +548,17 @@ func _check_run_end_conditions() -> void:
 
 
 func _finish_run(victory: bool, reason: String) -> void:
+	var was_tutorial_run := _is_tutorial_run
 	_run_ended = true
 	_run_active = false
+	_is_tutorial_run = false
 	_awaiting_upgrade_choice = false
 	_awaiting_weekly_recap_ack = false
 	_pending_upgrade_choices.clear()
+	if was_tutorial_run:
+		_tutorial_manager.reset_tutorial()
+		_news_manager.clear_tutorial_scripted_news()
+		_market_manager.clear_tutorial_scripted_market()
 	_run_manager.clear_weekly_objective_display()
 	var title := "RUN COMPLETADA" if victory else "RUN PERDIDA"
 	if _game_ui != null:
@@ -458,7 +592,40 @@ func _on_return_to_menu_requested() -> void:
 	_show_main_menu()
 
 
+func _on_company_selected(ticker: String) -> void:
+	if not _is_tutorial_run or _run_ended:
+		return
+	var tutorial_result: Dictionary = _tutorial_manager.handle_company_selected(ticker)
+	if bool(tutorial_result.get("advanced", false)):
+		_last_status_message = str(tutorial_result.get("message", _last_status_message))
+		print("[DEBUG][GameManager][Tutorial] paso completado por seleccion | ticker=%s" % ticker)
+		_refresh_all_ui()
+
+
+func _on_tutorial_continue_requested() -> void:
+	if not _is_tutorial_run or _run_ended:
+		return
+	if _tutorial_manager.is_tutorial_completed():
+		_finish_run(true, "Tutorial completado.")
+		return
+	var tutorial_result: Dictionary = _tutorial_manager.handle_continue()
+	if not bool(tutorial_result.get("advanced", false)):
+		var blocked_message := str(tutorial_result.get("message", "")).strip_edges()
+		if not blocked_message.is_empty():
+			_last_status_message = blocked_message
+			_refresh_all_ui()
+		return
+	_last_status_message = str(tutorial_result.get("message", _last_status_message))
+	print("[DEBUG][GameManager][Tutorial] paso manual completado")
+	if _tutorial_manager.is_tutorial_completed():
+		_finish_run(true, "Tutorial completado.")
+		return
+	_refresh_all_ui()
+
+
 func _on_weekly_recap_closed() -> void:
+	if _is_tutorial_run:
+		return
 	if not _awaiting_weekly_recap_ack:
 		return
 	_awaiting_weekly_recap_ack = false
@@ -472,6 +639,8 @@ func _on_weekly_recap_closed() -> void:
 
 
 func _on_weekly_upgrade_selected(upgrade_id: String) -> void:
+	if _is_tutorial_run:
+		return
 	if not _awaiting_upgrade_choice:
 		return
 
@@ -496,10 +665,30 @@ func _on_quit_requested() -> void:
 func _refresh_all_ui() -> void:
 	_update_weekly_objective_display()
 	if _game_ui != null:
+		# Sincroniza primero para que refresh_all_ui use permisos tutorial actualizados
+		# (evita que "Pasar Dia" quede con estado viejo en transiciones de paso).
+		_sync_tutorial_ui_state()
 		_game_ui.set_event_log_entries(_event_log_entries)
 		_game_ui.set_debt_feedback_snapshot(_build_debt_feedback_snapshot())
 		_game_ui.refresh_all_ui(_last_status_message)
+		# Recalculo final para que el highlight use los rects ya reconstruidos.
+		_sync_tutorial_ui_state()
 		_flush_runtime_alerts()
+
+
+func _sync_tutorial_ui_state() -> void:
+	if _game_ui == null:
+		return
+	if not _is_tutorial_run:
+		_game_ui.set_tutorial_state({"active": false})
+		return
+
+	var step: Dictionary = _tutorial_manager.get_current_step()
+	var target_id := str(step.get("target", "header"))
+	var ticker_hint := str(step.get("expected_ticker", ""))
+	var highlight_rect := _game_ui.get_tutorial_target_rect(target_id, ticker_hint)
+	var state: Dictionary = _tutorial_manager.build_ui_state(highlight_rect)
+	_game_ui.set_tutorial_state(state)
 
 
 func _build_day_summary(effective_news: Array, market_report: Dictionary, expense_text: String) -> String:

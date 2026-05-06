@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# This catches `git pull --rebase`.
+if [[ "${1:-}" != "rebase" ]]; then
+  exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "${REPO_ROOT}" ]]; then
+  exit 0
+fi
+
+AUTO_SCRIPT="${REPO_ROOT}/scripts/utils/auto_deploy_itch_after_pull.sh"
+if [[ ! -x "${AUTO_SCRIPT}" ]]; then
+  exit 0
+fi
+
+"${AUTO_SCRIPT}" "post-rewrite" "$@"

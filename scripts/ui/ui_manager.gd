@@ -7,6 +7,8 @@ signal end_day_requested
 signal return_to_menu_requested
 signal weekly_upgrade_selected(upgrade_id: String)
 signal weekly_recap_closed
+signal company_selected(ticker: String)
+signal tutorial_continue_requested
 
 const WEEKLY_ACTIVITY_NOTIONAL_FLOOR := 170.0
 const WEEKLY_ACTIVITY_NOTIONAL_RATIO := 0.28
@@ -42,6 +44,8 @@ var _toast_queue: Array[Dictionary] = []
 var _toast_showing: bool = false
 var _toast_timer: Timer = null
 var _market_ticker_order: Array[String] = []
+var _company_row_controls_by_ticker: Dictionary = {}
+var _tutorial_state: Dictionary = {"active": false}
 
 @onready var _day_label: Label = $MainMargin/MainVBox/HeaderBar/DayLabel
 @onready var _week_label: Label = $MainMargin/MainVBox/HeaderBar/WeekLabel
@@ -49,6 +53,7 @@ var _market_ticker_order: Array[String] = []
 @onready var _debt_label: Label = $MainMargin/MainVBox/HeaderBar/DebtLabel
 @onready var _net_worth_label: Label = $MainMargin/MainVBox/HeaderBar/NetWorthLabel
 @onready var _upgrade_label: Label = $MainMargin/MainVBox/HeaderBar/UpgradeLabel
+@onready var _header_bar: GridContainer = $MainMargin/MainVBox/HeaderBar
 @onready var _market_title: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketTitle
 @onready var _market_header: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketHeader
 @onready var _details_title: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/DetailsTitle
@@ -83,6 +88,7 @@ var _market_ticker_order: Array[String] = []
 @onready var _event_log_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/EventLogPanel/EventLogVBox/EventLogScroll/EventLogLabel
 @onready var _toast_panel: PanelContainer = $ToastPanel
 @onready var _toast_label: Label = $ToastPanel/ToastMargin/ToastLabel
+@onready var _tutorial_overlay = $TutorialOverlay
 
 @onready var _end_run_panel: PanelContainer = $EndRunPanel
 @onready var _end_run_title: Label = $EndRunPanel/EndRunCenter/EndRunVBox/EndRunTitle
@@ -104,15 +110,19 @@ func _ready() -> void:
 	_sell_button.pressed.connect(_on_sell_button_pressed)
 	_end_day_button.pressed.connect(_on_end_day_button_pressed)
 	_quantity_input.value_changed.connect(_on_quantity_value_changed)
+	_market_panel.gui_input.connect(_on_market_panel_gui_input)
 	_history_button.pressed.connect(_on_history_button_pressed)
 	_news_history_button.pressed.connect(_on_news_history_button_pressed)
 	_back_to_menu_button.pressed.connect(_on_back_to_menu_pressed)
 	_weekly_recap_continue_button.pressed.connect(_on_weekly_recap_continue_pressed)
+	resized.connect(_on_ui_resized)
 	_end_run_panel.visible = false
 	_upgrade_choice_panel.visible = false
 	_weekly_recap_panel.visible = false
 	_history_text.visible = false
 	_toast_panel.visible = false
+	_tutorial_overlay.visible = false
+	_tutorial_overlay.continue_requested.connect(_on_tutorial_continue_pressed)
 	set_process_unhandled_key_input(true)
 	_apply_ui_tone()
 	_setup_toast_timer()
@@ -161,6 +171,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 	_status_label.text = compact_status
 	_status_label.tooltip_text = _last_status_message
 	_apply_status_tone(compact_status)
+	_apply_tutorial_visual_state()
 
 
 func show_run_end(title: String, description: String) -> void:
@@ -195,6 +206,49 @@ func enqueue_runtime_alerts(alerts: Array[Dictionary]) -> void:
 			"severity": severity
 		})
 	_show_next_runtime_alert()
+
+
+func set_tutorial_state(state: Dictionary) -> void:
+	_tutorial_state = state.duplicate(true)
+	_apply_tutorial_visual_state()
+	# Recalcula botones al cambiar de paso tutorial (ej. cuando Pasar Dia pasa de bloqueado a habilitado).
+	if _run_manager != null:
+		_update_trade_preview()
+
+
+func get_tutorial_target_rect(target_id: String, ticker_hint: String = "") -> Rect2:
+	match target_id:
+		"header":
+			return _header_bar.get_global_rect()
+		"news_panel":
+			return _news_panel.get_global_rect()
+		"market_panel":
+			return _market_panel.get_global_rect()
+		"details_panel":
+			return _details_panel.get_global_rect()
+		"bottom_panel":
+			return _bottom_panel.get_global_rect()
+		"buy_button":
+			return _buy_button.get_global_rect()
+		"sell_button":
+			return _sell_button.get_global_rect()
+		"end_day_button":
+			return _end_day_button.get_global_rect()
+		"quantity_input":
+			return _quantity_input.get_global_rect()
+		"market_row":
+			if _company_row_controls_by_ticker.has(ticker_hint):
+				var target_control := _company_row_controls_by_ticker[ticker_hint] as Control
+				if target_control != null:
+					return target_control.get_global_rect()
+			return _market_panel.get_global_rect()
+		_:
+			pass
+	return _header_bar.get_global_rect()
+
+
+func get_selected_ticker() -> String:
+	return _selected_ticker
 
 
 func show_weekly_upgrade_choices(choices: Array[RunUpgrade]) -> void:
@@ -429,6 +483,7 @@ func _refresh_news_panel_header() -> void:
 func _update_market_table() -> void:
 	_clear_container(_market_rows)
 	_market_ticker_order.clear()
+	_company_row_controls_by_ticker.clear()
 	var companies := _market_manager.get_sorted_active_companies()
 	_market_title.text = "Mercado (%d activas)" % companies.size()
 	_market_header.text = "Selecciona una empresa para operar. %s" % HOTKEYS_HINT
@@ -529,6 +584,7 @@ func _update_market_table() -> void:
 		_bind_company_row_click(bottom_info_label, company.ticker)
 
 		_market_rows.add_child(row_card)
+		_company_row_controls_by_ticker[company.ticker] = row_card
 
 
 func _update_selected_company_details() -> void:
@@ -597,6 +653,10 @@ func _build_history_text(company: Company) -> String:
 
 
 func _on_buy_button_pressed() -> void:
+	if not _tutorial_allows("allow_buy"):
+		_last_status_message = "Sigue el paso actual del tutorial."
+		refresh_all_ui()
+		return
 	if _selected_ticker.is_empty():
 		_last_status_message = "Selecciona una empresa para comprar."
 		refresh_all_ui()
@@ -605,6 +665,10 @@ func _on_buy_button_pressed() -> void:
 
 
 func _on_sell_button_pressed() -> void:
+	if not _tutorial_allows("allow_sell"):
+		_last_status_message = "Sigue el paso actual del tutorial."
+		refresh_all_ui()
+		return
 	if _selected_ticker.is_empty():
 		_last_status_message = "Selecciona una empresa para vender."
 		refresh_all_ui()
@@ -613,10 +677,18 @@ func _on_sell_button_pressed() -> void:
 
 
 func _on_end_day_button_pressed() -> void:
+	if not _tutorial_allows("allow_end_day"):
+		_last_status_message = "Sigue el paso actual del tutorial."
+		refresh_all_ui()
+		return
 	emit_signal("end_day_requested")
 
 
 func _on_news_history_button_pressed() -> void:
+	if _is_tutorial_active():
+		_last_status_message = "En tutorial, centrate en el panel de hoy."
+		refresh_all_ui()
+		return
 	_news_history_visible = not _news_history_visible
 	refresh_all_ui()
 
@@ -627,16 +699,34 @@ func _on_weekly_recap_continue_pressed() -> void:
 
 
 func _on_history_button_pressed() -> void:
+	if _is_tutorial_active():
+		_last_status_message = "Este paso del tutorial usa la vista principal."
+		refresh_all_ui()
+		return
 	_history_visible = not _history_visible
 	_history_button.text = "Ocultar historial" if _history_visible else "Ver historial"
 	refresh_all_ui()
 
 
 func _on_company_selected(ticker: String) -> void:
-	if ticker == _selected_ticker:
+	if _is_tutorial_active():
+		if not _tutorial_allows("allow_company_select"):
+			return
+		var required_ticker := _tutorial_required_ticker()
+		if not required_ticker.is_empty() and ticker != required_ticker:
+			_last_status_message = "En este paso debes seleccionar %s." % required_ticker
+			refresh_all_ui()
+			return
+	var changed_selection := ticker != _selected_ticker
+	if changed_selection:
+		_selected_ticker = ticker
+		refresh_all_ui()
+	elif _is_tutorial_active():
+		# En tutorial permitimos confirmar la seleccion aunque ya estuviera activa.
+		refresh_all_ui()
+	else:
 		return
-	_selected_ticker = ticker
-	refresh_all_ui()
+	emit_signal("company_selected", ticker)
 
 
 func _bind_company_row_click(control: Control, ticker: String) -> void:
@@ -659,12 +749,37 @@ func _on_company_row_gui_input(event: InputEvent, ticker: String) -> void:
 	_on_company_selected(ticker)
 
 
+func _on_market_panel_gui_input(event: InputEvent) -> void:
+	if not _is_tutorial_active():
+		return
+	if not _tutorial_allows("allow_company_select"):
+		return
+	if not (event is InputEventMouseButton):
+		return
+	var mouse_event := event as InputEventMouseButton
+	if mouse_event == null:
+		return
+	if mouse_event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	if not mouse_event.pressed:
+		return
+	_ensure_selected_company_is_valid()
+	if _selected_ticker.is_empty():
+		return
+	# Fallback: confirmar seleccion desde cualquier click en el panel de mercado.
+	_on_company_selected(_selected_ticker)
+
+
 func _on_back_to_menu_pressed() -> void:
 	emit_signal("return_to_menu_requested")
 
 
 func _on_upgrade_choice_pressed(upgrade_id: String) -> void:
 	emit_signal("weekly_upgrade_selected", upgrade_id)
+
+
+func _on_tutorial_continue_pressed() -> void:
+	emit_signal("tutorial_continue_requested")
 
 
 func _on_simulation_changed() -> void:
@@ -694,21 +809,25 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 	match key_event.keycode:
 		KEY_UP:
+			if not _tutorial_allows("allow_company_select"):
+				return
 			_select_relative_company(-1)
 			accept_event()
 		KEY_DOWN:
+			if not _tutorial_allows("allow_company_select"):
+				return
 			_select_relative_company(1)
 			accept_event()
 		KEY_B:
-			if not _buy_button.disabled:
+			if _tutorial_allows("allow_buy") and not _buy_button.disabled:
 				_on_buy_button_pressed()
 				accept_event()
 		KEY_V:
-			if not _sell_button.disabled:
+			if _tutorial_allows("allow_sell") and not _sell_button.disabled:
 				_on_sell_button_pressed()
 				accept_event()
 		KEY_ENTER, KEY_KP_ENTER:
-			if not _end_day_button.disabled:
+			if _tutorial_allows("allow_end_day") and not _end_day_button.disabled:
 				_on_end_day_button_pressed()
 				accept_event()
 		_:
@@ -766,6 +885,53 @@ func _set_action_buttons_enabled(enabled: bool) -> void:
 	_buy_button.disabled = not enabled
 	_sell_button.disabled = not enabled
 	_end_day_button.disabled = not enabled
+
+
+func _is_tutorial_active() -> bool:
+	return bool(_tutorial_state.get("active", false))
+
+
+func _tutorial_allows(action_key: String) -> bool:
+	if not _is_tutorial_active():
+		return true
+	return bool(_tutorial_state.get(action_key, false))
+
+
+func _tutorial_required_ticker() -> String:
+	return str(_tutorial_state.get("required_ticker", ""))
+
+
+func _apply_tutorial_visual_state() -> void:
+	if _tutorial_overlay == null:
+		return
+	if not _is_tutorial_active():
+		_tutorial_overlay.visible = false
+		_quantity_input.editable = true
+		_news_history_button.disabled = false
+		_history_button.disabled = false
+		return
+
+	var overlay_state := _tutorial_state.duplicate(true)
+	var target_id := str(overlay_state.get("target", ""))
+	var target_ticker := str(overlay_state.get("required_ticker", ""))
+	if not target_id.is_empty():
+		overlay_state["highlight_rect"] = get_tutorial_target_rect(target_id, target_ticker)
+	var highlight_rect: Variant = overlay_state.get("highlight_rect", Rect2())
+	if typeof(highlight_rect) != TYPE_RECT2:
+		overlay_state["highlight_rect"] = get_global_rect()
+		overlay_state["highlight_rect_global"] = true
+	else:
+		overlay_state["highlight_rect_global"] = true
+	_tutorial_overlay.apply_state(overlay_state)
+	_quantity_input.editable = _tutorial_allows("allow_buy") or _tutorial_allows("allow_sell")
+	_news_history_button.disabled = true
+	_history_button.disabled = true
+	if not _are_actions_locked():
+		if not _tutorial_allows("allow_buy"):
+			_buy_button.disabled = true
+		if not _tutorial_allows("allow_sell"):
+			_sell_button.disabled = true
+		_end_day_button.disabled = not _tutorial_allows("allow_end_day")
 
 
 func _are_actions_locked() -> bool:
@@ -902,6 +1068,12 @@ func _on_toast_timeout() -> void:
 	_show_next_runtime_alert()
 
 
+func _on_ui_resized() -> void:
+	if not _is_tutorial_active():
+		return
+	_apply_tutorial_visual_state()
+
+
 func _build_upgrade_details(upgrade: RunUpgrade) -> String:
 	var lines: Array[String] = []
 	lines.append(upgrade.description)
@@ -1022,6 +1194,8 @@ func _update_action_buttons_state(
 		if not _are_actions_locked():
 			_buy_button.disabled = true
 			_sell_button.disabled = true
+			if _is_tutorial_active():
+				_end_day_button.disabled = not _tutorial_allows("allow_end_day")
 		return
 
 	var can_buy := bool(buy_preview.get("success", false))
@@ -1041,6 +1215,12 @@ func _update_action_buttons_state(
 		return
 	_buy_button.disabled = not can_buy
 	_sell_button.disabled = not can_sell
+	if _is_tutorial_active():
+		if not _tutorial_allows("allow_buy"):
+			_buy_button.disabled = true
+		if not _tutorial_allows("allow_sell"):
+			_sell_button.disabled = true
+		_end_day_button.disabled = not _tutorial_allows("allow_end_day")
 
 
 func _update_selection_context() -> void:

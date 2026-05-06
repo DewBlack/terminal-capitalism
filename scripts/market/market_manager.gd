@@ -16,6 +16,8 @@ var _run_regime_label: String = "Mercado lateral"
 var _regime_base_drift: float = 0.0
 var _regime_tailwind_tags: Array[String] = []
 var _regime_headwind_tags: Array[String] = []
+var _tutorial_mode: bool = false
+var _tutorial_scripted_day_changes: Dictionary = {}
 
 
 func setup(
@@ -40,6 +42,8 @@ func setup(
 
 
 func get_run_regime_text() -> String:
+	if _tutorial_mode:
+		return "Tutorial guiado | Mercado fijo sin ruido ni eventos aleatorios."
 	var tailwind_text := ", ".join(_regime_tailwind_tags) if not _regime_tailwind_tags.is_empty() else "ninguno"
 	var headwind_text := ", ".join(_regime_headwind_tags) if not _regime_headwind_tags.is_empty() else "ninguno"
 	return "%s | Viento a favor: %s | Viento en contra: %s" % [_run_regime_label, tailwind_text, headwind_text]
@@ -81,6 +85,9 @@ func get_company_market_price(ticker: String) -> float:
 
 
 func apply_day_events(news_events: Array, day_index: int) -> Dictionary:
+	if _tutorial_mode:
+		return _apply_tutorial_day_events(day_index)
+
 	var report := {
 		"spawned": [],
 		"bankruptcies": [],
@@ -132,6 +139,71 @@ func apply_day_events(news_events: Array, day_index: int) -> Dictionary:
 
 	_process_special_events(news_events, day_index, report)
 	_process_natural_bankruptcies(report)
+	emit_signal("market_updated")
+	return report
+
+
+func configure_tutorial_scripted_market(scripted_day_changes: Dictionary) -> void:
+	_tutorial_mode = true
+	_tutorial_scripted_day_changes = scripted_day_changes.duplicate(true)
+
+
+func clear_tutorial_scripted_market() -> void:
+	_tutorial_mode = false
+	_tutorial_scripted_day_changes.clear()
+
+
+func is_tutorial_mode_enabled() -> bool:
+	return _tutorial_mode
+
+
+func replace_companies_from_dicts(raw_companies: Array) -> void:
+	companies.clear()
+	_companies_by_ticker.clear()
+	for row in raw_companies:
+		if typeof(row) != TYPE_DICTIONARY:
+			continue
+		_add_company(Company.from_dict(row))
+	emit_signal("market_updated")
+
+
+func _apply_tutorial_day_events(day_index: int) -> Dictionary:
+	var report := {
+		"spawned": [],
+		"bankruptcies": [],
+		"mergers": []
+	}
+
+	var day_changes_variant: Variant = _tutorial_scripted_day_changes.get(day_index, {})
+	var day_changes: Dictionary = {}
+	if day_changes_variant is Dictionary:
+		day_changes = day_changes_variant
+
+	for company in get_active_companies():
+		var change_row_variant: Variant = day_changes.get(company.ticker, {})
+		var change_row: Dictionary = {}
+		if change_row_variant is Dictionary:
+			change_row = change_row_variant
+
+		var delta := float(change_row.get("percent", 0.0))
+		var reasons: Array[String] = []
+		var raw_reasons: Variant = change_row.get("reasons", [])
+		if raw_reasons is Array:
+			var reasons_array: Array = raw_reasons
+			for reason in reasons_array:
+				reasons.append(str(reason))
+		if reasons.is_empty():
+			reasons.append("Sesion tutorial sin catalizadores adicionales.")
+
+		var old_price := company.current_price
+		company.apply_price_change(delta, reasons)
+		print("[DEBUG][MarketManager][Tutorial] precio modificado | %s %s -> %s (%s)" % [
+			company.ticker,
+			_money(old_price),
+			_money(company.current_price),
+			_percent_text(delta)
+		])
+
 	emit_signal("market_updated")
 	return report
 

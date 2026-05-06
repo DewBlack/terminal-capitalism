@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/ui_manager.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/price_chart.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/ui/tutorial_overlay.gd" id="3"]
 
 [node name="GameScreen" type="Control"]
 layout_mode = 3
@@ -334,6 +335,96 @@ theme_override_constants/margin_bottom = 8
 layout_mode = 2
 autowrap_mode = 3
 text = "Alerta"
+
+[node name="TutorialOverlay" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("3")
+
+[node name="TopShade" type="ColorRect" parent="TutorialOverlay"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+mouse_filter = 0
+color = Color(0, 0, 0, 0.72)
+
+[node name="LeftShade" type="ColorRect" parent="TutorialOverlay"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+mouse_filter = 0
+color = Color(0, 0, 0, 0.72)
+
+[node name="RightShade" type="ColorRect" parent="TutorialOverlay"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+mouse_filter = 0
+color = Color(0, 0, 0, 0.72)
+
+[node name="BottomShade" type="ColorRect" parent="TutorialOverlay"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+mouse_filter = 0
+color = Color(0, 0, 0, 0.72)
+
+[node name="FocusFrame" type="PanelContainer" parent="TutorialOverlay"]
+layout_mode = 0
+offset_right = 120.0
+offset_bottom = 120.0
+mouse_filter = 2
+
+[node name="CardPanel" type="PanelContainer" parent="TutorialOverlay"]
+layout_mode = 1
+anchors_preset = 10
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -270.0
+offset_top = -220.0
+offset_right = 270.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 0
+
+[node name="CardMargin" type="MarginContainer" parent="TutorialOverlay/CardPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
+
+[node name="CardVBox" type="VBoxContainer" parent="TutorialOverlay/CardPanel/CardMargin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TitleLabel" type="Label" parent="TutorialOverlay/CardPanel/CardMargin/CardVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Tutorial"
+
+[node name="BodyLabel" type="Label" parent="TutorialOverlay/CardPanel/CardMargin/CardVBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Texto del paso."
+
+[node name="HintLabel" type="Label" parent="TutorialOverlay/CardPanel/CardMargin/CardVBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Accion requerida."
+
+[node name="ContinueButton" type="Button" parent="TutorialOverlay/CardPanel/CardMargin/CardVBox"]
+layout_mode = 2
+text = "Continuar"
 
 [node name="EndRunPanel" type="PanelContainer" parent="."]
 visible = false

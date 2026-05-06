@@ -26,6 +26,8 @@ var _recent_event_ids: Array[String] = []
 var latest_headlines: Array[NewsEvent] = []
 var latest_effective_events: Array[NewsEvent] = []
 var news_history: Array[Dictionary] = []
+var _tutorial_mode: bool = false
+var _tutorial_scripted_news_by_day: Dictionary = {}
 
 
 func setup(content_data: Dictionary, seed_value: int) -> void:
@@ -57,6 +59,9 @@ func get_run_news_profile_text() -> String:
 
 
 func roll_daily_news(day_index: int, active_companies: Array) -> Array[NewsEvent]:
+	if _tutorial_mode:
+		return _roll_scripted_tutorial_news(day_index)
+
 	latest_headlines.clear()
 	latest_effective_events.clear()
 
@@ -88,6 +93,27 @@ func roll_daily_news(day_index: int, active_companies: Array) -> Array[NewsEvent
 
 	emit_signal("daily_news_generated", latest_headlines, latest_effective_events)
 	return latest_effective_events
+
+
+func configure_tutorial_scripted_news(scripted_news_by_day: Dictionary) -> void:
+	_tutorial_mode = true
+	_tutorial_scripted_news_by_day = scripted_news_by_day.duplicate(true)
+	_active_effects.clear()
+	latest_headlines.clear()
+	latest_effective_events.clear()
+	news_history.clear()
+
+
+func clear_tutorial_scripted_news() -> void:
+	_tutorial_mode = false
+	_tutorial_scripted_news_by_day.clear()
+	_active_effects.clear()
+	latest_headlines.clear()
+	latest_effective_events.clear()
+
+
+func is_tutorial_mode_enabled() -> bool:
+	return _tutorial_mode
 
 
 func get_news_history_entries(limit: int = 40) -> Array[Dictionary]:
@@ -124,6 +150,27 @@ func get_latest_news_lines() -> Array[String]:
 	for news_event in latest_headlines:
 		lines.append("%s: %s" % [news_event.title, news_event.description])
 	return lines
+
+
+func _roll_scripted_tutorial_news(day_index: int) -> Array[NewsEvent]:
+	latest_headlines.clear()
+	latest_effective_events.clear()
+
+	var scripted_rows: Array = []
+	var raw_rows: Variant = _tutorial_scripted_news_by_day.get(day_index, [])
+	if raw_rows is Array:
+		scripted_rows = raw_rows
+
+	for row in scripted_rows:
+		if typeof(row) != TYPE_DICTIONARY:
+			continue
+		var event := NewsEvent.from_dict(row)
+		latest_headlines.append(event)
+		latest_effective_events.append(event)
+
+	_append_news_history(day_index, latest_headlines)
+	emit_signal("daily_news_generated", latest_headlines, latest_effective_events)
+	return latest_effective_events
 
 
 func _append_news_history(day_index: int, events: Array[NewsEvent]) -> void:
