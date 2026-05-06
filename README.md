@@ -155,27 +155,25 @@ Proyecto en desarrollo activo. MVP jugable.
 
 ---
 
-## 11) Auto deploy local a itch.io (sin GitHub Actions)
+## 11) Deploy Web con GitHub Actions
 
-Si quieres desplegar desde tu propio equipo cada vez que haces `git pull` en `main`, sin consumir minutos/tokens de GitHub:
+El deploy a itch.io se hace por workflow de GitHub Actions (usa minutos de Actions):
 
-1. Instala hooks locales del repo:
-   - Windows PowerShell: `.\scripts\utils\install_local_hooks.ps1`
-   - Linux/macOS/Git Bash: `./scripts/utils/install_local_hooks.sh`
-2. Edita `.local/itch_deploy.env` (se crea automaticamente)
-3. Elige modo:
-   - `ITCH_DEPLOY_MODE=offline` -> solo exporta Web y genera ZIP local (sin subir)
-   - `ITCH_DEPLOY_MODE=upload` -> exporta y sube a itch.io con `butler`
-   - opcional: `SKIP_EXPORT=1` para empaquetar un export ya existente sin relanzar Godot
-4. Si usas `upload`, instala y autentica `butler`:
-   - `butler login`
-5. Si usas `upload`, define `ITCH_TARGET=usuario/juego`
+- Workflow: `.github/workflows/deploy-itch-web.yml`
+- Trigger: `push` a `main` + `workflow_dispatch`
+- Flujo: export Web (`index.html`) -> paquete -> subida con `butler`
 
-Desde ese momento, tras un pull exitoso en `main`, el hook:
-- exporta Web con `index.html`
-- empaqueta para itch
-- en modo `upload`, sube con `butler push` al canal configurado (default: `web`)
+### Secrets requeridos en GitHub
 
-Para desactivar temporalmente:
-- `TC_AUTO_DEPLOY_ITCH=0 git pull`
+- `BUTLER_API_KEY`
+- `ITCH_TARGET` (formato `usuario/juego`)
+
+---
+
+## 12) Build temporal local para probar Web
+
+Se mantiene el flujo local temporal para pruebas web:
+
+- Script: `scripts/utils/export_and_deploy_tmp_web.sh`
+- Este flujo es solo para preview local/temporal y no reemplaza el deploy de CI.
 

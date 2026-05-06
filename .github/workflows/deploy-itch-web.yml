@@ -1,0 +1,96 @@
+name: Deploy Web To Itch
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      export_mode:
+        description: "Modo de export de Godot"
+        required: false
+        default: "release"
+        type: choice
+        options:
+          - release
+          - debug
+      itch_channel:
+        description: "Canal de itch.io"
+        required: false
+        default: "web"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-itch-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.6.2
+    env:
+      DEFAULT_EXPORT_MODE: release
+      DEFAULT_ITCH_CHANNEL: web
+      WEB_EXPORT_PATH: Builds/Web/index.html
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          set -euxo pipefail
+          apt-get update
+          apt-get install -y zip rsync curl unzip
+
+      - name: Ensure scripts are executable
+        run: |
+          set -euxo pipefail
+          chmod +x scripts/utils/export_to_web.sh
+          chmod +x scripts/utils/export_and_package_itch_web.sh
+          chmod +x scripts/utils/upload_itch_web.sh
+
+      - name: Install butler
+        run: |
+          set -euxo pipefail
+          curl -fsSL https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default -o /tmp/butler.zip
+          unzip -q /tmp/butler.zip -d /usr/local/bin
+          chmod +x /usr/local/bin/butler
+          butler -V
+
+      - name: Export, package and upload to itch.io
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          ITCH_TARGET: ${{ secrets.ITCH_TARGET }}
+          INPUT_EXPORT_MODE: ${{ github.event.inputs.export_mode }}
+          INPUT_ITCH_CHANNEL: ${{ github.event.inputs.itch_channel }}
+        run: |
+          set -euxo pipefail
+
+          if [ -z "${BUTLER_API_KEY:-}" ]; then
+            echo "Missing required secret: BUTLER_API_KEY"
+            exit 1
+          fi
+
+          if [ -z "${ITCH_TARGET:-}" ]; then
+            echo "Missing required secret: ITCH_TARGET (format: usuario/juego)"
+            exit 1
+          fi
+
+          export_mode="${INPUT_EXPORT_MODE:-$DEFAULT_EXPORT_MODE}"
+          itch_channel="${INPUT_ITCH_CHANNEL:-$DEFAULT_ITCH_CHANNEL}"
+
+          EXPORT_MODE="${export_mode}" \
+          WEB_EXPORT_PATH="${WEB_EXPORT_PATH}" \
+          ./scripts/utils/upload_itch_web.sh "${ITCH_TARGET}" "${itch_channel}"
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminal-capitalism-web-itch-zip
+          path: Builds/Itch/web/terminal-capitalism-web-itch.zip
+          if-no-files-found: error
