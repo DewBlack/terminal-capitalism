@@ -1,109 +1,31 @@
-name: Deploy Web To Itch
+name: Publish to Itch.io
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
-    inputs:
-      export_mode:
-        description: "Modo de export de Godot"
-        required: false
-        default: "release"
-        type: choice
-        options:
-          - release
-          - debug
-      itch_channel:
-        description: "Canal de itch.io"
-        required: false
-        default: "web"
-        type: string
-
-permissions:
-  contents: read
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
-concurrency:
-  group: deploy-itch-web-${{ github.ref }}
-  cancel-in-progress: true
+    branches: ["master"]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    container:
-      image: barichello/godot-ci:4.6.2
-    defaults:
-      run:
-        shell: bash
-    env:
-      DEFAULT_EXPORT_MODE: release
-      DEFAULT_ITCH_CHANNEL: web
-      WEB_EXPORT_PATH: Builds/Web/index.html
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
+      - name: Checkout source code
+        uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: |
-          set -euxo pipefail
-          if command -v apt-get >/dev/null 2>&1; then
-            apt-get update
-            apt-get install -y zip rsync curl unzip
-          elif command -v apk >/dev/null 2>&1; then
-            apk add --no-cache zip rsync curl unzip
-          else
-            echo "No se detecto apt-get ni apk"
-            exit 1
-          fi
-
-      - name: Ensure scripts are executable
-        run: |
-          set -euxo pipefail
-          chmod +x scripts/utils/export_to_web.sh
-          chmod +x scripts/utils/export_and_package_itch_web.sh
-          chmod +x scripts/utils/upload_itch_web.sh
-
-      - name: Install butler
-        run: |
-          set -euxo pipefail
-          curl -fsSL https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default -o /tmp/butler.zip
-          unzip -q /tmp/butler.zip -d /usr/local/bin
-          chmod +x /usr/local/bin/butler
-          butler -V
-
-      - name: Export, package and upload to itch.io
-        env:
-          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
-          ITCH_TARGET: ${{ secrets.ITCH_TARGET }}
-          INPUT_EXPORT_MODE: ${{ github.event.inputs.export_mode }}
-          INPUT_ITCH_CHANNEL: ${{ github.event.inputs.itch_channel }}
-        run: |
-          set -euxo pipefail
-
-          if [ -z "${BUTLER_API_KEY:-}" ]; then
-            echo "Missing required secret: BUTLER_API_KEY"
-            exit 1
-          fi
-
-          if [ -z "${ITCH_TARGET:-}" ]; then
-            echo "Missing required secret: ITCH_TARGET (format: usuario/juego)"
-            exit 1
-          fi
-
-          export_mode="${INPUT_EXPORT_MODE:-$DEFAULT_EXPORT_MODE}"
-          itch_channel="${INPUT_ITCH_CHANNEL:-$DEFAULT_ITCH_CHANNEL}"
-
-          EXPORT_MODE="${export_mode}" \
-          WEB_EXPORT_PATH="${WEB_EXPORT_PATH}" \
-          ./scripts/utils/upload_itch_web.sh "${ITCH_TARGET}" "${itch_channel}"
-
-      - name: Upload ZIP artifact
-        uses: actions/upload-artifact@v4
+      - name: Godot Export
+        id: export
+        uses: firebelley/godot-export@v7.0.0
         with:
-          name: terminal-capitalism-web-itch-zip
-          path: Builds/Itch/web/terminal-capitalism-web-itch.zip
-          if-no-files-found: error
+          godot_executable_download_url: https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_linux.x86_64.zip
+          godot_export_templates_download_url: https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_export_templates.tpz
+          relative_project_path: ./
+          archive_output: true
+        env:
+          GITHUB_TOKEN: ${{secrets.GH_TOKEN}}
+      - name: Publish to Itch
+        uses: Ayowel/butler-to-itch@v1.2.0
+        with:
+          butler_key: ${{secrets.ITCHIO_TOKEN}}
+          itch_user: andreullorens
+          itch_game: capitalismo-terminal
+          version: ${{ github.ref_name }}
+          files: "${{ steps.export.outputs.archive_directory }}/export-web.zip"
