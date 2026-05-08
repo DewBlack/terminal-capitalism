@@ -9,23 +9,12 @@ const TUTORIAL_ACTION_SELECT_TICKER := "select_ticker"
 const TUTORIAL_ACTION_BUY := "buy"
 const TUTORIAL_ACTION_SELL := "sell"
 const TUTORIAL_ACTION_END_DAY := "end_day"
-const RUN_STARTING_CASH := 960.0
-const RUN_BASE_WEEKLY_EXPENSE := 260.0
-const INACTIVITY_WEEKLY_SURCHARGE := 110.0
-const LOW_ACTIVITY_WEEKLY_SURCHARGE := 35.0
-const WEEKLY_ACTIVITY_NOTIONAL_FLOOR := 170.0
-const WEEKLY_ACTIVITY_NOTIONAL_RATIO := 0.28
-const WEEKLY_LOW_ACTIVITY_RATIO := 0.50
-const MIN_WEEKLY_HOLDINGS_FOR_ACTIVITY := 180.0
+const RUN_STARTING_CASH := RunBalanceConfig.RUN_STARTING_CASH
+const RUN_BASE_WEEKLY_EXPENSE := RunBalanceConfig.RUN_BASE_WEEKLY_EXPENSE
+const INACTIVITY_WEEKLY_SURCHARGE := RunBalanceConfig.INACTIVITY_WEEKLY_SURCHARGE
+const LOW_ACTIVITY_WEEKLY_SURCHARGE := RunBalanceConfig.LOW_ACTIVITY_WEEKLY_SURCHARGE
 const WEEKLY_RECAP_NEWS_LIMIT := 3
 const EVENT_LOG_MAX_ENTRIES := 72
-const WEEKLY_OBJECTIVE_NOTIONAL_RATIO_WEEK1 := 0.78
-const WEEKLY_OBJECTIVE_NOTIONAL_RATIO_BASE := 0.92
-const WEEKLY_OBJECTIVE_NOTIONAL_RATIO_SPREAD := 0.12
-const WEEKLY_OBJECTIVE_PROFIT_RATIO_MIN := 0.02
-const WEEKLY_OBJECTIVE_PROFIT_RATIO_MAX := 0.06
-const WEEKLY_OBJECTIVE_PROFIT_MIN := 16.0
-const WEEKLY_OBJECTIVE_PROFIT_MAX := 120.0
 const UPGRADE_OFFER_MIN_DAYS_BETWEEN := 3
 const UPGRADE_OFFER_TRIGGER_LOOKBACK_DAYS := 2
 const UPGRADE_OFFER_REQUIRE_MARKET_TRIGGER := true
@@ -314,20 +303,22 @@ func _on_end_day_requested() -> void:
 		var traded_this_week := _player_portfolio.has_meaningful_trade_in_day_range(week_start_day, week_end_day)
 		var holdings_value := _player_portfolio.get_holdings_value(_market_manager)
 		var weekly_target_notional := _weekly_activity_notional_target()
-		var low_activity_threshold := weekly_target_notional * WEEKLY_LOW_ACTIVITY_RATIO
-		var full_activity := traded_this_week and (
-			weekly_notional >= weekly_target_notional
-			or holdings_value >= MIN_WEEKLY_HOLDINGS_FOR_ACTIVITY
+		var activity_state := WeeklyActivityService.evaluate_activity(
+			traded_this_week,
+			weekly_notional,
+			holdings_value,
+			weekly_target_notional
 		)
-		var low_activity := traded_this_week and not full_activity and weekly_notional >= low_activity_threshold
-		var inactivity_surcharge := 0.0
-		if not grace_week:
-			if not traded_this_week:
-				inactivity_surcharge = INACTIVITY_WEEKLY_SURCHARGE
-			elif low_activity:
-				inactivity_surcharge = LOW_ACTIVITY_WEEKLY_SURCHARGE
-			elif not full_activity:
-				inactivity_surcharge = INACTIVITY_WEEKLY_SURCHARGE
+		var full_activity := bool(activity_state.get("full_activity", false))
+		var low_activity := bool(activity_state.get("low_activity", false))
+		var activity_label := str(activity_state.get("activity_label", "Nula"))
+		var activity_tier := int(activity_state.get("activity_tier", 0))
+		var inactivity_surcharge := WeeklyActivityService.resolve_inactivity_surcharge(
+			grace_week,
+			traded_this_week,
+			full_activity,
+			low_activity
+		)
 		var weekly_charge := _run_manager.weekly_expense + inactivity_surcharge
 		var expense_result := _player_portfolio.apply_weekly_expense(
 				weekly_charge,
@@ -376,16 +367,6 @@ func _on_end_day_requested() -> void:
 				_money(raw_weekly_notional),
 				_money(weekly_notional)
 			])
-		var activity_label := "Nula"
-		var activity_tier := 0
-		if full_activity:
-			activity_tier = 2
-			activity_label = "Alta"
-		elif low_activity:
-			activity_tier = 1
-			activity_label = "Media"
-		elif traded_this_week:
-			activity_label = "Baja"
 		var objective_snapshot := _get_objective_plan_snapshot()
 		var objective_opening_net := float(objective_snapshot.get("opening_net_worth", _week_open_net_worth))
 		var objective_metrics := {
@@ -723,8 +704,7 @@ func _get_current_week_day_range() -> Dictionary:
 
 
 func _weekly_activity_notional_target() -> float:
-	var scaled_target := maxf(0.0, _week_open_net_worth) * WEEKLY_ACTIVITY_NOTIONAL_RATIO
-	return maxf(WEEKLY_ACTIVITY_NOTIONAL_FLOOR, scaled_target)
+	return WeeklyActivityService.weekly_target_notional(_week_open_net_worth)
 
 
 func _build_weekly_recap_text(recap_data: Dictionary) -> String:
@@ -910,28 +890,22 @@ func _build_debt_feedback_snapshot() -> Dictionary:
 	var traded_meaningful := _player_portfolio.has_meaningful_trade_in_day_range(week_start_day, week_end_day)
 	var holdings_value := _player_portfolio.get_holdings_value(_market_manager)
 	var weekly_target_notional := _weekly_activity_notional_target()
-	var low_activity_threshold := weekly_target_notional * WEEKLY_LOW_ACTIVITY_RATIO
-	var full_activity := traded_meaningful and (
-		weekly_notional >= weekly_target_notional
-		or holdings_value >= MIN_WEEKLY_HOLDINGS_FOR_ACTIVITY
+	var activity_state := WeeklyActivityService.evaluate_activity(
+		traded_meaningful,
+		weekly_notional,
+		holdings_value,
+		weekly_target_notional
 	)
-	var low_activity := traded_meaningful and not full_activity and weekly_notional >= low_activity_threshold
-	var estimated_surcharge := 0.0
+	var full_activity := bool(activity_state.get("full_activity", false))
+	var low_activity := bool(activity_state.get("low_activity", false))
 	var grace_week := week_index == 1
-	if not grace_week:
-		if not traded_meaningful:
-			estimated_surcharge = INACTIVITY_WEEKLY_SURCHARGE
-		elif low_activity:
-			estimated_surcharge = LOW_ACTIVITY_WEEKLY_SURCHARGE
-		elif not full_activity:
-			estimated_surcharge = INACTIVITY_WEEKLY_SURCHARGE
-	var activity_label := "Nula"
-	if full_activity:
-		activity_label = "Alta"
-	elif low_activity:
-		activity_label = "Media"
-	elif traded_meaningful:
-		activity_label = "Baja"
+	var estimated_surcharge := WeeklyActivityService.resolve_inactivity_surcharge(
+		grace_week,
+		traded_meaningful,
+		full_activity,
+		low_activity
+	)
+	var activity_label := str(activity_state.get("activity_label", "Nula"))
 	var weekly_multiplier := _upgrade_manager.get_weekly_expense_multiplier()
 	var estimated_charge := (_run_manager.weekly_expense + estimated_surcharge) * maxf(0.1, weekly_multiplier)
 	var debt_limit := PlayerPortfolio.MAX_TRADING_DEBT
@@ -1123,56 +1097,12 @@ func _roll_weekly_objectives_for_week(week_index: int, clear_if_missing: bool) -
 
 
 func _build_weekly_objective_plan(week_index: int) -> Dictionary:
-	if week_index <= 0:
-		return {}
-	var weekly_target_notional := _weekly_activity_notional_target()
-	var opening_net := _week_open_net_worth
-	var notional_ratio := WEEKLY_OBJECTIVE_NOTIONAL_RATIO_BASE + _objective_rng.randf_range(
-		-WEEKLY_OBJECTIVE_NOTIONAL_RATIO_SPREAD,
-		WEEKLY_OBJECTIVE_NOTIONAL_RATIO_SPREAD
+	return WeeklyObjectiveService.build_weekly_plan(
+		week_index,
+		_week_open_net_worth,
+		_weekly_activity_notional_target(),
+		_objective_rng
 	)
-	if week_index == 1:
-		notional_ratio = minf(notional_ratio, WEEKLY_OBJECTIVE_NOTIONAL_RATIO_WEEK1)
-	notional_ratio = clampf(notional_ratio, 0.66, 1.05)
-	var notional_target := maxf(120.0, weekly_target_notional * notional_ratio)
-
-	var objectives: Array[Dictionary] = []
-	objectives.append({
-		"id": "weekly_notional_%d" % week_index,
-		"type": "notional",
-		"title": "Mueve notional valido >= %s" % _money(notional_target),
-		"target": notional_target
-	})
-
-	if _objective_rng.randf() < 0.50:
-		var traded_tickers_target := 2
-		if week_index >= 3 and _objective_rng.randf() < 0.55:
-			traded_tickers_target = 3
-		objectives.append({
-			"id": "weekly_breadth_%d" % week_index,
-			"type": "breadth",
-			"title": "Opera en >= %d tickers distintos" % traded_tickers_target,
-			"target": traded_tickers_target
-		})
-	else:
-		var profit_ratio := _objective_rng.randf_range(WEEKLY_OBJECTIVE_PROFIT_RATIO_MIN, WEEKLY_OBJECTIVE_PROFIT_RATIO_MAX)
-		var profit_target := clampf(
-			maxf(WEEKLY_OBJECTIVE_PROFIT_MIN, maxf(0.0, opening_net) * profit_ratio),
-			WEEKLY_OBJECTIVE_PROFIT_MIN,
-			WEEKLY_OBJECTIVE_PROFIT_MAX
-		)
-		objectives.append({
-			"id": "weekly_profit_%d" % week_index,
-			"type": "profit",
-			"title": "Cierra con beneficio >= %s antes de gastos" % _money(profit_target),
-			"target": profit_target
-		})
-
-	return {
-		"week_index": week_index,
-		"opening_net_worth": opening_net,
-		"items": objectives
-	}
 
 
 func _get_objective_plan_snapshot() -> Dictionary:
@@ -1180,61 +1110,7 @@ func _get_objective_plan_snapshot() -> Dictionary:
 
 
 func _evaluate_weekly_objectives(metrics: Dictionary) -> Dictionary:
-	var results: Array[Dictionary] = []
-	var completed_count := 0
-	var objective_items_variant: Variant = _weekly_objective_plan.get("items", [])
-	var objective_items: Array = []
-	if objective_items_variant is Array:
-		objective_items = objective_items_variant
-
-	for objective_data in objective_items:
-		if typeof(objective_data) != TYPE_DICTIONARY:
-			continue
-		var objective_result := _evaluate_objective_item(objective_data, metrics)
-		if bool(objective_result.get("completed", false)):
-			completed_count += 1
-		results.append(objective_result)
-	return {
-		"completed_count": completed_count,
-		"total_count": results.size(),
-		"items": results
-	}
-
-
-func _evaluate_objective_item(objective_data: Dictionary, metrics: Dictionary) -> Dictionary:
-	var objective_type := str(objective_data.get("type", "notional"))
-	var target_value := float(objective_data.get("target", 0.0))
-	var progress_value := 0.0
-	var completed := false
-	var progress_text := "-"
-
-	match objective_type:
-		"notional":
-			progress_value = float(metrics.get("weekly_notional", 0.0))
-			completed = progress_value >= target_value - 0.01
-			progress_text = "%s / %s" % [_money(progress_value), _money(target_value)]
-		"breadth":
-			progress_value = float(metrics.get("traded_tickers", 0))
-			completed = int(progress_value) >= int(target_value)
-			progress_text = "%d / %d tickers" % [int(progress_value), int(target_value)]
-		"profit":
-			progress_value = float(metrics.get("net_delta", 0.0))
-			completed = progress_value >= target_value - 0.01
-			progress_text = "%s / %s" % [_money_with_sign(progress_value), _money_with_sign(target_value)]
-		_:
-			progress_value = float(metrics.get("weekly_notional", 0.0))
-			completed = progress_value >= target_value - 0.01
-			progress_text = "%s / %s" % [_money(progress_value), _money(target_value)]
-
-	return {
-		"id": str(objective_data.get("id", "")),
-		"type": objective_type,
-		"title": str(objective_data.get("title", "Objetivo")),
-		"target": target_value,
-		"progress": progress_value,
-		"progress_text": progress_text,
-		"completed": completed
-	}
+	return WeeklyObjectiveService.evaluate_plan(_weekly_objective_plan, metrics)
 
 
 func _update_weekly_objective_display() -> void:
