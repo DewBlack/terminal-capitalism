@@ -1,129 +1,132 @@
 # AGENTS.md
 
-## Project
+## Proyecto
 
-This project is a Godot 4 game called **Terminal Capitalism**.
+**Terminal Capitalism** es un juego en Godot 4 (GDScript) de simulacion bursatil absurda con estructura roguelike.
 
-It is an absurd stock market roguelike where the player buys and sells stocks to survive a 30-day run.
+Objetivo de una run:
+- Sobrevivir 30 dias.
+- Gestionar caja, deuda y riesgo.
+- Leer noticias y operar en un mercado explicable por tags.
 
-The game uses:
-- Godot 4
-- GDScript
-- Simple UI
-- Data-driven content through JSON
-- No runtime generative AI
-- No external assets for the MVP
+## Flujo Git por chat (obligatorio)
 
-## Core Loop
+- En cada chat nuevo, crear una rama nueva desde el ultimo `dev` antes de aplicar cambios.
+- Mantener todos los cambios de ese chat en esa misma rama.
+- No crear ramas nuevas por cada cambio dentro del mismo chat.
+- Proponer nombres de rama tipo `chat/YYYY-MM-DD-<tema>`.
 
-The main gameplay loop is:
+## Pilares de diseno
 
-1. Read market news.
-2. Analyze affected tags.
-3. Buy or sell stocks.
-4. End the day.
-5. Watch prices change.
-6. Pay weekly expenses.
-7. Survive until day 30.
+- El mercado puede ser absurdo, pero no arbitrario.
+- Cada movimiento importante debe tener razones legibles.
+- Las noticias impactan por matching de tags.
+- Los stats de empresa (volatility, reputation, hype, legal_risk, debt, absurdity) modulan intensidad y direccion.
+- Empresas meme deben ser mas volatiles.
+- Empresas estables deben moverse menos.
+- Riesgo legal alto debe sufrir mas ante escandalos/regulacion.
+- Hype alto debe amplificar subidas y bajadas.
 
-## Main Design Rules
+## Loop principal
 
-- The market can be absurd, but it must not feel random.
-- Price changes should be explainable through tags.
-- Every important price movement should have readable reasons.
-- News affects companies through tag matching.
-- Companies have stats that modify price impact:
-  - volatility
-  - reputation
-  - hype
-  - legal_risk
-  - debt
-  - absurdity
-- Meme companies should be more volatile.
-- Stable companies should move less.
-- High legal risk companies should suffer more from scandals and regulation.
-- High hype companies should rise harder on good news and fall harder on bad news.
+1. Leer noticias del dia.
+2. Analizar tags y exposicion de cada empresa.
+3. Comprar o vender.
+4. Cerrar dia.
+5. Procesar variaciones de precio, eventos y riesgo.
+6. Cobrar gasto semanal.
+7. Repetir hasta dia 30 o derrota.
 
-## MVP Scope
+## Alcance MVP (obligatorio)
 
-The MVP must include:
+- Menu principal
+- Nueva run
+- Mercado (tabla de empresas)
+- Panel de noticias
+- Panel de detalle de empresa
+- Compra y venta
+- Fin de dia
+- Noticias diarias
+- Gastos semanales
+- Mejoras temporales semanales
+- Creacion de empresas
+- Quiebras
+- Fusiones
+- Victoria dia 30
+- Derrota por deuda/patrimonio
 
-- Main menu
-- New run
-- Market screen
-- Company table
-- News panel
-- Company details panel
-- Buy shares
-- Sell shares
-- End day
-- Daily news
-- Weekly expenses
-- Weekly temporary upgrades
-- Company creation
-- Company bankruptcy
-- Company mergers
-- Victory after surviving 30 days
-- Defeat by debt or negative net worth
+## No incluir aun (salvo pedido explicito)
 
-## Do Not Add Yet
-
-Do not add these systems unless explicitly requested:
-
-- Steam integration
-- Monetization
-- Online features
+- Steam
+- Monetizacion
+- Online/multijugador
 - Runtime AI generation
-- Advanced save system
-- Localization system
-- Final art
-- Final audio
-- DLC implementation
-- Complex animations
-- Complex charts
-- Multiplayer
+- Sistema avanzado de saves
+- Localizacion
+- Arte/audio final
+- DLC
+- Animaciones complejas
+- Graficas complejas
 
-## Architecture Rules
+## Reglas de arquitectura
 
-Keep simulation logic separate from UI.
+- Separar simulacion y UI.
+- No meter logica de mercado dentro de scripts de UI.
+- Preferir managers para sistemas globales:
+  - `GameManager`
+  - `RunManager`
+  - `MarketManager`
+  - `NewsManager`
+  - `PlayerPortfolio`
+  - `UpgradeManager`
+  - `ContentPackLoader`
+  - `TutorialManager`
+- Usar clases de datos ligeras para:
+  - `Company`
+  - `NewsEvent`
+  - `RunUpgrade`
+  - `PriceMovement`
+  - `MarketEffect`
+- Preferir funciones pequenas.
+- Evitar dependencias circulares.
+- Usar signals para reaccion de UI.
 
-Do not put market logic inside UI scripts.
+## Mapa actual (estado real del repo)
 
-Use managers for global systems:
+- `GameManager`: orquestacion de run, flujo diario/semanal, victoria/derrota, tutorial.
+- `RunManager`: dia/semana y estado operativo de objetivos semanales.
+- `MarketManager`: empresas activas, pricing diario, quiebras/fusiones/spawn.
+- `NewsManager`: seleccion de titulares, clima narrativo, historial.
+- `PlayerPortfolio`: caja/deuda/holdings, fees y validacion de ordenes.
+- `UpgradeManager`: mejoras semanales temporales.
+- `UIManager`: render completo de HUD/tabla/paneles/modales.
+- `RunBalanceConfig`: parametros compartidos de balance semanal.
+- `WeeklyActivityService`: evaluacion de actividad semanal y recargos.
+- `WeeklyObjectiveService`: generacion y evaluacion de objetivos semanales.
 
-- GameManager
-- RunManager
-- MarketManager
-- NewsManager
-- PlayerPortfolio
-- UpgradeManager
-- ContentPackLoader
+## Deuda tecnica conocida
 
-Use data classes or lightweight scripts for:
+- `GameManager` y `UIManager` estan sobredimensionados (>1000 lineas cada uno).
+- Hay logica de presentacion y logica de dominio mezclada en algunos tramos de `UIManager`.
+- Faltan pruebas automaticas de regresion para balance y contenido JSON.
+- El sistema de guardado existe solo como stub (`SaveManager`) y no debe escalarse aun.
 
-- Company
-- NewsEvent
-- RunUpgrade
-- PriceMovement
-- MarketEffect
+## Politica de refactor (importante)
 
-Prefer small functions.
+Cuando se agreguen features nuevas, **no** seguir creciendo `GameManager`/`UIManager` sin limite.
 
-Avoid circular dependencies.
+Prioridad de extraccion:
+1. Resolver logica semanal (actividad, recargos, objetivos) en servicios de `scripts/run/`.
+2. Mover calculos de presentacion de `UIManager` a helpers dedicados.
+3. Mantener `GameManager` como orquestador, no como contenedor de toda la logica.
 
-Use signals when UI needs to react to simulation changes.
-
-Keep scripts readable and commented.
-
-## Folder Structure
-
-Use this structure:
+## Estructura de carpetas
 
 ```text
 res://
   scenes/
     main/
-    menu/
+    menu/            # reservado
     game/
     ui/
 
@@ -133,6 +136,7 @@ res://
     player/
     market/
     news/
+    data/
     ui/
     utils/
 
@@ -146,3 +150,24 @@ res://
 
   audio/
     placeholder/
+
+  docs/              # estrategia, deuda tecnica, planes
+  reports/           # salidas de analisis (generadas)
+```
+
+## Estrategia de desarrollo (corto plazo)
+
+1. Estabilizar arquitectura (menos acoplamiento entre manager y UI).
+2. Endurecer balance de loop semanal y riesgo de deuda.
+3. Consolidar onboarding/tutorial.
+4. Validar contenido data-driven con checks automaticos.
+5. Cerrar MVP con polish de UX y telemetria local de balance.
+
+## Definicion de "hecho"
+
+Una tarea de gameplay se considera cerrada cuando:
+- Respeta las reglas de arquitectura.
+- Expone razones legibles en UI para cambios de precio.
+- No rompe tutorial ni flujo semanal.
+- Mantiene compatibilidad con datos en `data/base` y packs.
+- Actualiza docs si cambia reglas de negocio.

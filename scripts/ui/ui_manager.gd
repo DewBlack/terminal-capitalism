@@ -10,10 +10,7 @@ signal weekly_recap_closed
 signal company_selected(ticker: String)
 signal tutorial_continue_requested
 
-const WEEKLY_ACTIVITY_NOTIONAL_FLOOR := 170.0
-const WEEKLY_ACTIVITY_NOTIONAL_RATIO := 0.28
-const WEEKLY_LOW_ACTIVITY_RATIO := 0.50
-const MIN_WEEKLY_HOLDINGS_FOR_ACTIVITY := 180.0
+const WEEKLY_ACTIVITY_SERVICE := preload("res://scripts/run/weekly_activity_service.gd")
 const STATUS_MAX_CHARS := 220
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
@@ -26,7 +23,7 @@ const COMPANY_TAGS_VISIBLE := 6
 const ROW_NAME_MIN_WIDTH := 176.0
 const ROW_PRICE_MIN_WIDTH := 84.0
 const ROW_CHANGE_MIN_WIDTH := 74.0
-const HOTKEYS_HINT := "Atajos: ↑/↓ empresa · B comprar · V vender · Enter pasar dia"
+const HOTKEYS_HINT := "Atajos: Up/Down empresa | B comprar | V vender | Enter pasar dia"
 
 var _run_manager: RunManager
 var _player_portfolio: PlayerPortfolio
@@ -323,20 +320,14 @@ func _update_header() -> void:
 	var weekly_notional := _player_portfolio.get_effective_trade_notional_in_day_range(week_start_day, week_end_day)
 	var raw_weekly_notional := _player_portfolio.get_trade_notional_in_day_range(week_start_day, week_end_day)
 	var weekly_target_notional := _weekly_activity_notional_target(net_worth)
-	var low_activity_threshold := weekly_target_notional * WEEKLY_LOW_ACTIVITY_RATIO
 	var traded_meaningful := _player_portfolio.has_meaningful_trade_in_day_range(week_start_day, week_end_day)
-	var full_activity := traded_meaningful and (
-		weekly_notional >= weekly_target_notional
-		or holdings_value >= MIN_WEEKLY_HOLDINGS_FOR_ACTIVITY
+	var activity_state := WEEKLY_ACTIVITY_SERVICE.evaluate_activity(
+		traded_meaningful,
+		weekly_notional,
+		holdings_value,
+		weekly_target_notional
 	)
-	var low_activity := traded_meaningful and not full_activity and weekly_notional >= low_activity_threshold
-	var activity_label := "Nula"
-	if full_activity:
-		activity_label = "Alta"
-	elif low_activity:
-		activity_label = "Media"
-	elif traded_meaningful:
-		activity_label = "Baja"
+	var activity_label := str(activity_state.get("activity_label", "Nula"))
 
 	_day_label.text = "Dia %02d/%02d" % [_run_manager.current_day, _run_manager.max_days]
 	var objective_display := _run_manager.get_weekly_objective_display()
@@ -1249,8 +1240,7 @@ func _update_selection_context() -> void:
 
 
 func _weekly_activity_notional_target(net_worth: float) -> float:
-	var scaled_target := maxf(0.0, net_worth) * WEEKLY_ACTIVITY_NOTIONAL_RATIO
-	return maxf(WEEKLY_ACTIVITY_NOTIONAL_FLOOR, scaled_target)
+	return WEEKLY_ACTIVITY_SERVICE.weekly_target_notional(net_worth)
 
 
 func _money(value: float) -> String:
