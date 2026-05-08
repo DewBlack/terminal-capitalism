@@ -10,6 +10,7 @@ signal weekly_recap_closed
 signal company_selected(ticker: String)
 signal tutorial_continue_requested
 
+const WEEKLY_ACTIVITY_SERVICE := preload("res://scripts/run/weekly_activity_service.gd")
 const STATUS_MAX_CHARS := 220
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
@@ -320,7 +321,7 @@ func _update_header() -> void:
 	var raw_weekly_notional := _player_portfolio.get_trade_notional_in_day_range(week_start_day, week_end_day)
 	var weekly_target_notional := _weekly_activity_notional_target(net_worth)
 	var traded_meaningful := _player_portfolio.has_meaningful_trade_in_day_range(week_start_day, week_end_day)
-	var activity_state := WeeklyActivityService.evaluate_activity(
+	var activity_state := WEEKLY_ACTIVITY_SERVICE.evaluate_activity(
 		traded_meaningful,
 		weekly_notional,
 		holdings_value,
@@ -1239,7 +1240,7 @@ func _update_selection_context() -> void:
 
 
 func _weekly_activity_notional_target(net_worth: float) -> float:
-	return WeeklyActivityService.weekly_target_notional(net_worth)
+	return WEEKLY_ACTIVITY_SERVICE.weekly_target_notional(net_worth)
 
 
 func _money(value: float) -> String:

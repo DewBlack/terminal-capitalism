@@ -4,15 +4,17 @@ extends Node
 const MENU_SCENE := preload("res://scenes/ui/main_menu.tscn")
 const GAME_SCENE := preload("res://scenes/game/game_screen.tscn")
 const TUTORIAL_MANAGER_SCRIPT := preload("res://scripts/run/tutorial_manager.gd")
+const WEEKLY_ACTIVITY_SERVICE := preload("res://scripts/run/weekly_activity_service.gd")
+const WEEKLY_OBJECTIVE_SERVICE := preload("res://scripts/run/weekly_objective_service.gd")
 const TUTORIAL_ACTION_CONTINUE := "continue"
 const TUTORIAL_ACTION_SELECT_TICKER := "select_ticker"
 const TUTORIAL_ACTION_BUY := "buy"
 const TUTORIAL_ACTION_SELL := "sell"
 const TUTORIAL_ACTION_END_DAY := "end_day"
-const RUN_STARTING_CASH := RunBalanceConfig.RUN_STARTING_CASH
-const RUN_BASE_WEEKLY_EXPENSE := RunBalanceConfig.RUN_BASE_WEEKLY_EXPENSE
-const INACTIVITY_WEEKLY_SURCHARGE := RunBalanceConfig.INACTIVITY_WEEKLY_SURCHARGE
-const LOW_ACTIVITY_WEEKLY_SURCHARGE := RunBalanceConfig.LOW_ACTIVITY_WEEKLY_SURCHARGE
+const RUN_STARTING_CASH := 960.0
+const RUN_BASE_WEEKLY_EXPENSE := 260.0
+const INACTIVITY_WEEKLY_SURCHARGE := 110.0
+const LOW_ACTIVITY_WEEKLY_SURCHARGE := 35.0
 const WEEKLY_RECAP_NEWS_LIMIT := 3
 const EVENT_LOG_MAX_ENTRIES := 72
 const UPGRADE_OFFER_MIN_DAYS_BETWEEN := 3
@@ -303,7 +305,7 @@ func _on_end_day_requested() -> void:
 		var traded_this_week := _player_portfolio.has_meaningful_trade_in_day_range(week_start_day, week_end_day)
 		var holdings_value := _player_portfolio.get_holdings_value(_market_manager)
 		var weekly_target_notional := _weekly_activity_notional_target()
-		var activity_state := WeeklyActivityService.evaluate_activity(
+		var activity_state := WEEKLY_ACTIVITY_SERVICE.evaluate_activity(
 			traded_this_week,
 			weekly_notional,
 			holdings_value,
@@ -313,7 +315,7 @@ func _on_end_day_requested() -> void:
 		var low_activity := bool(activity_state.get("low_activity", false))
 		var activity_label := str(activity_state.get("activity_label", "Nula"))
 		var activity_tier := int(activity_state.get("activity_tier", 0))
-		var inactivity_surcharge := WeeklyActivityService.resolve_inactivity_surcharge(
+		var inactivity_surcharge := WEEKLY_ACTIVITY_SERVICE.resolve_inactivity_surcharge(
 			grace_week,
 			traded_this_week,
 			full_activity,
@@ -704,7 +706,7 @@ func _get_current_week_day_range() -> Dictionary:
 
 
 func _weekly_activity_notional_target() -> float:
-	return WeeklyActivityService.weekly_target_notional(_week_open_net_worth)
+	return WEEKLY_ACTIVITY_SERVICE.weekly_target_notional(_week_open_net_worth)
 
 
 func _build_weekly_recap_text(recap_data: Dictionary) -> String:
@@ -890,7 +892,7 @@ func _build_debt_feedback_snapshot() -> Dictionary:
 	var traded_meaningful := _player_portfolio.has_meaningful_trade_in_day_range(week_start_day, week_end_day)
 	var holdings_value := _player_portfolio.get_holdings_value(_market_manager)
 	var weekly_target_notional := _weekly_activity_notional_target()
-	var activity_state := WeeklyActivityService.evaluate_activity(
+	var activity_state := WEEKLY_ACTIVITY_SERVICE.evaluate_activity(
 		traded_meaningful,
 		weekly_notional,
 		holdings_value,
@@ -899,7 +901,7 @@ func _build_debt_feedback_snapshot() -> Dictionary:
 	var full_activity := bool(activity_state.get("full_activity", false))
 	var low_activity := bool(activity_state.get("low_activity", false))
 	var grace_week := week_index == 1
-	var estimated_surcharge := WeeklyActivityService.resolve_inactivity_surcharge(
+	var estimated_surcharge := WEEKLY_ACTIVITY_SERVICE.resolve_inactivity_surcharge(
 		grace_week,
 		traded_meaningful,
 		full_activity,
@@ -1097,7 +1099,7 @@ func _roll_weekly_objectives_for_week(week_index: int, clear_if_missing: bool) -
 
 
 func _build_weekly_objective_plan(week_index: int) -> Dictionary:
-	return WeeklyObjectiveService.build_weekly_plan(
+	return WEEKLY_OBJECTIVE_SERVICE.build_weekly_plan(
 		week_index,
 		_week_open_net_worth,
 		_weekly_activity_notional_target(),
@@ -1110,7 +1112,7 @@ func _get_objective_plan_snapshot() -> Dictionary:
 
 
 func _evaluate_weekly_objectives(metrics: Dictionary) -> Dictionary:
-	return WeeklyObjectiveService.evaluate_plan(_weekly_objective_plan, metrics)
+	return WEEKLY_OBJECTIVE_SERVICE.evaluate_plan(_weekly_objective_plan, metrics)
 
 
 func _update_weekly_objective_display() -> void:
