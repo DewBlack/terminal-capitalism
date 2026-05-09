@@ -3,6 +3,10 @@ extends SceneTree
 const RUN_BALANCE_CONFIG := preload("res://scripts/run/run_balance_config.gd")
 const WEEKLY_CYCLE_SERVICE := preload("res://scripts/run/weekly_cycle_service.gd")
 const RUN_OUTCOME_SERVICE := preload("res://scripts/run/run_outcome_service.gd")
+const MARKET_MANAGER_SCRIPT := preload("res://scripts/market/market_manager.gd")
+const PLAYER_PORTFOLIO_SCRIPT := preload("res://scripts/player/player_portfolio.gd")
+const RUN_MANAGER_SCRIPT := preload("res://scripts/run/run_manager.gd")
+const UPGRADE_MANAGER_SCRIPT := preload("res://scripts/run/upgrade_manager.gd")
 
 
 func _initialize() -> void:
@@ -25,12 +29,12 @@ func _initialize() -> void:
 
 
 func _test_grace_week_without_trades(failures: Array[String]) -> void:
-	var market := _build_market(80.0)
-	var portfolio := _build_portfolio()
-	var run_manager := _build_run_manager()
-	var upgrade_manager := _build_upgrade_manager()
-	var opening_net := portfolio.get_net_worth(market)
-	var target := RUN_BALANCE_CONFIG.weekly_activity_notional_target(opening_net)
+	var market = _build_market(80.0)
+	var portfolio = _build_portfolio()
+	var run_manager = _build_run_manager()
+	var upgrade_manager = _build_upgrade_manager()
+	var opening_net = portfolio.get_net_worth(market)
+	var target = RUN_BALANCE_CONFIG.weekly_activity_notional_target(opening_net)
 	var activity_snapshot: Dictionary = WEEKLY_CYCLE_SERVICE.build_weekly_activity_snapshot({
 		"player_portfolio": portfolio,
 		"market_manager": market,
@@ -68,12 +72,12 @@ func _test_grace_week_without_trades(failures: Array[String]) -> void:
 
 
 func _test_week_two_without_trades(failures: Array[String]) -> void:
-	var market := _build_market(80.0)
-	var portfolio := _build_portfolio()
-	var run_manager := _build_run_manager()
-	var upgrade_manager := _build_upgrade_manager()
-	var opening_net := portfolio.get_net_worth(market)
-	var target := RUN_BALANCE_CONFIG.weekly_activity_notional_target(opening_net)
+	var market = _build_market(80.0)
+	var portfolio = _build_portfolio()
+	var run_manager = _build_run_manager()
+	var upgrade_manager = _build_upgrade_manager()
+	var opening_net = portfolio.get_net_worth(market)
+	var target = RUN_BALANCE_CONFIG.weekly_activity_notional_target(opening_net)
 	var activity_snapshot: Dictionary = WEEKLY_CYCLE_SERVICE.build_weekly_activity_snapshot({
 		"player_portfolio": portfolio,
 		"market_manager": market,
@@ -111,18 +115,18 @@ func _test_week_two_without_trades(failures: Array[String]) -> void:
 
 
 func _test_week_two_low_activity(failures: Array[String]) -> void:
-	var market := _build_market(80.0)
-	var portfolio := _build_portfolio()
-	var run_manager := _build_run_manager()
-	var upgrade_manager := _build_upgrade_manager()
-	var company := market.get_company_by_ticker("ACME")
+	var market = _build_market(80.0)
+	var portfolio = _build_portfolio()
+	var run_manager = _build_run_manager()
+	var upgrade_manager = _build_upgrade_manager()
+	var company = market.get_company_by_ticker("ACME")
 	var buy_result: Dictionary = portfolio.buy_shares(company, 2, 1.0, 8)
 	_assert_true(
 		bool(buy_result.get("success", false)),
 		"Compra de setup para actividad media debe ser valida",
 		failures
 	)
-	var opening_net := portfolio.get_net_worth(market)
+	var opening_net = portfolio.get_net_worth(market)
 	var activity_snapshot: Dictionary = WEEKLY_CYCLE_SERVICE.build_weekly_activity_snapshot({
 		"player_portfolio": portfolio,
 		"market_manager": market,
@@ -170,9 +174,9 @@ func _test_week_two_low_activity(failures: Array[String]) -> void:
 
 
 func _test_week_two_full_activity_by_holdings(failures: Array[String]) -> void:
-	var market := _build_market(95.0)
-	var portfolio := _build_portfolio()
-	var company := market.get_company_by_ticker("ACME")
+	var market = _build_market(95.0)
+	var portfolio = _build_portfolio()
+	var company = market.get_company_by_ticker("ACME")
 	var buy_result: Dictionary = portfolio.buy_shares(company, 2, 1.0, 8)
 	_assert_true(
 		bool(buy_result.get("success", false)),
@@ -264,8 +268,8 @@ func _test_run_outcomes(failures: Array[String]) -> void:
 	)
 
 
-func _build_market(price: float) -> MarketManager:
-	var market := MarketManager.new()
+func _build_market(price: float):
+	var market = MARKET_MANAGER_SCRIPT.new()
 	market.replace_companies_from_dicts([
 		{
 			"id": "company_acme",
@@ -287,20 +291,20 @@ func _build_market(price: float) -> MarketManager:
 	return market
 
 
-func _build_portfolio() -> PlayerPortfolio:
-	var portfolio := PlayerPortfolio.new()
+func _build_portfolio():
+	var portfolio = PLAYER_PORTFOLIO_SCRIPT.new()
 	portfolio.reset_for_new_run(RUN_BALANCE_CONFIG.RUN_STARTING_CASH)
 	return portfolio
 
 
-func _build_run_manager() -> RunManager:
-	var run_manager := RunManager.new()
+func _build_run_manager():
+	var run_manager = RUN_MANAGER_SCRIPT.new()
 	run_manager.reset_for_new_run(30, RUN_BALANCE_CONFIG.RUN_BASE_WEEKLY_EXPENSE)
 	return run_manager
 
 
-func _build_upgrade_manager() -> UpgradeManager:
-	var upgrade_manager := UpgradeManager.new()
+func _build_upgrade_manager():
+	var upgrade_manager = UPGRADE_MANAGER_SCRIPT.new()
 	upgrade_manager.setup(9971)
 	return upgrade_manager
 
