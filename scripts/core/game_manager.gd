@@ -4,12 +4,8 @@ extends Node
 const MENU_SCENE := preload("res://scenes/ui/main_menu.tscn")
 const GAME_SCENE := preload("res://scenes/game/game_screen.tscn")
 const TUTORIAL_MANAGER_SCRIPT := preload("res://scripts/run/tutorial_manager.gd")
-const RUN_DAY_FLOW_SERVICE := preload("res://scripts/run/run_day_flow_service.gd")
-const RUN_DAY_UI_ORCHESTRATOR_SERVICE := preload("res://scripts/run/run_day_ui_orchestrator_service.gd")
-const TUTORIAL_DAY_FLOW_SERVICE := preload("res://scripts/run/tutorial_day_flow_service.gd")
+const RUN_END_DAY_ORCHESTRATOR_SERVICE := preload("res://scripts/run/run_end_day_orchestrator_service.gd")
 const WEEKLY_CYCLE_SERVICE := preload("res://scripts/run/weekly_cycle_service.gd")
-const WEEKLY_POST_PROCESS_SERVICE := preload("res://scripts/run/weekly_post_process_service.gd")
-const WEEKLY_EFFECTS_SERVICE := preload("res://scripts/run/weekly_effects_service.gd")
 const UPGRADE_OFFER_GATE_SERVICE := preload("res://scripts/run/upgrade_offer_gate_service.gd")
 const RUN_NOTIFICATION_BUFFER_SERVICE := preload("res://scripts/run/run_notification_buffer_service.gd")
 const DEBT_RISK_TRANSITION_SERVICE := preload("res://scripts/run/debt_risk_transition_service.gd")
@@ -20,7 +16,6 @@ const TUTORIAL_ACTION_CONTINUE := "continue"
 const TUTORIAL_ACTION_SELECT_TICKER := "select_ticker"
 const TUTORIAL_ACTION_BUY := "buy"
 const TUTORIAL_ACTION_SELL := "sell"
-const TUTORIAL_ACTION_END_DAY := "end_day"
 const RUN_STARTING_CASH := 960.0
 const RUN_BASE_WEEKLY_EXPENSE := 260.0
 const INACTIVITY_WEEKLY_SURCHARGE := 110.0
@@ -221,183 +216,133 @@ func _on_sell_requested(ticker: String, amount: int) -> void:
 
 
 func _on_end_day_requested() -> void:
-	if not _run_active or _run_ended:
-		return
-	if _is_tutorial_run:
-		_process_tutorial_end_day()
-		return
-	if _awaiting_weekly_recap_ack:
-		_last_status_message = "Revisa el resumen semanal antes de continuar."
-		_refresh_all_ui()
-		return
-	if _awaiting_upgrade_choice:
-		_last_status_message = "Antes de seguir, elige una mejora semanal."
-		_refresh_all_ui()
-		return
-
-	var day_flow_result := RUN_DAY_FLOW_SERVICE.process_regular_day(
+	var branch_result := RUN_END_DAY_ORCHESTRATOR_SERVICE.process_end_day_branch(
+		_run_active,
+		_run_ended,
+		_is_tutorial_run,
+		_awaiting_weekly_recap_ack,
+		_awaiting_upgrade_choice,
 		_run_manager,
 		_player_portfolio,
 		_market_manager,
 		_news_manager,
 		_upgrade_manager,
+		_tutorial_manager,
 		_week_open_net_worth,
 		_get_objective_plan_snapshot(),
+		_pending_upgrade_choices,
+		_last_upgrade_offer_day,
+		_upgrade_offer_trigger_days,
+		UPGRADE_OFFER_TRIGGER_LOOKBACK_DAYS,
+		UPGRADE_OFFER_MIN_DAYS_BETWEEN,
+		UPGRADE_OFFER_TRIGGER_ON_BANKRUPTCY,
+		UPGRADE_OFFER_TRIGGER_ON_MERGER,
 		Callable(self, "_evaluate_weekly_objectives"),
 		Callable(self, "_evaluate_upgrade_offer_gate"),
 		Callable(self, "_roll_weekly_objectives_if_needed")
 	)
-	print(str(day_flow_result.get("day_transition_log", "")))
+	if not bool(branch_result.get("handled", false)):
+		return
+
+	_print_debug_logs(branch_result.get("debug_logs", []))
+	_last_status_message = str(branch_result.get("status_message", _last_status_message))
+	if bool(branch_result.get("blocked", false)):
+		if bool(branch_result.get("should_refresh_ui", false)):
+			_refresh_all_ui()
+		return
+
+	_apply_end_day_branch_state(branch_result)
 	var market_report: Dictionary = {}
-	var market_report_variant: Variant = day_flow_result.get("market_report", {})
+	var market_report_variant: Variant = branch_result.get("market_report", {})
 	if market_report_variant is Dictionary:
 		market_report = market_report_variant
-	print(str(day_flow_result.get("news_application_log", "")))
-	UPGRADE_OFFER_GATE_SERVICE.register_trigger_day(
-		_upgrade_offer_trigger_days,
-		_run_manager.current_day,
-		market_report,
-		UPGRADE_OFFER_TRIGGER_LOOKBACK_DAYS,
-		UPGRADE_OFFER_MIN_DAYS_BETWEEN,
-		UPGRADE_OFFER_TRIGGER_ON_BANKRUPTCY,
-		UPGRADE_OFFER_TRIGGER_ON_MERGER
-	)
 	_record_market_report_events(_run_manager.current_day, market_report)
+	RUN_NOTIFICATION_BUFFER_SERVICE.apply_updates(
+		_event_log_entries,
+		_pending_runtime_alerts,
+		branch_result.get("weekly_notification_updates", {}),
+		EVENT_LOG_MAX_ENTRIES
+	)
 
-	var should_offer_weekly_upgrade := false
-	var weekly_recap_data := {}
-	var weekly_result: Dictionary = {}
-	var weekly_result_variant: Variant = day_flow_result.get("weekly_result", {})
-	if weekly_result_variant is Dictionary:
-		weekly_result = weekly_result_variant
-	var weekly_post_state := WEEKLY_POST_PROCESS_SERVICE.extract_state(weekly_result, _week_open_net_worth)
-	if bool(weekly_post_state.get("has_weekly_result", false)):
-		_pending_upgrade_choices.clear()
-		var weekly_effects := WEEKLY_EFFECTS_SERVICE.build_effects(
-			weekly_post_state,
-			day_flow_result.get("weekly_telemetry_logs", [])
-		)
-		should_offer_weekly_upgrade = bool(weekly_effects.get("should_offer_weekly_upgrade", false))
-		RUN_NOTIFICATION_BUFFER_SERVICE.apply_updates(
-			_event_log_entries,
-			_pending_runtime_alerts,
-			{
-				"event_log_entries": weekly_effects.get("event_log_entries", []),
-				"runtime_alerts": weekly_effects.get("runtime_alerts", [])
-			},
-			EVENT_LOG_MAX_ENTRIES
-		)
-		var telemetry_logs_variant: Variant = weekly_effects.get("telemetry_logs", [])
-		if telemetry_logs_variant is Array:
-			var telemetry_logs: Array = telemetry_logs_variant
-			for telemetry_log in telemetry_logs:
-				print(str(telemetry_log))
-		_awaiting_upgrade_choice = bool(weekly_effects.get("awaiting_upgrade_choice", false))
-		_pending_upgrade_choices.clear()
-		var pending_choices_variant: Variant = weekly_effects.get("pending_upgrade_choices", [])
-		if pending_choices_variant is Array:
-			var pending_choices_array: Array = pending_choices_variant
-			for pending_choice in pending_choices_array:
-				if pending_choice is RunUpgrade:
-					_pending_upgrade_choices.append(pending_choice)
-		if bool(weekly_effects.get("should_mark_upgrade_offer_day", false)):
-			_last_upgrade_offer_day = _run_manager.current_day
-		var recap_variant: Variant = weekly_effects.get("weekly_recap_data", {})
-		if recap_variant is Dictionary:
-			weekly_recap_data = recap_variant
-		_week_open_net_worth = float(weekly_effects.get("next_week_open_net_worth", _week_open_net_worth))
-
-	_last_status_message = str(day_flow_result.get("status_message", "Dia %d cerrado." % _run_manager.current_day))
 	_update_weekly_objective_display()
 	_queue_debt_risk_transition_alert()
 	var objective_display := _run_manager.get_weekly_objective_display()
-	var objective_brief := str(objective_display.get("brief", ""))
-	_last_status_message = RUN_DAY_UI_ORCHESTRATOR_SERVICE.append_objective_brief_if_needed(
+	var finalize_result := RUN_END_DAY_ORCHESTRATOR_SERVICE.finalize_end_day(
+		str(branch_result.get("flow_kind", "regular")),
+		_is_tutorial_run,
 		_last_status_message,
-		objective_brief,
-		weekly_recap_data
-	)
-	_check_run_end_conditions()
-	if _run_ended:
-		_refresh_all_ui()
-		return
-
-	var weekly_ui_outcome := RUN_DAY_UI_ORCHESTRATOR_SERVICE.build_weekly_ui_outcome(
-		_last_status_message,
-		weekly_recap_data,
-		should_offer_weekly_upgrade,
+		branch_result.get("weekly_recap_data", {}),
+		bool(branch_result.get("should_offer_weekly_upgrade", false)),
 		_pending_upgrade_choices,
 		_run_manager,
 		_player_portfolio,
 		_market_manager,
 		_news_manager,
-		WEEKLY_RECAP_NEWS_LIMIT
-	)
-	_last_status_message = str(weekly_ui_outcome.get("status_message", _last_status_message))
-	_awaiting_weekly_recap_ack = bool(weekly_ui_outcome.get("awaiting_weekly_recap_ack", false))
-	if bool(weekly_ui_outcome.get("show_weekly_recap", false)) and _game_ui != null:
-		_game_ui.show_weekly_recap(
-			int(weekly_ui_outcome.get("recap_week_index", 1)),
-			str(weekly_ui_outcome.get("recap_text", ""))
-		)
-	if bool(weekly_ui_outcome.get("show_weekly_upgrade_choices", false)) and _game_ui != null:
-		_game_ui.show_weekly_upgrade_choices(_pending_upgrade_choices)
-	if bool(weekly_ui_outcome.get("should_return_early", false)):
-		_refresh_all_ui()
-		return
-	_refresh_all_ui()
-
-
-func _process_tutorial_end_day() -> void:
-	var tutorial_day_result := TUTORIAL_DAY_FLOW_SERVICE.process_end_day(
-		TUTORIAL_ACTION_END_DAY,
-		_run_manager,
-		_upgrade_manager,
-		_market_manager,
-		_news_manager,
-		_tutorial_manager
-	)
-	if not bool(tutorial_day_result.get("allowed", false)):
-		_last_status_message = str(tutorial_day_result.get("status_message", "Sigue el paso actual del tutorial."))
-		_refresh_all_ui()
-		return
-
-	var day_transition_variant: Variant = tutorial_day_result.get("day_transition", {})
-	if day_transition_variant is Dictionary:
-		var day_transition: Dictionary = day_transition_variant
-		print("[DEBUG][GameManager][Tutorial] dia avanzado | %d -> %d" % [
-			int(day_transition.get("previous_day", _run_manager.current_day)),
-			int(day_transition.get("current_day", _run_manager.current_day))
-		])
-
-	var market_report: Dictionary = {}
-	var market_report_variant: Variant = tutorial_day_result.get("market_report", {})
-	if market_report_variant is Dictionary:
-		market_report = market_report_variant
-	_record_market_report_events(_run_manager.current_day, market_report)
-	_last_status_message = str(tutorial_day_result.get("status_message", "Dia %d cerrado en tutorial." % _run_manager.current_day))
-
-	_check_run_end_conditions()
-	if _run_ended:
-		return
-
-	_refresh_all_ui()
-
-
-func _check_run_end_conditions() -> void:
-	var outcome := RUN_LIFECYCLE_SERVICE.evaluate_run_outcome(
-		_is_tutorial_run,
 		_tutorial_manager,
-		_run_manager,
-		_player_portfolio,
-		_market_manager
+		WEEKLY_RECAP_NEWS_LIMIT,
+		str(objective_display.get("brief", ""))
 	)
-	if not bool(outcome.get("ended", false)):
+	_last_status_message = str(finalize_result.get("status_message", _last_status_message))
+
+	var run_outcome: Dictionary = {}
+	var run_outcome_variant: Variant = finalize_result.get("run_outcome", {})
+	if run_outcome_variant is Dictionary:
+		run_outcome = run_outcome_variant
+	if bool(run_outcome.get("ended", false)):
+		_finish_run(
+			bool(run_outcome.get("victory", false)),
+			str(run_outcome.get("reason", "Resultado de run no especificado."))
+		)
+		if bool(finalize_result.get("refresh_after_finish", false)):
+			_refresh_all_ui()
 		return
-	_finish_run(
-		bool(outcome.get("victory", false)),
-		str(outcome.get("reason", "Resultado de run no especificado."))
+
+	_awaiting_weekly_recap_ack = bool(
+		finalize_result.get("awaiting_weekly_recap_ack", _awaiting_weekly_recap_ack)
 	)
+	_apply_end_day_ui_signals(finalize_result)
+	if bool(finalize_result.get("should_return_early", false)):
+		_refresh_all_ui()
+		return
+	if bool(finalize_result.get("should_refresh_ui", true)):
+		_refresh_all_ui()
+
+
+func _apply_end_day_branch_state(branch_result: Dictionary) -> void:
+	_awaiting_upgrade_choice = bool(branch_result.get("awaiting_upgrade_choice", _awaiting_upgrade_choice))
+	_week_open_net_worth = float(branch_result.get("week_open_net_worth", _week_open_net_worth))
+	_last_upgrade_offer_day = int(branch_result.get("last_upgrade_offer_day", _last_upgrade_offer_day))
+	_pending_upgrade_choices.clear()
+	var pending_choices_variant: Variant = branch_result.get("pending_upgrade_choices", [])
+	if pending_choices_variant is Array:
+		var pending_choices_array: Array = pending_choices_variant
+		for pending_choice in pending_choices_array:
+			if pending_choice is RunUpgrade:
+				_pending_upgrade_choices.append(pending_choice)
+
+
+func _apply_end_day_ui_signals(finalize_result: Dictionary) -> void:
+	var ui_outcome_variant: Variant = finalize_result.get("ui_outcome", {})
+	if not (ui_outcome_variant is Dictionary):
+		return
+	var ui_outcome: Dictionary = ui_outcome_variant
+	if bool(ui_outcome.get("show_weekly_recap", false)) and _game_ui != null:
+		_game_ui.show_weekly_recap(
+			int(ui_outcome.get("recap_week_index", 1)),
+			str(ui_outcome.get("recap_text", ""))
+		)
+	if bool(ui_outcome.get("show_weekly_upgrade_choices", false)) and _game_ui != null:
+		_game_ui.show_weekly_upgrade_choices(_pending_upgrade_choices)
+
+
+func _print_debug_logs(log_lines_variant: Variant) -> void:
+	if not (log_lines_variant is Array):
+		return
+	var log_lines: Array = log_lines_variant
+	for log_line in log_lines:
+		var clean_log := str(log_line).strip_edges()
+		if not clean_log.is_empty():
+			print(clean_log)
 
 
 func _finish_run(victory: bool, reason: String) -> void:
