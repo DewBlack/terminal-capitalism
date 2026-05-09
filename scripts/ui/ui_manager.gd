@@ -10,7 +10,6 @@ signal weekly_recap_closed
 signal company_selected(ticker: String)
 signal tutorial_continue_requested
 
-const WEEKLY_ACTIVITY_SERVICE := preload("res://scripts/run/weekly_activity_service.gd")
 const MARKET_TABLE_PRESENTER := preload("res://scripts/ui/market_table_presenter.gd")
 const MARKET_ROW_FACTORY := preload("res://scripts/ui/market_row_factory.gd")
 const NEWS_CARD_FACTORY := preload("res://scripts/ui/news_card_factory.gd")
@@ -22,6 +21,7 @@ const TOAST_STYLE_PRESENTER := preload("res://scripts/ui/toast_style_presenter.g
 const COMPANY_DETAILS_PRESENTER := preload("res://scripts/ui/company_details_presenter.gd")
 const TRADE_PREVIEW_PRESENTER := preload("res://scripts/ui/trade_preview_presenter.gd")
 const HEADER_PRESENTER := preload("res://scripts/ui/header_presenter.gd")
+const HEADER_METRICS_PRESENTER := preload("res://scripts/ui/header_metrics_presenter.gd")
 const DEBT_FEEDBACK_PRESENTER := preload("res://scripts/ui/debt_feedback_presenter.gd")
 const SELECTION_CONTEXT_PRESENTER := preload("res://scripts/ui/selection_context_presenter.gd")
 const EVENT_LOG_PRESENTER := preload("res://scripts/ui/event_log_presenter.gd")
@@ -315,41 +315,26 @@ func _connect_manager_signals() -> void:
 
 
 func _update_header() -> void:
-	var week := _run_manager.get_week_index()
-	var holdings_value := _player_portfolio.get_holdings_value(_market_manager)
-	var net_worth := _player_portfolio.get_net_worth(_market_manager)
-	var week_start_day := ((_run_manager.days_per_week * (week - 1)) + 1)
-	var week_end_day := _run_manager.current_day
-	var weekly_notional := _player_portfolio.get_effective_trade_notional_in_day_range(week_start_day, week_end_day)
-	var raw_weekly_notional := _player_portfolio.get_trade_notional_in_day_range(week_start_day, week_end_day)
-	var weekly_target_notional := _weekly_activity_notional_target(net_worth)
-	var traded_meaningful := _player_portfolio.has_meaningful_trade_in_day_range(week_start_day, week_end_day)
-	var activity_state := WEEKLY_ACTIVITY_SERVICE.evaluate_activity(
-		traded_meaningful,
-		weekly_notional,
-		holdings_value,
-		weekly_target_notional
+	var header_metrics := HEADER_METRICS_PRESENTER.build_metrics(
+		_run_manager,
+		_player_portfolio,
+		_market_manager,
+		_debt_feedback_snapshot
 	)
-	var activity_label := str(activity_state.get("activity_label", "Nula"))
-
-	_day_label.text = "Dia %02d/%02d" % [_run_manager.current_day, _run_manager.max_days]
-	var objective_display := _run_manager.get_weekly_objective_display()
-	var objective_brief := str(objective_display.get("brief", ""))
-	var debt_limit := float(_debt_feedback_snapshot.get("debt_limit", 1000.0))
 	var header_model := HEADER_PRESENTER.build_model(
-		_run_manager.current_day,
-		_run_manager.max_days,
-		week,
-		activity_label,
-		objective_brief,
-		weekly_notional,
-		weekly_target_notional,
-		raw_weekly_notional,
-		_player_portfolio.cash,
-		_player_portfolio.debt,
-		debt_limit,
-		net_worth,
-		holdings_value,
+		int(header_metrics.get("current_day", 1)),
+		int(header_metrics.get("max_days", 1)),
+		int(header_metrics.get("week_index", 1)),
+		str(header_metrics.get("activity_label", "Nula")),
+		str(header_metrics.get("objective_brief", "")),
+		float(header_metrics.get("weekly_notional", 0.0)),
+		float(header_metrics.get("weekly_target_notional", 0.0)),
+		float(header_metrics.get("raw_weekly_notional", 0.0)),
+		float(header_metrics.get("cash", 0.0)),
+		float(header_metrics.get("debt", 0.0)),
+		float(header_metrics.get("debt_limit", 1000.0)),
+		float(header_metrics.get("net_worth", 0.0)),
+		float(header_metrics.get("holdings_value", 0.0)),
 		_upgrade_manager.get_active_upgrade_text(),
 		WEEK_LABEL_MAX_CHARS
 	)
@@ -964,10 +949,6 @@ func _apply_status_model(status_model: Dictionary) -> void:
 	_status_label.add_theme_color_override("font_color", status_model.get("color", Color(0.90, 0.96, 0.99)))
 
 
-func _weekly_activity_notional_target(net_worth: float) -> float:
-	return WEEKLY_ACTIVITY_SERVICE.weekly_target_notional(net_worth)
-
-
 func _apply_ui_tone() -> void:
 	var shell_style := _build_shell_style(Color(0.10, 0.11, 0.14, 0.96), Color(0.24, 0.29, 0.36, 1.0))
 	_news_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
@@ -1008,6 +989,5 @@ func _apply_action_hints() -> void:
 	_end_day_button.tooltip_text = "Cierra el dia y procesa precios/noticias."
 	_selection_label.tooltip_text = "Selecciona una empresa en la tabla de mercado."
 	_market_header.tooltip_text = HOTKEYS_HINT
-
 
 

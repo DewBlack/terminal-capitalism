@@ -67,6 +67,40 @@ static func build_weekly_plan(
 	}
 
 
+static func build_weekly_display_model(
+	objective_plan: Dictionary,
+	run_manager: RunManager,
+	player_portfolio: PlayerPortfolio,
+	market_manager: MarketManager,
+	fallback_opening_net_worth: float
+) -> Dictionary:
+	if not _has_displayable_items(objective_plan):
+		return {"has_display": false}
+
+	var current_week := run_manager.get_week_index()
+	var safe_days_per_week := maxi(1, run_manager.days_per_week)
+	var week_start_day := ((safe_days_per_week * (current_week - 1)) + 1)
+	var week_end_day := run_manager.current_day
+	var opening_net := float(objective_plan.get("opening_net_worth", fallback_opening_net_worth))
+	var current_net := player_portfolio.get_net_worth(market_manager)
+	var objective_metrics := {
+		"weekly_notional": player_portfolio.get_effective_trade_notional_in_day_range(week_start_day, week_end_day),
+		"traded_tickers": player_portfolio.get_traded_tickers_in_day_range(week_start_day, week_end_day).size(),
+		"net_delta": current_net - opening_net
+	}
+	var objective_results := evaluate_plan(objective_plan, objective_metrics)
+	var completed_count := int(objective_results.get("completed_count", 0))
+	var total_count := maxi(1, int(objective_results.get("total_count", 0)))
+	var objective_lines := _build_objective_lines(objective_results)
+	return {
+		"has_display": true,
+		"title": "Semana %d" % int(objective_plan.get("week_index", current_week)),
+		"brief": "%d/%d completados" % [completed_count, total_count],
+		"lines": objective_lines,
+		"results": objective_results
+	}
+
+
 static func evaluate_plan(objective_plan: Dictionary, metrics: Dictionary) -> Dictionary:
 	var results: Array[Dictionary] = []
 	var completed_count := 0
@@ -123,6 +157,30 @@ static func _evaluate_item(objective_data: Dictionary, metrics: Dictionary) -> D
 		"progress_text": progress_text,
 		"completed": completed
 	}
+
+
+static func _has_displayable_items(objective_plan: Dictionary) -> bool:
+	var objective_items_variant: Variant = objective_plan.get("items", [])
+	if not (objective_items_variant is Array):
+		return false
+	var objective_items: Array = objective_items_variant
+	return not objective_items.is_empty()
+
+
+static func _build_objective_lines(objective_results: Dictionary) -> Array[String]:
+	var objective_lines: Array[String] = []
+	var objective_result_items_variant: Variant = objective_results.get("items", [])
+	if not (objective_result_items_variant is Array):
+		return objective_lines
+	var objective_result_items: Array = objective_result_items_variant
+	for item in objective_result_items:
+		if typeof(item) != TYPE_DICTIONARY:
+			continue
+		var marker := "OK" if bool(item.get("completed", false)) else ".."
+		objective_lines.append(
+			"%s %s | %s" % [marker, str(item.get("title", "Objetivo")), str(item.get("progress_text", "-"))]
+		)
+	return objective_lines
 
 
 static func _money(value: float) -> String:
