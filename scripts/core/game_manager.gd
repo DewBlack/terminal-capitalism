@@ -4,6 +4,8 @@ extends Node
 const MENU_SCENE := preload("res://scenes/ui/main_menu.tscn")
 const GAME_SCENE := preload("res://scenes/game/game_screen.tscn")
 const TUTORIAL_MANAGER_SCRIPT := preload("res://scripts/run/tutorial_manager.gd")
+const RUN_OUTCOME_SERVICE := preload("res://scripts/run/run_outcome_service.gd")
+const WEEKLY_CYCLE_SERVICE := preload("res://scripts/run/weekly_cycle_service.gd")
 const WEEKLY_ACTIVITY_SERVICE := preload("res://scripts/run/weekly_activity_service.gd")
 const WEEKLY_OBJECTIVE_SERVICE := preload("res://scripts/run/weekly_objective_service.gd")
 const TUTORIAL_ACTION_CONTINUE := "continue"
@@ -33,6 +35,8 @@ var _tag_effect_system := TagEffectSystem.new()
 var _company_generator := CompanyGenerator.new()
 var _save_manager := SaveManager.new()
 var _tutorial_manager = TUTORIAL_MANAGER_SCRIPT.new()
+var _run_outcome_service := RUN_OUTCOME_SERVICE.new()
+var _weekly_cycle_service := WEEKLY_CYCLE_SERVICE.new()
 
 var _current_screen: Node = null
 var _game_ui: UIManager = null
@@ -298,35 +302,36 @@ func _on_end_day_requested() -> void:
 		var week_start_day: int = int(week_range["start_day"])
 		var week_end_day: int = int(week_range["end_day"])
 		var week_index: int = _run_manager.get_week_index()
-		var net_worth_before_expense := _player_portfolio.get_net_worth(_market_manager)
-		var grace_week := week_index == 1
-		var raw_weekly_notional := _player_portfolio.get_trade_notional_in_day_range(week_start_day, week_end_day)
-		var weekly_notional := _player_portfolio.get_effective_trade_notional_in_day_range(week_start_day, week_end_day)
-		var traded_this_week := _player_portfolio.has_meaningful_trade_in_day_range(week_start_day, week_end_day)
-		var holdings_value := _player_portfolio.get_holdings_value(_market_manager)
-		var weekly_target_notional := _weekly_activity_notional_target()
-		var activity_state := WEEKLY_ACTIVITY_SERVICE.evaluate_activity(
-			traded_this_week,
-			weekly_notional,
-			holdings_value,
-			weekly_target_notional
-		)
-		var full_activity := bool(activity_state.get("full_activity", false))
-		var low_activity := bool(activity_state.get("low_activity", false))
-		var activity_label := str(activity_state.get("activity_label", "Nula"))
-		var activity_tier := int(activity_state.get("activity_tier", 0))
-		var inactivity_surcharge := WEEKLY_ACTIVITY_SERVICE.resolve_inactivity_surcharge(
-			grace_week,
-			traded_this_week,
-			full_activity,
-			low_activity
-		)
-		var weekly_charge := _run_manager.weekly_expense + inactivity_surcharge
-		var expense_result := _player_portfolio.apply_weekly_expense(
-				weekly_charge,
-				_upgrade_manager.get_weekly_expense_multiplier()
-			)
-		var charged_amount := float(expense_result.get("charged_amount", 0.0))
+		var objective_snapshot := _get_objective_plan_snapshot()
+		var weekly_activity_snapshot: Dictionary = _weekly_cycle_service.build_weekly_activity_snapshot({
+			"player_portfolio": _player_portfolio,
+			"market_manager": _market_manager,
+			"week_index": week_index,
+			"week_start_day": week_start_day,
+			"week_end_day": week_end_day,
+			"weekly_target_notional": _weekly_activity_notional_target()
+		})
+		var weekly_result: Dictionary = _weekly_cycle_service.apply_weekly_charge({
+			"run_manager": _run_manager,
+			"player_portfolio": _player_portfolio,
+			"market_manager": _market_manager,
+			"upgrade_manager": _upgrade_manager,
+			"week_open_net_worth": _week_open_net_worth,
+			"objective_snapshot": objective_snapshot,
+			"activity_snapshot": weekly_activity_snapshot
+		})
+		var charged_amount := float(weekly_result.get("charged_amount", 0.0))
+		var inactivity_surcharge := float(weekly_result.get("inactivity_surcharge", 0.0))
+		var weekly_notional := float(weekly_result.get("weekly_notional", 0.0))
+		var raw_weekly_notional := float(weekly_result.get("raw_weekly_notional", weekly_notional))
+		var traded_this_week := bool(weekly_result.get("traded_this_week", false))
+		var holdings_value := float(weekly_result.get("holdings_value", 0.0))
+		var weekly_target_notional := float(weekly_result.get("weekly_target_notional", 0.0))
+		var full_activity := bool(weekly_result.get("full_activity", false))
+		var low_activity := bool(weekly_result.get("low_activity", false))
+		var activity_label := str(weekly_result.get("activity_label", "Nula"))
+		var activity_tier := int(weekly_result.get("activity_tier", 0))
+		var grace_week := bool(weekly_result.get("grace_week", false))
 		expense_text = "Gasto semanal: %s (%s base + %s por inactividad). " % [
 			_money(charged_amount),
 			_money(_run_manager.weekly_expense),
@@ -341,11 +346,10 @@ func _on_end_day_requested() -> void:
 				_money(_player_portfolio.debt)
 			]
 		)
-		var charge_severity := "info"
-		if _player_portfolio.debt >= PlayerPortfolio.MAX_TRADING_DEBT:
-			charge_severity = "danger"
-		elif _player_portfolio.debt >= PlayerPortfolio.MAX_TRADING_DEBT * 0.75:
-			charge_severity = "warning"
+		var charge_severity: String = _weekly_cycle_service.resolve_charge_alert_severity(
+			_player_portfolio.debt,
+			PlayerPortfolio.MAX_TRADING_DEBT
+		)
 		_queue_runtime_alert(
 			"D%02d: cobro semanal %s (base %s + actividad %s). Deuda ahora %s." % [
 				_run_manager.current_day,
@@ -369,29 +373,19 @@ func _on_end_day_requested() -> void:
 				_money(raw_weekly_notional),
 				_money(weekly_notional)
 			])
-		var objective_snapshot := _get_objective_plan_snapshot()
-		var objective_opening_net := float(objective_snapshot.get("opening_net_worth", _week_open_net_worth))
-		var objective_metrics := {
-			"weekly_notional": weekly_notional,
-			"traded_tickers": _player_portfolio.get_traded_tickers_in_day_range(week_start_day, week_end_day).size(),
-			"net_delta": net_worth_before_expense - objective_opening_net
-		}
+		var objective_metrics: Dictionary = weekly_result.get("objective_metrics", {})
 		var objective_results := _evaluate_weekly_objectives(objective_metrics)
 		var objective_completed_count := int(objective_results.get("completed_count", 0))
-		var offered_count := clampi(activity_tier + objective_completed_count - 1, 0, 3)
+		var offered_count: int = _weekly_cycle_service.resolve_upgrade_offer_count(activity_tier, objective_completed_count)
 		should_offer_weekly_upgrade = offered_count > 0
-		if grace_week:
-			weekly_note += " Semana 1 en modo gracia."
-		if objective_completed_count <= 0:
-			weekly_note += " Objetivos semanales 0/2: recompensa reducida."
-		else:
-			weekly_note += " Objetivos semanales %d/2." % objective_completed_count
-		if not traded_this_week:
-			weekly_note += " Sin operaciones validas: no hay mejora semanal."
-		elif not full_activity and not low_activity:
-			weekly_note += " Actividad insuficiente: bonus bloqueado."
-		if offered_count >= 3:
-			weekly_note += " Semana excelente: maximo de opciones."
+		weekly_note += _weekly_cycle_service.build_weekly_note({
+			"grace_week": grace_week,
+			"objective_completed_count": objective_completed_count,
+			"traded_this_week": traded_this_week,
+			"full_activity": full_activity,
+			"low_activity": low_activity,
+			"offered_count": offered_count
+		})
 		if should_offer_weekly_upgrade:
 			var offer_gate := _evaluate_upgrade_offer_gate(_run_manager.current_day)
 			if not bool(offer_gate.get("allowed", false)):
@@ -418,29 +412,16 @@ func _on_end_day_requested() -> void:
 		else:
 			_awaiting_upgrade_choice = false
 
-		var net_worth_after_expense := _player_portfolio.get_net_worth(_market_manager)
-		weekly_recap_data = {
-			"week_index": week_index,
-			"week_start_day": week_start_day,
-			"week_end_day": week_end_day,
-			"opening_net_worth": _week_open_net_worth,
-			"net_worth_before_expense": net_worth_before_expense,
-			"net_worth_after_expense": net_worth_after_expense,
+		var net_worth_after_expense := float(weekly_result.get("net_worth_after_expense", _player_portfolio.get_net_worth(_market_manager)))
+		weekly_recap_data = _weekly_cycle_service.build_weekly_recap_data({
+			"weekly_result": weekly_result,
+			"week_open_net_worth": _week_open_net_worth,
 			"cash": _player_portfolio.cash,
 			"debt": _player_portfolio.debt,
-			"charged_amount": charged_amount,
 			"base_weekly_expense": _run_manager.weekly_expense,
-			"inactivity_surcharge": inactivity_surcharge,
-			"activity_label": activity_label,
-			"weekly_notional": weekly_notional,
-			"raw_weekly_notional": raw_weekly_notional,
-			"weekly_target_notional": weekly_target_notional,
-			"holdings_value": holdings_value,
-			"grace_week": grace_week,
-			"traded_this_week": traded_this_week,
-			"weekly_objective_plan": objective_snapshot,
-			"weekly_objective_results": objective_results
-		}
+			"objective_snapshot": objective_snapshot,
+			"objective_results": objective_results
+		})
 		_week_open_net_worth = net_worth_after_expense
 
 	_last_status_message = _build_day_summary(effective_news, market_report, expense_text)
@@ -513,21 +494,21 @@ func _process_tutorial_end_day() -> void:
 
 
 func _check_run_end_conditions() -> void:
-	if _is_tutorial_run:
-		if _tutorial_manager.is_tutorial_completed():
-			_finish_run(true, "Tutorial completado.")
-		elif _run_manager.has_reached_run_limit():
-			_finish_run(true, "Tutorial completado por limite de dias.")
+	var outcome: Dictionary = _run_outcome_service.resolve_outcome({
+		"is_tutorial_run": _is_tutorial_run,
+		"tutorial_completed": _tutorial_manager.is_tutorial_completed(),
+		"reached_run_limit": _run_manager.has_reached_run_limit(),
+		"net_worth": _player_portfolio.get_net_worth(_market_manager),
+		"debt": _player_portfolio.debt,
+		"debt_defeat_threshold": 1000.0,
+		"max_days": _run_manager.max_days
+	})
+	if not bool(outcome.get("has_outcome", false)):
 		return
-	var net_worth := _player_portfolio.get_net_worth(_market_manager)
-	if _player_portfolio.debt > 1000.0:
-		_finish_run(false, "Derrota: la deuda supero $1000.")
-		return
-	if net_worth < 0.0:
-		_finish_run(false, "Derrota: patrimonio neto negativo.")
-		return
-	if _run_manager.has_reached_run_limit():
-		_finish_run(true, "Victoria: sobreviviste los %d dias." % _run_manager.max_days)
+	_finish_run(
+		bool(outcome.get("victory", false)),
+		str(outcome.get("reason", ""))
+	)
 
 
 func _finish_run(victory: bool, reason: String) -> void:
@@ -543,31 +524,31 @@ func _finish_run(victory: bool, reason: String) -> void:
 		_news_manager.clear_tutorial_scripted_news()
 		_market_manager.clear_tutorial_scripted_market()
 	_run_manager.clear_weekly_objective_display()
-	var title := "RUN COMPLETADA" if victory else "RUN PERDIDA"
+	var title: String = _run_outcome_service.run_end_title(victory)
 	if _game_ui != null:
 		_game_ui.show_run_end(title, reason)
 
 	# TODO: Expandir snapshot con log completo de eventos para replays y analisis.
-	var snapshot := {
-		"day": _run_manager.current_day,
-		"victory": victory,
-		"reason": reason,
-		"portfolio": _player_portfolio.get_snapshot()
-	}
+	var snapshot: Dictionary = _run_outcome_service.build_run_snapshot(
+		_run_manager.current_day,
+		victory,
+		reason,
+		_player_portfolio.get_snapshot()
+	)
 	_save_manager.save_run_stub(snapshot)
-	print("[DEBUG][GameManager] %s detectada | razon=%s dia=%d patrimonio=%s deuda=%s" % [
-		"victoria" if victory else "derrota",
+	print(_run_outcome_service.build_debug_message(
+		victory,
 		reason,
 		_run_manager.current_day,
 		_money(_player_portfolio.get_net_worth(_market_manager)),
 		_money(_player_portfolio.debt)
-	])
-	_append_event_log_entry("D%02d | %s: %s" % [
+	))
+	_append_event_log_entry(_run_outcome_service.build_event_log_entry(
 		_run_manager.current_day,
-		"Victoria" if victory else "Derrota",
+		victory,
 		reason
-	])
-	_queue_runtime_alert(reason, "success" if victory else "danger")
+	))
+	_queue_runtime_alert(reason, _run_outcome_service.alert_severity(victory))
 	_refresh_all_ui()
 
 
@@ -888,26 +869,17 @@ func _build_debt_feedback_snapshot() -> Dictionary:
 	var week_index := _run_manager.get_week_index()
 	var week_start_day := ((_run_manager.days_per_week * (week_index - 1)) + 1)
 	var week_end_day := _run_manager.current_day
-	var weekly_notional := _player_portfolio.get_effective_trade_notional_in_day_range(week_start_day, week_end_day)
-	var traded_meaningful := _player_portfolio.has_meaningful_trade_in_day_range(week_start_day, week_end_day)
-	var holdings_value := _player_portfolio.get_holdings_value(_market_manager)
-	var weekly_target_notional := _weekly_activity_notional_target()
-	var activity_state := WEEKLY_ACTIVITY_SERVICE.evaluate_activity(
-		traded_meaningful,
-		weekly_notional,
-		holdings_value,
-		weekly_target_notional
-	)
-	var full_activity := bool(activity_state.get("full_activity", false))
-	var low_activity := bool(activity_state.get("low_activity", false))
-	var grace_week := week_index == 1
-	var estimated_surcharge := WEEKLY_ACTIVITY_SERVICE.resolve_inactivity_surcharge(
-		grace_week,
-		traded_meaningful,
-		full_activity,
-		low_activity
-	)
-	var activity_label := str(activity_state.get("activity_label", "Nula"))
+	var activity_snapshot: Dictionary = _weekly_cycle_service.build_weekly_activity_snapshot({
+		"player_portfolio": _player_portfolio,
+		"market_manager": _market_manager,
+		"week_index": week_index,
+		"week_start_day": week_start_day,
+		"week_end_day": week_end_day,
+		"weekly_target_notional": _weekly_activity_notional_target()
+	})
+	var estimated_surcharge := float(activity_snapshot.get("inactivity_surcharge", 0.0))
+	var activity_label := str(activity_snapshot.get("activity_label", "Nula"))
+	var grace_week := bool(activity_snapshot.get("grace_week", false))
 	var weekly_multiplier := _upgrade_manager.get_weekly_expense_multiplier()
 	var estimated_charge := (_run_manager.weekly_expense + estimated_surcharge) * maxf(0.1, weekly_multiplier)
 	var debt_limit := PlayerPortfolio.MAX_TRADING_DEBT

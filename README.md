@@ -36,8 +36,13 @@ MVP jugable con:
 - `UpgradeManager`: mejoras semanales temporales.
 - `ContentPackLoader`: carga data-driven de base + packs.
 - `UIManager`: interfaz y feedback visual.
+- `MarketTablePresenter`: payload de filas/resumen para tabla de mercado.
+- `CompanyDetailsPresenter`: payload de detalle contextual y razones legibles.
+- `RunOutcomeService`: reglas de victoria/derrota y payload de cierre de run.
+- `UIFormatHelper`: utilidades de formato/compactado para presentacion de UI.
 - `RunBalanceConfig`: constantes compartidas de balance semanal.
 - `WeeklyActivityService`: reglas de actividad y recargos semanales.
+- `WeeklyCycleService`: procesamiento de actividad/cobro semanal y armado de recap.
 - `WeeklyObjectiveService`: construccion/evaluacion de objetivos por semana.
 
 Nota: el sistema de guardado actual (`SaveManager`) es un **stub** y se mantiene asi por alcance de MVP.
@@ -87,6 +92,20 @@ Puedes extender con packs en `data/packs/<mi_pack>/` con `pack_manifest.json`.
 2. Ejecuta `res://scenes/main/main.tscn`.
 3. Elige `Nueva Run` o `Tutorial Guiado`.
 
+## Validar contenido JSON
+
+```bash
+godot --headless --script scripts/utils/validate_content_json.gd
+```
+
+## Smokes headless
+
+```bash
+godot --headless --script scripts/utils/script_parse_smoke.gd
+godot --headless --script scripts/utils/weekly_cycle_regression_smoke.gd
+godot --headless --script scripts/utils/validate_content_json.gd
+```
+
 ## Deploy web
 
 Workflow CI:
@@ -101,6 +120,6 @@ El usuario/juego de itch.io esta definido en el workflow (`andreullorens/capital
 ## Prioridades inmediatas
 
 1. Reducir tamano de `GameManager` y `UIManager` extrayendo modulos.
-2. Anadir validacion automatica de JSON de contenido.
+2. Ampliar smokes/regresion de balance semanal (no solo validacion de contenido).
 3. Cerrar balance semanal (actividad, recargos, riesgo de deuda).
 4. Pulir UX del tutorial y feedback de decisiones.

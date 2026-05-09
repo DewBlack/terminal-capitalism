@@ -1,0 +1,32 @@
+name: Content Validation
+
+on:
+  pull_request:
+    branches: ["main", "dev", "pre"]
+  push:
+    branches: ["main", "dev", "pre"]
+
+jobs:
+  headless-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3
+
+      - name: Download Godot binary
+        run: |
+          curl -L -o godot.zip "https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_linux.x86_64.zip"
+          unzip godot.zip
+          chmod +x Godot_v4.5.1-stable_linux.x86_64
+
+      - name: Parse Smoke
+        run: |
+          ./Godot_v4.5.1-stable_linux.x86_64 --headless --path ./ --script scripts/utils/script_parse_smoke.gd
+
+      - name: Weekly Balance Smoke
+        run: |
+          ./Godot_v4.5.1-stable_linux.x86_64 --headless --path ./ --script scripts/utils/weekly_cycle_regression_smoke.gd
+
+      - name: Validate JSON content
+        run: |
+          ./Godot_v4.5.1-stable_linux.x86_64 --headless --path ./ --script scripts/utils/validate_content_json.gd
