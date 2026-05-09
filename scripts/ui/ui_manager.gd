@@ -18,11 +18,11 @@ const RUN_CONTEXT_PRESENTER := preload("res://scripts/ui/run_context_presenter.g
 const UPGRADE_CHOICE_PRESENTER := preload("res://scripts/ui/upgrade_choice_presenter.gd")
 const UPGRADE_CHOICE_FACTORY := preload("res://scripts/ui/upgrade_choice_factory.gd")
 const COMPANY_DETAILS_PRESENTER := preload("res://scripts/ui/company_details_presenter.gd")
-const TRADE_PREVIEW_PRESENTER := preload("res://scripts/ui/trade_preview_presenter.gd")
 const HEADER_PRESENTER := preload("res://scripts/ui/header_presenter.gd")
 const HEADER_METRICS_PRESENTER := preload("res://scripts/ui/header_metrics_presenter.gd")
 const SELECTION_CONTEXT_PRESENTER := preload("res://scripts/ui/selection_context_presenter.gd")
 const UI_FEEDBACK_CONTROLLER := preload("res://scripts/ui/ui_feedback_controller.gd")
+const UI_TRADE_ACTION_CONTROLLER := preload("res://scripts/ui/ui_trade_action_controller.gd")
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
 const MOVEMENT_REASON_MAX_CHARS := 88
@@ -45,6 +45,7 @@ var _history_visible: bool = false
 var _news_history_visible: bool = false
 var _last_status_message: String = ""
 var _ui_feedback_controller = null
+var _trade_action_controller = null
 var _market_ticker_order: Array[String] = []
 var _company_row_controls_by_ticker: Dictionary = {}
 var _tutorial_state: Dictionary = {"active": false}
@@ -104,8 +105,6 @@ var _tutorial_state: Dictionary = {"active": false}
 @onready var _weekly_recap_body: RichTextLabel = $WeeklyRecapPanel/RecapCenter/RecapVBox/RecapBody
 @onready var _weekly_recap_continue_button: Button = $WeeklyRecapPanel/RecapCenter/RecapVBox/RecapContinueButton
 
-var _trade_preview_label: Label
-
 
 func _ready() -> void:
 	_buy_button.pressed.connect(_on_buy_button_pressed)
@@ -136,7 +135,21 @@ func _ready() -> void:
 		_toast_panel,
 		_toast_label
 	)
-	_setup_trade_preview_label()
+	_trade_action_controller = UI_TRADE_ACTION_CONTROLLER.new()
+	_trade_action_controller.setup(
+		_details_vbox,
+		_quantity_input,
+		_buy_button,
+		_sell_button,
+		_end_day_button
+	)
+	if _run_manager != null:
+		_trade_action_controller.bind_managers(
+			_run_manager,
+			_player_portfolio,
+			_market_manager,
+			_upgrade_manager
+		)
 	_apply_action_hints()
 	_news_title.text = "Periodico del Dia"
 	_news_history_button.text = "Ver historico"
@@ -154,6 +167,13 @@ func bind_managers(
 	_market_manager = market_manager
 	_news_manager = news_manager
 	_upgrade_manager = upgrade_manager
+	if _trade_action_controller != null:
+		_trade_action_controller.bind_managers(
+			_run_manager,
+			_player_portfolio,
+			_market_manager,
+			_upgrade_manager
+		)
 
 	_connect_manager_signals()
 	_news_history_visible = false
@@ -176,7 +196,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 	_update_market_table()
 	_update_selected_company_details()
 	_update_selection_context()
-	_update_trade_preview()
+	_update_trade_action_state()
 	if _ui_feedback_controller != null:
 		_ui_feedback_controller.update_feedback_panel(_player_portfolio)
 		_ui_feedback_controller.apply_status_text(_last_status_message)
@@ -189,9 +209,7 @@ func show_run_end(title: String, description: String) -> void:
 	_end_run_panel.visible = true
 	_end_run_title.text = title
 	_end_run_description.text = description
-	_buy_button.disabled = true
-	_sell_button.disabled = true
-	_end_day_button.disabled = true
+	_set_action_buttons_enabled(false)
 
 
 func set_event_log_entries(entries: Array[String]) -> void:
@@ -217,7 +235,7 @@ func set_tutorial_state(state: Dictionary) -> void:
 	_apply_tutorial_visual_state()
 	# Recalcula botones al cambiar de paso tutorial (ej. cuando Pasar Dia pasa de bloqueado a habilitado).
 	if _run_manager != null:
-		_update_trade_preview()
+		_update_trade_action_state()
 
 
 func get_tutorial_target_rect(target_id: String, ticker_hint: String = "") -> Rect2:
@@ -484,32 +502,27 @@ func _apply_company_details_model(detail_model: Dictionary, trade_markers: Array
 
 
 func _on_buy_button_pressed() -> void:
-	if not _tutorial_allows("allow_buy"):
-		_last_status_message = "Sigue el paso actual del tutorial."
-		refresh_all_ui()
-		return
-	if _selected_ticker.is_empty():
-		_last_status_message = "Selecciona una empresa para comprar."
+	var validation := _validate_trade_action("buy")
+	if not bool(validation.get("allowed", false)):
+		_last_status_message = str(validation.get("status_message", "No se puede comprar ahora."))
 		refresh_all_ui()
 		return
 	emit_signal("buy_requested", _selected_ticker, int(_quantity_input.value))
 
 
 func _on_sell_button_pressed() -> void:
-	if not _tutorial_allows("allow_sell"):
-		_last_status_message = "Sigue el paso actual del tutorial."
-		refresh_all_ui()
-		return
-	if _selected_ticker.is_empty():
-		_last_status_message = "Selecciona una empresa para vender."
+	var validation := _validate_trade_action("sell")
+	if not bool(validation.get("allowed", false)):
+		_last_status_message = str(validation.get("status_message", "No se puede vender ahora."))
 		refresh_all_ui()
 		return
 	emit_signal("sell_requested", _selected_ticker, int(_quantity_input.value))
 
 
 func _on_end_day_button_pressed() -> void:
-	if not _tutorial_allows("allow_end_day"):
-		_last_status_message = "Sigue el paso actual del tutorial."
+	var validation := _validate_trade_action("end_day")
+	if not bool(validation.get("allowed", false)):
+		_last_status_message = str(validation.get("status_message", "No puedes cerrar el dia ahora."))
 		refresh_all_ui()
 		return
 	emit_signal("end_day_requested")
@@ -650,15 +663,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_select_relative_company(1)
 			accept_event()
 		KEY_B:
-			if _tutorial_allows("allow_buy") and not _buy_button.disabled:
+			if _trade_action_controller != null and _trade_action_controller.can_trigger_buy_hotkey(_tutorial_state):
 				_on_buy_button_pressed()
 				accept_event()
 		KEY_V:
-			if _tutorial_allows("allow_sell") and not _sell_button.disabled:
+			if _trade_action_controller != null and _trade_action_controller.can_trigger_sell_hotkey(_tutorial_state):
 				_on_sell_button_pressed()
 				accept_event()
 		KEY_ENTER, KEY_KP_ENTER:
-			if _tutorial_allows("allow_end_day") and not _end_day_button.disabled:
+			if _trade_action_controller != null and _trade_action_controller.can_trigger_end_day_hotkey(_tutorial_state):
 				_on_end_day_button_pressed()
 				accept_event()
 		_:
@@ -713,6 +726,9 @@ func _clear_container(container: Node) -> void:
 
 
 func _set_action_buttons_enabled(enabled: bool) -> void:
+	if _trade_action_controller != null:
+		_trade_action_controller.set_action_buttons_enabled(enabled)
+		return
 	_buy_button.disabled = not enabled
 	_sell_button.disabled = not enabled
 	_end_day_button.disabled = not enabled
@@ -737,7 +753,8 @@ func _apply_tutorial_visual_state() -> void:
 		return
 	if not _is_tutorial_active():
 		_tutorial_overlay.visible = false
-		_quantity_input.editable = true
+		if _trade_action_controller != null:
+			_trade_action_controller.clear_tutorial_action_state()
 		_news_history_button.disabled = false
 		_history_button.disabled = false
 		return
@@ -754,15 +771,10 @@ func _apply_tutorial_visual_state() -> void:
 	else:
 		overlay_state["highlight_rect_global"] = true
 	_tutorial_overlay.apply_state(overlay_state)
-	_quantity_input.editable = _tutorial_allows("allow_buy") or _tutorial_allows("allow_sell")
 	_news_history_button.disabled = true
 	_history_button.disabled = true
-	if not _are_actions_locked():
-		if not _tutorial_allows("allow_buy"):
-			_buy_button.disabled = true
-		if not _tutorial_allows("allow_sell"):
-			_sell_button.disabled = true
-		_end_day_button.disabled = not _tutorial_allows("allow_end_day")
+	if _trade_action_controller != null:
+		_trade_action_controller.apply_tutorial_action_state(_tutorial_state, _are_actions_locked())
 
 
 func _are_actions_locked() -> bool:
@@ -775,77 +787,28 @@ func _on_ui_resized() -> void:
 	_apply_tutorial_visual_state()
 
 
-func _setup_trade_preview_label() -> void:
-	_trade_preview_label = Label.new()
-	_trade_preview_label.name = "TradePreviewLabel"
-	_trade_preview_label.clip_text = true
-	_trade_preview_label.text = "Coste estimado de operacion."
-	_details_vbox.add_child(_trade_preview_label)
-	_details_vbox.move_child(_trade_preview_label, _details_vbox.get_child_count() - 3)
+func _validate_trade_action(action_id: String) -> Dictionary:
+	if _trade_action_controller == null:
+		return {"allowed": false, "status_message": "Controles de trading no disponibles."}
+	match action_id:
+		"buy":
+			return _trade_action_controller.validate_buy_action(_selected_ticker, _tutorial_state)
+		"sell":
+			return _trade_action_controller.validate_sell_action(_selected_ticker, _tutorial_state)
+		"end_day":
+			return _trade_action_controller.validate_end_day_action(_tutorial_state)
+		_:
+			return {"allowed": false, "status_message": "Accion no soportada."}
 
 
-func _update_trade_preview() -> void:
-	if _trade_preview_label == null:
+func _update_trade_action_state() -> void:
+	if _trade_action_controller == null:
 		return
-	var quantity := maxi(1, int(_quantity_input.value))
-	if _run_manager == null or _player_portfolio == null or _market_manager == null or _upgrade_manager == null:
-		_apply_trade_preview_model(
-			TRADE_PREVIEW_PRESENTER.build_unavailable_model(quantity, ""),
-			null
-		)
-		return
-	var company := _market_manager.get_company_by_ticker(_selected_ticker)
-	if company == null:
-		_apply_trade_preview_model(
-			TRADE_PREVIEW_PRESENTER.build_unavailable_model(quantity, "Selecciona una empresa para ver coste estimado de compra/venta."),
-			null
-		)
-		return
-
-	var buy_preview := _player_portfolio.estimate_buy_order(
-		company,
-		quantity,
-		_upgrade_manager.get_buy_price_multiplier()
+	_trade_action_controller.update_trade_preview(
+		_selected_ticker,
+		_tutorial_state,
+		_are_actions_locked()
 	)
-	var sell_preview := _player_portfolio.estimate_sell_order(
-		company,
-		quantity,
-		_upgrade_manager.get_sell_price_multiplier(),
-		_run_manager.current_day
-	)
-	var preview_model := TRADE_PREVIEW_PRESENTER.build_model(company, quantity, buy_preview, sell_preview)
-	_apply_trade_preview_model(preview_model, company)
-
-func _apply_trade_preview_model(preview_model: Dictionary, company: Company) -> void:
-	_trade_preview_label.text = str(preview_model.get("preview_text", ""))
-	_trade_preview_label.tooltip_text = str(preview_model.get("preview_tooltip", ""))
-	_buy_button.text = str(preview_model.get("buy_button_text", _buy_button.text))
-	_sell_button.text = str(preview_model.get("sell_button_text", _sell_button.text))
-	_end_day_button.text = str(preview_model.get("end_day_button_text", _end_day_button.text))
-	_buy_button.tooltip_text = str(preview_model.get("buy_tooltip", _buy_button.tooltip_text))
-	_sell_button.tooltip_text = str(preview_model.get("sell_tooltip", _sell_button.tooltip_text))
-
-	if company == null:
-		if not _are_actions_locked():
-			_buy_button.disabled = true
-			_sell_button.disabled = true
-			if _is_tutorial_active():
-				_end_day_button.disabled = not _tutorial_allows("allow_end_day")
-		return
-
-	var can_buy := bool(preview_model.get("can_buy", false))
-	var can_sell := bool(preview_model.get("can_sell", false))
-
-	if _are_actions_locked():
-		return
-	_buy_button.disabled = not can_buy
-	_sell_button.disabled = not can_sell
-	if _is_tutorial_active():
-		if not _tutorial_allows("allow_buy"):
-			_buy_button.disabled = true
-		if not _tutorial_allows("allow_sell"):
-			_sell_button.disabled = true
-		_end_day_button.disabled = not _tutorial_allows("allow_end_day")
 
 
 func _update_selection_context() -> void:
