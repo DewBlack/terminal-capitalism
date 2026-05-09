@@ -17,21 +17,15 @@ const NEWS_PANEL_PRESENTER := preload("res://scripts/ui/news_panel_presenter.gd"
 const RUN_CONTEXT_PRESENTER := preload("res://scripts/ui/run_context_presenter.gd")
 const UPGRADE_CHOICE_PRESENTER := preload("res://scripts/ui/upgrade_choice_presenter.gd")
 const UPGRADE_CHOICE_FACTORY := preload("res://scripts/ui/upgrade_choice_factory.gd")
-const TOAST_STYLE_PRESENTER := preload("res://scripts/ui/toast_style_presenter.gd")
 const COMPANY_DETAILS_PRESENTER := preload("res://scripts/ui/company_details_presenter.gd")
 const TRADE_PREVIEW_PRESENTER := preload("res://scripts/ui/trade_preview_presenter.gd")
 const HEADER_PRESENTER := preload("res://scripts/ui/header_presenter.gd")
 const HEADER_METRICS_PRESENTER := preload("res://scripts/ui/header_metrics_presenter.gd")
-const DEBT_FEEDBACK_PRESENTER := preload("res://scripts/ui/debt_feedback_presenter.gd")
 const SELECTION_CONTEXT_PRESENTER := preload("res://scripts/ui/selection_context_presenter.gd")
-const EVENT_LOG_PRESENTER := preload("res://scripts/ui/event_log_presenter.gd")
-const STATUS_PRESENTER := preload("res://scripts/ui/status_presenter.gd")
-const STATUS_MAX_CHARS := 220
+const UI_FEEDBACK_CONTROLLER := preload("res://scripts/ui/ui_feedback_controller.gd")
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
 const MOVEMENT_REASON_MAX_CHARS := 88
-const EVENT_LOG_VISIBLE_MAX := 12
-const TOAST_DURATION_SEC := 3.2
 const MARKET_TAGS_VISIBLE := 3
 const MARKET_TAGS_MAX_CHARS := 24
 const COMPANY_TAGS_VISIBLE := 6
@@ -50,11 +44,7 @@ var _selected_ticker: String = ""
 var _history_visible: bool = false
 var _news_history_visible: bool = false
 var _last_status_message: String = ""
-var _event_log_entries: Array[String] = []
-var _debt_feedback_snapshot: Dictionary = {}
-var _toast_queue: Array[Dictionary] = []
-var _toast_showing: bool = false
-var _toast_timer: Timer = null
+var _ui_feedback_controller = null
 var _market_ticker_order: Array[String] = []
 var _company_row_controls_by_ticker: Dictionary = {}
 var _tutorial_state: Dictionary = {"active": false}
@@ -132,12 +122,20 @@ func _ready() -> void:
 	_upgrade_choice_panel.visible = false
 	_weekly_recap_panel.visible = false
 	_history_text.visible = false
-	_toast_panel.visible = false
 	_tutorial_overlay.visible = false
 	_tutorial_overlay.continue_requested.connect(_on_tutorial_continue_pressed)
 	set_process_unhandled_key_input(true)
 	_apply_ui_tone()
-	_setup_toast_timer()
+	_ui_feedback_controller = UI_FEEDBACK_CONTROLLER.new()
+	add_child(_ui_feedback_controller)
+	_ui_feedback_controller.setup(
+		_status_label,
+		_debt_risk_label,
+		_invoice_preview_label,
+		_event_log_label,
+		_toast_panel,
+		_toast_label
+	)
 	_setup_trade_preview_label()
 	_apply_action_hints()
 	_news_title.text = "Periodico del Dia"
@@ -179,8 +177,9 @@ func refresh_all_ui(status_message: String = "") -> void:
 	_update_selected_company_details()
 	_update_selection_context()
 	_update_trade_preview()
-	_update_feedback_panel()
-	_apply_status_model(STATUS_PRESENTER.build_model(_last_status_message, STATUS_MAX_CHARS))
+	if _ui_feedback_controller != null:
+		_ui_feedback_controller.update_feedback_panel(_player_portfolio)
+		_ui_feedback_controller.apply_status_text(_last_status_message)
 	_apply_tutorial_visual_state()
 
 
@@ -196,26 +195,21 @@ func show_run_end(title: String, description: String) -> void:
 
 
 func set_event_log_entries(entries: Array[String]) -> void:
-	_event_log_entries.clear()
-	for entry in entries:
-		_event_log_entries.append(str(entry))
+	if _ui_feedback_controller == null:
+		return
+	_ui_feedback_controller.set_event_log_entries(entries)
 
 
 func set_debt_feedback_snapshot(snapshot: Dictionary) -> void:
-	_debt_feedback_snapshot = snapshot.duplicate(true)
+	if _ui_feedback_controller == null:
+		return
+	_ui_feedback_controller.set_debt_feedback_snapshot(snapshot)
 
 
 func enqueue_runtime_alerts(alerts: Array[Dictionary]) -> void:
-	for alert_data in alerts:
-		var message := str(alert_data.get("message", "")).strip_edges()
-		if message.is_empty():
-			continue
-		var severity := str(alert_data.get("severity", "info")).to_lower()
-		_toast_queue.append({
-			"message": message,
-			"severity": severity
-		})
-	_show_next_runtime_alert()
+	if _ui_feedback_controller == null:
+		return
+	_ui_feedback_controller.enqueue_runtime_alerts(alerts)
 
 
 func set_tutorial_state(state: Dictionary) -> void:
@@ -315,11 +309,14 @@ func _connect_manager_signals() -> void:
 
 
 func _update_header() -> void:
+	var debt_feedback_snapshot: Dictionary = {}
+	if _ui_feedback_controller != null:
+		debt_feedback_snapshot = _ui_feedback_controller.get_debt_feedback_snapshot()
 	var header_metrics := HEADER_METRICS_PRESENTER.build_metrics(
 		_run_manager,
 		_player_portfolio,
 		_market_manager,
-		_debt_feedback_snapshot
+		debt_feedback_snapshot
 	)
 	var header_model := HEADER_PRESENTER.build_model(
 		int(header_metrics.get("current_day", 1)),
@@ -772,85 +769,6 @@ func _are_actions_locked() -> bool:
 	return _upgrade_choice_panel.visible or _weekly_recap_panel.visible or _end_run_panel.visible
 
 
-func _update_feedback_panel() -> void:
-	_update_debt_risk_panel()
-	_update_event_log_panel()
-
-
-func _update_debt_risk_panel() -> void:
-	var debt_model := DEBT_FEEDBACK_PRESENTER.build_empty_model()
-	if _player_portfolio != null:
-		debt_model = DEBT_FEEDBACK_PRESENTER.build_model(
-			_debt_feedback_snapshot,
-			_player_portfolio.debt,
-			PlayerPortfolio.MAX_TRADING_DEBT
-		)
-	_apply_debt_feedback_model(debt_model)
-
-
-func _apply_debt_feedback_model(debt_model: Dictionary) -> void:
-	_debt_risk_label.text = str(debt_model.get("risk_text", "Sin datos de deuda."))
-	_invoice_preview_label.text = str(debt_model.get("invoice_text", "Sin datos de factura semanal."))
-	_debt_risk_label.remove_theme_color_override("font_color")
-	_debt_risk_label.add_theme_color_override(
-		"font_color",
-		debt_model.get("risk_color", Color(0.73, 0.93, 0.76))
-	)
-
-
-func _update_event_log_panel() -> void:
-	var event_log_model := EVENT_LOG_PRESENTER.build_model(_event_log_entries, EVENT_LOG_VISIBLE_MAX)
-	_event_log_label.text = str(event_log_model.get("text", "Sin eventos importantes todavia."))
-	_event_log_label.tooltip_text = str(event_log_model.get("tooltip", ""))
-
-
-func _setup_toast_timer() -> void:
-	_toast_timer = Timer.new()
-	_toast_timer.one_shot = true
-	_toast_timer.wait_time = TOAST_DURATION_SEC
-	_toast_timer.timeout.connect(_on_toast_timeout)
-	add_child(_toast_timer)
-
-
-func _show_next_runtime_alert() -> void:
-	if _toast_showing:
-		return
-	if _toast_queue.is_empty():
-		_toast_panel.visible = false
-		return
-	var alert_payload: Dictionary = _toast_queue[0]
-	_toast_queue.remove_at(0)
-	var message := str(alert_payload.get("message", ""))
-	if message.is_empty():
-		_show_next_runtime_alert()
-		return
-	var severity := str(alert_payload.get("severity", "info"))
-	_apply_toast_style(severity)
-	_toast_label.text = message
-	_toast_panel.visible = true
-	_toast_showing = true
-	if _toast_timer != null:
-		_toast_timer.start(TOAST_DURATION_SEC)
-
-
-func _apply_toast_style(severity: String) -> void:
-	var style_model := TOAST_STYLE_PRESENTER.build_style_model(severity)
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = style_model.get("background", Color(0.17, 0.22, 0.28, 0.95))
-	panel_style.corner_radius_top_left = 10
-	panel_style.corner_radius_top_right = 10
-	panel_style.corner_radius_bottom_left = 10
-	panel_style.corner_radius_bottom_right = 10
-	_toast_panel.add_theme_stylebox_override("panel", panel_style)
-	_toast_label.add_theme_color_override("font_color", style_model.get("font_color", Color(0.90, 0.96, 1.0, 1.0)))
-
-
-func _on_toast_timeout() -> void:
-	_toast_showing = false
-	_toast_panel.visible = false
-	_show_next_runtime_alert()
-
-
 func _on_ui_resized() -> void:
 	if not _is_tutorial_active():
 		return
@@ -943,12 +861,6 @@ func _update_selection_context() -> void:
 	_selection_label.tooltip_text = str(selection_model.get("tooltip", HOTKEYS_HINT))
 
 
-func _apply_status_model(status_model: Dictionary) -> void:
-	_status_label.text = str(status_model.get("text", "Listo para operar."))
-	_status_label.tooltip_text = str(status_model.get("tooltip", ""))
-	_status_label.add_theme_color_override("font_color", status_model.get("color", Color(0.90, 0.96, 0.99)))
-
-
 func _apply_ui_tone() -> void:
 	var shell_style := _build_shell_style(Color(0.10, 0.11, 0.14, 0.96), Color(0.24, 0.29, 0.36, 1.0))
 	_news_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
@@ -989,5 +901,3 @@ func _apply_action_hints() -> void:
 	_end_day_button.tooltip_text = "Cierra el dia y procesa precios/noticias."
 	_selection_label.tooltip_text = "Selecciona una empresa en la tabla de mercado."
 	_market_header.tooltip_text = HOTKEYS_HINT
-
-
