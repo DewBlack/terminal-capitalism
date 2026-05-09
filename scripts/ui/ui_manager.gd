@@ -25,6 +25,7 @@ const UI_FEEDBACK_CONTROLLER := preload("res://scripts/ui/ui_feedback_controller
 const UI_TRADE_ACTION_CONTROLLER := preload("res://scripts/ui/ui_trade_action_controller.gd")
 const UI_MARKET_SELECTION_CONTROLLER := preload("res://scripts/ui/ui_market_selection_controller.gd")
 const UI_HOTKEY_INPUT_CONTROLLER := preload("res://scripts/ui/ui_hotkey_input_controller.gd")
+const TUTORIAL_OVERLAY_CONTROLLER := preload("res://scripts/ui/tutorial_overlay_controller.gd")
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
 const MOVEMENT_REASON_MAX_CHARS := 88
@@ -49,6 +50,7 @@ var _ui_feedback_controller = null
 var _trade_action_controller = null
 var _market_selection_controller = null
 var _hotkey_input_controller = null
+var _tutorial_overlay_controller = null
 var _tutorial_state: Dictionary = {"active": false}
 
 @onready var _day_label: Label = $MainMargin/MainVBox/HeaderBar/DayLabel
@@ -147,6 +149,15 @@ func _ready() -> void:
 	_market_selection_controller = UI_MARKET_SELECTION_CONTROLLER.new()
 	_market_selection_controller.set_tutorial_state(_tutorial_state)
 	_hotkey_input_controller = UI_HOTKEY_INPUT_CONTROLLER.new()
+	_tutorial_overlay_controller = TUTORIAL_OVERLAY_CONTROLLER.new()
+	_tutorial_overlay_controller.setup(
+		_tutorial_overlay,
+		_news_history_button,
+		_history_button,
+		_trade_action_controller,
+		Callable(self, "get_tutorial_target_rect"),
+		Callable(self, "get_global_rect")
+	)
 	if _run_manager != null:
 		_trade_action_controller.bind_managers(
 			_run_manager,
@@ -680,6 +691,8 @@ func _set_action_buttons_enabled(enabled: bool) -> void:
 
 
 func _is_tutorial_active() -> bool:
+	if _tutorial_overlay_controller != null:
+		return _tutorial_overlay_controller.is_tutorial_active(_tutorial_state)
 	return bool(_tutorial_state.get("active", false))
 
 
@@ -690,32 +703,9 @@ func _get_selected_ticker() -> String:
 
 
 func _apply_tutorial_visual_state() -> void:
-	if _tutorial_overlay == null:
+	if _tutorial_overlay_controller == null:
 		return
-	if not _is_tutorial_active():
-		_tutorial_overlay.visible = false
-		if _trade_action_controller != null:
-			_trade_action_controller.clear_tutorial_action_state()
-		_news_history_button.disabled = false
-		_history_button.disabled = false
-		return
-
-	var overlay_state := _tutorial_state.duplicate(true)
-	var target_id := str(overlay_state.get("target", ""))
-	var target_ticker := str(overlay_state.get("required_ticker", ""))
-	if not target_id.is_empty():
-		overlay_state["highlight_rect"] = get_tutorial_target_rect(target_id, target_ticker)
-	var highlight_rect: Variant = overlay_state.get("highlight_rect", Rect2())
-	if typeof(highlight_rect) != TYPE_RECT2:
-		overlay_state["highlight_rect"] = get_global_rect()
-		overlay_state["highlight_rect_global"] = true
-	else:
-		overlay_state["highlight_rect_global"] = true
-	_tutorial_overlay.apply_state(overlay_state)
-	_news_history_button.disabled = true
-	_history_button.disabled = true
-	if _trade_action_controller != null:
-		_trade_action_controller.apply_tutorial_action_state(_tutorial_state, _are_actions_locked())
+	_tutorial_overlay_controller.apply_tutorial_state(_tutorial_state, _are_actions_locked())
 
 
 func _are_actions_locked() -> bool:
@@ -723,9 +713,11 @@ func _are_actions_locked() -> bool:
 
 
 func _on_ui_resized() -> void:
-	if not _is_tutorial_active():
+	if _tutorial_overlay_controller == null:
 		return
-	_apply_tutorial_visual_state()
+	if not _tutorial_overlay_controller.is_tutorial_active(_tutorial_state):
+		return
+	_tutorial_overlay_controller.on_ui_resized(_tutorial_state, _are_actions_locked())
 
 
 func _validate_trade_action(action_id: String) -> Dictionary:
