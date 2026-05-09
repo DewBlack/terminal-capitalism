@@ -23,6 +23,7 @@ const HEADER_METRICS_PRESENTER := preload("res://scripts/ui/header_metrics_prese
 const SELECTION_CONTEXT_PRESENTER := preload("res://scripts/ui/selection_context_presenter.gd")
 const UI_FEEDBACK_CONTROLLER := preload("res://scripts/ui/ui_feedback_controller.gd")
 const UI_TRADE_ACTION_CONTROLLER := preload("res://scripts/ui/ui_trade_action_controller.gd")
+const UI_MARKET_SELECTION_CONTROLLER := preload("res://scripts/ui/ui_market_selection_controller.gd")
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
 const MOVEMENT_REASON_MAX_CHARS := 88
@@ -40,14 +41,12 @@ var _market_manager: MarketManager
 var _news_manager: NewsManager
 var _upgrade_manager: UpgradeManager
 
-var _selected_ticker: String = ""
 var _history_visible: bool = false
 var _news_history_visible: bool = false
 var _last_status_message: String = ""
 var _ui_feedback_controller = null
 var _trade_action_controller = null
-var _market_ticker_order: Array[String] = []
-var _company_row_controls_by_ticker: Dictionary = {}
+var _market_selection_controller = null
 var _tutorial_state: Dictionary = {"active": false}
 
 @onready var _day_label: Label = $MainMargin/MainVBox/HeaderBar/DayLabel
@@ -143,6 +142,8 @@ func _ready() -> void:
 		_sell_button,
 		_end_day_button
 	)
+	_market_selection_controller = UI_MARKET_SELECTION_CONTROLLER.new()
+	_market_selection_controller.set_tutorial_state(_tutorial_state)
 	if _run_manager != null:
 		_trade_action_controller.bind_managers(
 			_run_manager,
@@ -232,6 +233,8 @@ func enqueue_runtime_alerts(alerts: Array[Dictionary]) -> void:
 
 func set_tutorial_state(state: Dictionary) -> void:
 	_tutorial_state = state.duplicate(true)
+	if _market_selection_controller != null:
+		_market_selection_controller.set_tutorial_state(_tutorial_state)
 	_apply_tutorial_visual_state()
 	# Recalcula botones al cambiar de paso tutorial (ej. cuando Pasar Dia pasa de bloqueado a habilitado).
 	if _run_manager != null:
@@ -259,8 +262,8 @@ func get_tutorial_target_rect(target_id: String, ticker_hint: String = "") -> Re
 		"quantity_input":
 			return _quantity_input.get_global_rect()
 		"market_row":
-			if _company_row_controls_by_ticker.has(ticker_hint):
-				var target_control := _company_row_controls_by_ticker[ticker_hint] as Control
+			if _market_selection_controller != null:
+				var target_control: Control = _market_selection_controller.get_row_control_for_ticker(ticker_hint)
 				if target_control != null:
 					return target_control.get_global_rect()
 			return _market_panel.get_global_rect()
@@ -270,7 +273,7 @@ func get_tutorial_target_rect(target_id: String, ticker_hint: String = "") -> Re
 
 
 func get_selected_ticker() -> String:
-	return _selected_ticker
+	return _get_selected_ticker()
 
 
 func show_weekly_upgrade_choices(choices: Array[RunUpgrade]) -> void:
@@ -414,8 +417,8 @@ func _apply_news_panel_model(news_model: Dictionary) -> void:
 
 func _update_market_table() -> void:
 	_clear_container(_market_rows)
-	_market_ticker_order.clear()
-	_company_row_controls_by_ticker.clear()
+	if _market_selection_controller != null:
+		_market_selection_controller.clear_market_rows()
 	var companies := _market_manager.get_sorted_active_companies()
 	var header_model := MARKET_TABLE_PRESENTER.build_table_header(companies.size(), HOTKEYS_HINT)
 	_market_title.text = str(header_model.get("title", "Mercado"))
@@ -429,12 +432,13 @@ func _update_market_table() -> void:
 
 	for row_index in range(companies.size()):
 		var company: Company = companies[row_index]
-		_market_ticker_order.append(company.ticker)
+		if _market_selection_controller != null:
+			_market_selection_controller.append_market_ticker(company.ticker)
 		var owned_amount := _player_portfolio.get_holding_amount(company.ticker)
 		var row_model := MARKET_TABLE_PRESENTER.build_company_row_model(
 			company,
 			row_index,
-			_selected_ticker,
+			_get_selected_ticker(),
 			owned_amount,
 			MARKET_TAGS_VISIBLE,
 			MARKET_TAGS_MAX_CHARS
@@ -454,16 +458,22 @@ func _update_market_table() -> void:
 		if interactive_controls_variant is Array:
 			for interactive_control in interactive_controls_variant:
 				if interactive_control is Control:
-					_bind_company_row_click(interactive_control as Control, company.ticker)
+					if _market_selection_controller != null:
+						_market_selection_controller.bind_company_row_click(
+							interactive_control as Control,
+							company.ticker,
+							_on_company_selected
+						)
 		_market_rows.add_child(row_card)
-		_company_row_controls_by_ticker[company.ticker] = row_card
+		if _market_selection_controller != null:
+			_market_selection_controller.register_row_control(company.ticker, row_card)
 
 
 func _update_selected_company_details() -> void:
 	if _market_manager == null:
 		return
 	_ensure_selected_company_is_valid()
-	var company := _market_manager.get_company_by_ticker(_selected_ticker)
+	var company := _market_manager.get_company_by_ticker(_get_selected_ticker())
 	if company == null:
 		_apply_company_details_model(
 			COMPANY_DETAILS_PRESENTER.build_empty_model(),
@@ -507,7 +517,7 @@ func _on_buy_button_pressed() -> void:
 		_last_status_message = str(validation.get("status_message", "No se puede comprar ahora."))
 		refresh_all_ui()
 		return
-	emit_signal("buy_requested", _selected_ticker, int(_quantity_input.value))
+	emit_signal("buy_requested", _get_selected_ticker(), int(_quantity_input.value))
 
 
 func _on_sell_button_pressed() -> void:
@@ -516,7 +526,7 @@ func _on_sell_button_pressed() -> void:
 		_last_status_message = str(validation.get("status_message", "No se puede vender ahora."))
 		refresh_all_ui()
 		return
-	emit_signal("sell_requested", _selected_ticker, int(_quantity_input.value))
+	emit_signal("sell_requested", _get_selected_ticker(), int(_quantity_input.value))
 
 
 func _on_end_day_button_pressed() -> void:
@@ -553,65 +563,31 @@ func _on_history_button_pressed() -> void:
 
 
 func _on_company_selected(ticker: String) -> void:
-	if _is_tutorial_active():
-		if not _tutorial_allows("allow_company_select"):
-			return
-		var required_ticker := _tutorial_required_ticker()
-		if not required_ticker.is_empty() and ticker != required_ticker:
-			_last_status_message = "En este paso debes seleccionar %s." % required_ticker
+	if _market_selection_controller == null:
+		return
+	var selection_result: Dictionary = _market_selection_controller.build_selection_result(ticker)
+	if not bool(selection_result.get("apply", false)):
+		var status_message := str(selection_result.get("status_message", ""))
+		if not status_message.is_empty():
+			_last_status_message = status_message
 			refresh_all_ui()
-			return
-	var changed_selection := ticker != _selected_ticker
-	if changed_selection:
-		_selected_ticker = ticker
-		refresh_all_ui()
-	elif _is_tutorial_active():
-		# En tutorial permitimos confirmar la seleccion aunque ya estuviera activa.
-		refresh_all_ui()
-	else:
 		return
-	emit_signal("company_selected", ticker)
-
-
-func _bind_company_row_click(control: Control, ticker: String) -> void:
-	if control == null:
-		return
-	control.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	control.gui_input.connect(_on_company_row_gui_input.bind(ticker))
-
-
-func _on_company_row_gui_input(event: InputEvent, ticker: String) -> void:
-	if not (event is InputEventMouseButton):
-		return
-	var mouse_event := event as InputEventMouseButton
-	if mouse_event == null:
-		return
-	if mouse_event.button_index != MOUSE_BUTTON_LEFT:
-		return
-	if not mouse_event.pressed:
-		return
-	_on_company_selected(ticker)
+	refresh_all_ui()
+	if bool(selection_result.get("emit_signal", false)):
+		emit_signal("company_selected", ticker)
 
 
 func _on_market_panel_gui_input(event: InputEvent) -> void:
-	if not _is_tutorial_active():
+	if _market_selection_controller == null:
 		return
-	if not _tutorial_allows("allow_company_select"):
-		return
-	if not (event is InputEventMouseButton):
-		return
-	var mouse_event := event as InputEventMouseButton
-	if mouse_event == null:
-		return
-	if mouse_event.button_index != MOUSE_BUTTON_LEFT:
-		return
-	if not mouse_event.pressed:
+	if not _market_selection_controller.should_confirm_market_panel_click(event):
 		return
 	_ensure_selected_company_is_valid()
-	if _selected_ticker.is_empty():
+	var selected_ticker := _get_selected_ticker()
+	if selected_ticker.is_empty():
 		return
 	# Fallback: confirmar seleccion desde cualquier click en el panel de mercado.
-	_on_company_selected(_selected_ticker)
+	_on_company_selected(selected_ticker)
 
 
 func _on_back_to_menu_pressed() -> void:
@@ -653,12 +629,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 	match key_event.keycode:
 		KEY_UP:
-			if not _tutorial_allows("allow_company_select"):
+			if _market_selection_controller == null or not _market_selection_controller.should_handle_navigation_hotkey():
 				return
 			_select_relative_company(-1)
 			accept_event()
 		KEY_DOWN:
-			if not _tutorial_allows("allow_company_select"):
+			if _market_selection_controller == null or not _market_selection_controller.should_handle_navigation_hotkey():
 				return
 			_select_relative_company(1)
 			accept_event()
@@ -679,45 +655,29 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 func _select_relative_company(direction: int) -> void:
+	if _market_selection_controller == null:
+		return
 	if direction == 0:
 		return
-	if _market_ticker_order.is_empty():
+	if _market_manager == null:
+		return
+	if _market_manager.get_sorted_active_companies().is_empty():
+		return
+	if not _market_selection_controller.has_market_tickers():
 		_update_market_table()
-	if _market_ticker_order.is_empty():
+	if _market_selection_controller.get_selected_ticker().is_empty():
+		_update_market_table()
+	var selection_result: Dictionary = _market_selection_controller.build_relative_selection_result(direction)
+	if not bool(selection_result.get("apply", false)):
 		return
-	if _selected_ticker.is_empty():
-		_selected_ticker = _market_ticker_order[0]
-		refresh_all_ui()
-		return
-
-	var current_index := _market_ticker_order.find(_selected_ticker)
-	if current_index == -1:
-		_selected_ticker = _market_ticker_order[0]
-		refresh_all_ui()
-		return
-
-	var next_index := current_index + direction
-	if next_index < 0:
-		next_index = _market_ticker_order.size() - 1
-	elif next_index >= _market_ticker_order.size():
-		next_index = 0
-	_selected_ticker = _market_ticker_order[next_index]
 	refresh_all_ui()
 
 
 func _ensure_selected_company_is_valid() -> void:
+	if _market_manager == null or _market_selection_controller == null:
+		return
 	var companies := _market_manager.get_sorted_active_companies()
-	if companies.is_empty():
-		_selected_ticker = ""
-		return
-	if _selected_ticker.is_empty():
-		_selected_ticker = companies[0].ticker
-		return
-
-	for company in companies:
-		if company.ticker == _selected_ticker:
-			return
-	_selected_ticker = companies[0].ticker
+	_market_selection_controller.ensure_selected_company_is_valid(companies)
 
 
 func _clear_container(container: Node) -> void:
@@ -738,14 +698,10 @@ func _is_tutorial_active() -> bool:
 	return bool(_tutorial_state.get("active", false))
 
 
-func _tutorial_allows(action_key: String) -> bool:
-	if not _is_tutorial_active():
-		return true
-	return bool(_tutorial_state.get(action_key, false))
-
-
-func _tutorial_required_ticker() -> String:
-	return str(_tutorial_state.get("required_ticker", ""))
+func _get_selected_ticker() -> String:
+	if _market_selection_controller == null:
+		return ""
+	return _market_selection_controller.get_selected_ticker()
 
 
 func _apply_tutorial_visual_state() -> void:
@@ -792,9 +748,9 @@ func _validate_trade_action(action_id: String) -> Dictionary:
 		return {"allowed": false, "status_message": "Controles de trading no disponibles."}
 	match action_id:
 		"buy":
-			return _trade_action_controller.validate_buy_action(_selected_ticker, _tutorial_state)
+			return _trade_action_controller.validate_buy_action(_get_selected_ticker(), _tutorial_state)
 		"sell":
-			return _trade_action_controller.validate_sell_action(_selected_ticker, _tutorial_state)
+			return _trade_action_controller.validate_sell_action(_get_selected_ticker(), _tutorial_state)
 		"end_day":
 			return _trade_action_controller.validate_end_day_action(_tutorial_state)
 		_:
@@ -805,7 +761,7 @@ func _update_trade_action_state() -> void:
 	if _trade_action_controller == null:
 		return
 	_trade_action_controller.update_trade_preview(
-		_selected_ticker,
+		_get_selected_ticker(),
 		_tutorial_state,
 		_are_actions_locked()
 	)
@@ -815,8 +771,9 @@ func _update_selection_context() -> void:
 	if _selection_label == null:
 		return
 	var selection_model := SELECTION_CONTEXT_PRESENTER.build_empty_model(HOTKEYS_HINT)
-	if _market_manager != null and _player_portfolio != null and not _selected_ticker.is_empty():
-		var company := _market_manager.get_company_by_ticker(_selected_ticker)
+	var selected_ticker := _get_selected_ticker()
+	if _market_manager != null and _player_portfolio != null and not selected_ticker.is_empty():
+		var company := _market_manager.get_company_by_ticker(selected_ticker)
 		if company != null:
 			var amount := _player_portfolio.get_holding_amount(company.ticker)
 			selection_model = SELECTION_CONTEXT_PRESENTER.build_model(company, amount, HOTKEYS_HINT)
