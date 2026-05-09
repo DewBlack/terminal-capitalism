@@ -13,7 +13,7 @@ const WEEKLY_EFFECTS_SERVICE := preload("res://scripts/run/weekly_effects_servic
 const UPGRADE_OFFER_GATE_SERVICE := preload("res://scripts/run/upgrade_offer_gate_service.gd")
 const RUN_NOTIFICATION_BUFFER_SERVICE := preload("res://scripts/run/run_notification_buffer_service.gd")
 const DEBT_RISK_TRANSITION_SERVICE := preload("res://scripts/run/debt_risk_transition_service.gd")
-const RUN_OUTCOME_SERVICE := preload("res://scripts/run/run_outcome_service.gd")
+const RUN_LIFECYCLE_SERVICE := preload("res://scripts/run/run_lifecycle_service.gd")
 const WEEKLY_OBJECTIVE_SERVICE := preload("res://scripts/run/weekly_objective_service.gd")
 const MARKET_REPORT_EVENT_SERVICE := preload("res://scripts/run/market_report_event_service.gd")
 const TUTORIAL_ACTION_CONTINUE := "continue"
@@ -126,99 +126,51 @@ func _show_game_screen() -> void:
 
 
 func _on_start_run_requested() -> void:
-	var content := _content_pack_loader.load_all_content()
-	var seed_value := randi()
-	var initial_company_count := randi_range(7, 11)
-	_is_tutorial_run = false
-	_run_active = true
-	_run_ended = false
-	_pending_upgrade_choices.clear()
-	_awaiting_upgrade_choice = false
-	_awaiting_weekly_recap_ack = false
-	_event_log_entries.clear()
-	_pending_runtime_alerts.clear()
-	_last_debt_risk_label = ""
-	_last_upgrade_offer_day = -1000
-	_upgrade_offer_trigger_days.clear()
-	_tutorial_manager.reset_tutorial()
-	_news_manager.clear_tutorial_scripted_news()
-	_market_manager.clear_tutorial_scripted_market()
-
-	_run_manager.reset_for_new_run(30, RUN_BASE_WEEKLY_EXPENSE)
-	_player_portfolio.reset_for_new_run(RUN_STARTING_CASH)
-	_upgrade_manager.setup(seed_value + 3301)
-	_company_generator.setup(content, seed_value + 41)
-	_news_manager.setup(content, seed_value + 77)
-	_market_manager.setup(content, _company_generator, _tag_effect_system, seed_value + 123, initial_company_count)
-	_objective_rng.seed = seed_value + 5159
-	_roll_weekly_objectives_for_week(_run_manager.get_week_index(), true)
-	_update_weekly_objective_display()
-	_last_status_message = "Nueva run iniciada. Sobrevive hasta el dia 30. Capital inicial %s, gasto semanal base %s (+%s inactivo, +%s actividad baja). Semana 1 sin penalizacion de inactividad. Mercado inicial: %d empresas. %s. %s. %s." % [
-		_money(RUN_STARTING_CASH),
-		_money(RUN_BASE_WEEKLY_EXPENSE),
-		_money(INACTIVITY_WEEKLY_SURCHARGE),
-		_money(LOW_ACTIVITY_WEEKLY_SURCHARGE),
-		initial_company_count,
-		_company_generator.get_run_profile_text(),
-		_market_manager.get_run_regime_text(),
-		_news_manager.get_run_news_profile_text()
-	]
-	var objectives_preview := _format_objective_preview_text()
-	if not objectives_preview.is_empty():
-		_last_status_message += " Objetivos semanales: %s." % objectives_preview
-	_last_debt_risk_label = str(_build_debt_feedback_snapshot().get("risk_label", "Bajo"))
-	_append_event_log_entry("D01 | Run iniciada con capital %s y gasto base %s." % [_money(RUN_STARTING_CASH), _money(RUN_BASE_WEEKLY_EXPENSE)])
-	_append_event_log_entry("D01 | Mercado inicial: %d empresas activas." % initial_company_count)
-	_queue_runtime_alert("Run iniciada: sobrevive hasta el dia %d." % _run_manager.max_days, "success")
-	if not objectives_preview.is_empty():
-		_append_event_log_entry("D01 | Objetivos semana 1: %s." % objectives_preview)
-		_queue_runtime_alert("Objetivos semana 1 disponibles en cabecera.", "info")
-	_append_event_log_entry(
-		"D01 | Opciones de mejora: cooldown %dd + trigger de quiebra/fusion en ultimos %d dia(s)." % [
-			UPGRADE_OFFER_MIN_DAYS_BETWEEN,
-			UPGRADE_OFFER_TRIGGER_LOOKBACK_DAYS
-		]
+	var lifecycle_state := RUN_LIFECYCLE_SERVICE.start_standard_run(
+		_content_pack_loader,
+		_run_manager,
+		_player_portfolio,
+		_market_manager,
+		_news_manager,
+		_upgrade_manager,
+		_tag_effect_system,
+		_company_generator,
+		_tutorial_manager,
+		_objective_rng,
+		RUN_STARTING_CASH,
+		RUN_BASE_WEEKLY_EXPENSE,
+		INACTIVITY_WEEKLY_SURCHARGE,
+		LOW_ACTIVITY_WEEKLY_SURCHARGE,
+		UPGRADE_OFFER_MIN_DAYS_BETWEEN,
+		UPGRADE_OFFER_TRIGGER_LOOKBACK_DAYS,
+		Callable(self, "_roll_weekly_objectives_for_week"),
+		Callable(self, "_update_weekly_objective_display"),
+		Callable(self, "_format_objective_preview_text"),
+		Callable(self, "_build_debt_feedback_snapshot"),
+		Callable(self, "_money")
 	)
+	_apply_run_lifecycle_start_state(lifecycle_state)
 
 	_show_game_screen()
 	_refresh_all_ui()
 
 
 func _on_start_tutorial_requested() -> void:
-	var content := _content_pack_loader.load_all_content()
-	var tutorial_seed := 424242
-	_is_tutorial_run = true
-	_run_active = true
-	_run_ended = false
-	_pending_upgrade_choices.clear()
-	_awaiting_upgrade_choice = false
-	_awaiting_weekly_recap_ack = false
-	_event_log_entries.clear()
-	_pending_runtime_alerts.clear()
-	_last_debt_risk_label = ""
-	_last_upgrade_offer_day = -1000
-	_upgrade_offer_trigger_days.clear()
-
-	_tutorial_manager.start_tutorial()
-	_run_manager.reset_for_new_run(_tutorial_manager.get_max_days(), 0.0)
-	_player_portfolio.reset_for_new_run(_tutorial_manager.get_starting_cash())
-	_upgrade_manager.setup(tutorial_seed + 3301)
-	_company_generator.setup(content, tutorial_seed + 41)
-	_news_manager.setup(content, tutorial_seed + 77)
-	_market_manager.setup(content, _company_generator, _tag_effect_system, tutorial_seed + 123, 3)
-	_news_manager.configure_tutorial_scripted_news(_tutorial_manager.get_scripted_news_by_day())
-	_market_manager.configure_tutorial_scripted_market(_tutorial_manager.get_scripted_market_changes_by_day())
-	_market_manager.replace_companies_from_dicts(_tutorial_manager.get_tutorial_company_dicts())
-
-	_week_open_net_worth = _player_portfolio.get_net_worth(_market_manager)
-	_weekly_objective_plan.clear()
-	_run_manager.clear_weekly_objective_display()
-	_last_status_message = _tutorial_manager.get_current_step_message()
-	_append_event_log_entry("D01 | Tutorial guiado iniciado.")
-	_queue_runtime_alert("Tutorial activo: sigue los pasos resaltados.", "info")
-
+	var lifecycle_state := RUN_LIFECYCLE_SERVICE.start_tutorial_run(
+		_content_pack_loader,
+		_run_manager,
+		_player_portfolio,
+		_market_manager,
+		_news_manager,
+		_upgrade_manager,
+		_tag_effect_system,
+		_company_generator,
+		_tutorial_manager
+	)
+	_apply_run_lifecycle_start_state(lifecycle_state)
 	_show_game_screen()
-	_news_manager.roll_daily_news(_run_manager.current_day, _market_manager.get_active_companies())
+	if bool(lifecycle_state.get("roll_daily_news_on_start", false)):
+		_news_manager.roll_daily_news(_run_manager.current_day, _market_manager.get_active_companies())
 	_refresh_all_ui()
 
 
@@ -433,9 +385,9 @@ func _process_tutorial_end_day() -> void:
 
 
 func _check_run_end_conditions() -> void:
-	var outcome := RUN_OUTCOME_SERVICE.evaluate_run_outcome(
+	var outcome := RUN_LIFECYCLE_SERVICE.evaluate_run_outcome(
 		_is_tutorial_run,
-		_tutorial_manager.is_tutorial_completed(),
+		_tutorial_manager,
 		_run_manager,
 		_player_portfolio,
 		_market_manager
@@ -449,44 +401,74 @@ func _check_run_end_conditions() -> void:
 
 
 func _finish_run(victory: bool, reason: String) -> void:
-	var was_tutorial_run := _is_tutorial_run
-	_run_ended = true
-	_run_active = false
-	_is_tutorial_run = false
-	_awaiting_upgrade_choice = false
-	_awaiting_weekly_recap_ack = false
-	_pending_upgrade_choices.clear()
-	if was_tutorial_run:
-		_tutorial_manager.reset_tutorial()
-		_news_manager.clear_tutorial_scripted_news()
-		_market_manager.clear_tutorial_scripted_market()
-	_run_manager.clear_weekly_objective_display()
-	var title := RUN_OUTCOME_SERVICE.build_run_title(victory)
-	if _game_ui != null:
-		_game_ui.show_run_end(title, reason)
-
-	# TODO: Expandir snapshot con log completo de eventos para replays y analisis.
-	var snapshot := RUN_OUTCOME_SERVICE.build_run_snapshot(
-		_run_manager.current_day,
+	var finish_result := RUN_LIFECYCLE_SERVICE.finish_run(
 		victory,
 		reason,
-		_player_portfolio
+		_is_tutorial_run,
+		_run_manager,
+		_player_portfolio,
+		_market_manager,
+		_tutorial_manager,
+		_news_manager,
+		_save_manager,
+		Callable(self, "_money")
 	)
-	_save_manager.save_run_stub(snapshot)
-	print("[DEBUG][GameManager] %s detectada | razon=%s dia=%d patrimonio=%s deuda=%s" % [
-		"victoria" if victory else "derrota",
-		reason,
-		_run_manager.current_day,
-		_money(_player_portfolio.get_net_worth(_market_manager)),
-		_money(_player_portfolio.debt)
-	])
-	_append_event_log_entry("D%02d | %s: %s" % [
-		_run_manager.current_day,
-		"Victoria" if victory else "Derrota",
-		reason
-	])
-	_queue_runtime_alert(reason, "success" if victory else "danger")
+	_run_ended = bool(finish_result.get("run_ended", true))
+	_run_active = bool(finish_result.get("run_active", false))
+	_is_tutorial_run = bool(finish_result.get("is_tutorial_run", false))
+	_awaiting_upgrade_choice = bool(finish_result.get("awaiting_upgrade_choice", false))
+	_awaiting_weekly_recap_ack = bool(finish_result.get("awaiting_weekly_recap_ack", false))
+	_pending_upgrade_choices.clear()
+	var title := str(finish_result.get("title", ""))
+	if _game_ui != null:
+		_game_ui.show_run_end(title, reason)
+	var debug_log := str(finish_result.get("debug_log", "")).strip_edges()
+	if not debug_log.is_empty():
+		print(debug_log)
+	_append_event_log_entry(str(finish_result.get("event_log_entry", "")))
+	var runtime_alert_variant: Variant = finish_result.get("runtime_alert", {})
+	if runtime_alert_variant is Dictionary:
+		var runtime_alert: Dictionary = runtime_alert_variant
+		_queue_runtime_alert(
+			str(runtime_alert.get("message", "")),
+			str(runtime_alert.get("severity", "info"))
+		)
 	_refresh_all_ui()
+
+
+func _apply_run_lifecycle_start_state(lifecycle_state: Dictionary) -> void:
+	_is_tutorial_run = bool(lifecycle_state.get("is_tutorial_run", false))
+	_run_active = bool(lifecycle_state.get("run_active", false))
+	_run_ended = bool(lifecycle_state.get("run_ended", false))
+	_awaiting_upgrade_choice = bool(lifecycle_state.get("awaiting_upgrade_choice", false))
+	_awaiting_weekly_recap_ack = bool(lifecycle_state.get("awaiting_weekly_recap_ack", false))
+	_last_status_message = str(lifecycle_state.get("last_status_message", ""))
+	_last_debt_risk_label = str(lifecycle_state.get("last_debt_risk_label", ""))
+	_last_upgrade_offer_day = int(lifecycle_state.get("last_upgrade_offer_day", -1000))
+	_pending_upgrade_choices.clear()
+	_upgrade_offer_trigger_days.clear()
+	_event_log_entries.clear()
+	if bool(lifecycle_state.get("clear_weekly_objective_plan", false)):
+		_weekly_objective_plan.clear()
+	if lifecycle_state.has("week_open_net_worth"):
+		_week_open_net_worth = float(lifecycle_state.get("week_open_net_worth", _week_open_net_worth))
+	var event_entries_variant: Variant = lifecycle_state.get("event_log_entries", [])
+	if event_entries_variant is Array:
+		var event_entries: Array = event_entries_variant
+		for entry in event_entries:
+			_append_event_log_entry(str(entry))
+	_pending_runtime_alerts.clear()
+	var runtime_alerts_variant: Variant = lifecycle_state.get("runtime_alerts", [])
+	if runtime_alerts_variant is Array:
+		var runtime_alerts: Array = runtime_alerts_variant
+		for alert_data in runtime_alerts:
+			if typeof(alert_data) != TYPE_DICTIONARY:
+				continue
+			var alert: Dictionary = alert_data
+			_queue_runtime_alert(
+				str(alert.get("message", "")),
+				str(alert.get("severity", "info"))
+			)
 
 
 func _on_return_to_menu_requested() -> void:
