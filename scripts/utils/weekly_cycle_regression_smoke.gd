@@ -2,6 +2,13 @@ extends SceneTree
 
 const WEEKLY_CYCLE_SERVICE := preload("res://scripts/run/weekly_cycle_service.gd")
 const RUN_OUTCOME_SERVICE := preload("res://scripts/run/run_outcome_service.gd")
+const RUN_MANAGER_SCRIPT := preload("res://scripts/run/run_manager.gd")
+const PLAYER_PORTFOLIO_SCRIPT := preload("res://scripts/player/player_portfolio.gd")
+const MARKET_MANAGER_SCRIPT := preload("res://scripts/market/market_manager.gd")
+const UPGRADE_MANAGER_SCRIPT := preload("res://scripts/run/upgrade_manager.gd")
+
+var _weekly_cycle_service: Object = WEEKLY_CYCLE_SERVICE.new()
+var _run_outcome_service: Object = RUN_OUTCOME_SERVICE.new()
 
 
 func _initialize() -> void:
@@ -24,18 +31,18 @@ func _initialize() -> void:
 
 
 func _run_weekly_grace_case(failures: Array[String]) -> void:
-	var run_manager := RunManager.new()
+	var run_manager = RUN_MANAGER_SCRIPT.new()
 	run_manager.reset_for_new_run(30, 260.0)
 	run_manager.current_day = 7
 
-	var portfolio := PlayerPortfolio.new()
+	var portfolio = PLAYER_PORTFOLIO_SCRIPT.new()
 	portfolio.reset_for_new_run(960.0)
 
-	var market_manager := MarketManager.new()
-	var upgrade_manager := UpgradeManager.new()
+	var market_manager = MARKET_MANAGER_SCRIPT.new()
+	var upgrade_manager = UPGRADE_MANAGER_SCRIPT.new()
 	upgrade_manager.setup(11)
 
-	var result := WEEKLY_CYCLE_SERVICE.process_weekly_expense_day(
+	var result: Dictionary = _weekly_cycle_service.callv("process_weekly_expense_day", [
 		run_manager,
 		portfolio,
 		market_manager,
@@ -43,7 +50,7 @@ func _run_weekly_grace_case(failures: Array[String]) -> void:
 		960.0,
 		{"opening_net_worth": 960.0, "items": []},
 		Callable(self, "_objective_eval_stub")
-	)
+	])
 
 	_expect_float_eq(float(result.get("charged_amount", -1.0)), 260.0, 0.001, "grace_week charged_amount", failures)
 	_expect_bool(bool(result.get("should_offer_weekly_upgrade", true)), false, "grace_week should_offer_weekly_upgrade", failures)
@@ -56,18 +63,18 @@ func _run_weekly_grace_case(failures: Array[String]) -> void:
 
 
 func _run_weekly_inactivity_case(failures: Array[String]) -> void:
-	var run_manager := RunManager.new()
+	var run_manager = RUN_MANAGER_SCRIPT.new()
 	run_manager.reset_for_new_run(30, 260.0)
 	run_manager.current_day = 14
 
-	var portfolio := PlayerPortfolio.new()
+	var portfolio = PLAYER_PORTFOLIO_SCRIPT.new()
 	portfolio.reset_for_new_run(960.0)
 
-	var market_manager := MarketManager.new()
-	var upgrade_manager := UpgradeManager.new()
+	var market_manager = MARKET_MANAGER_SCRIPT.new()
+	var upgrade_manager = UPGRADE_MANAGER_SCRIPT.new()
 	upgrade_manager.setup(23)
 
-	var result := WEEKLY_CYCLE_SERVICE.process_weekly_expense_day(
+	var result: Dictionary = _weekly_cycle_service.callv("process_weekly_expense_day", [
 		run_manager,
 		portfolio,
 		market_manager,
@@ -75,7 +82,7 @@ func _run_weekly_inactivity_case(failures: Array[String]) -> void:
 		960.0,
 		{"opening_net_worth": 960.0, "items": []},
 		Callable(self, "_objective_eval_stub")
-	)
+	])
 
 	_expect_float_eq(float(result.get("inactivity_surcharge", -1.0)), 110.0, 0.001, "week2 inactivity_surcharge", failures)
 	_expect_float_eq(float(result.get("charged_amount", -1.0)), 370.0, 0.001, "week2 charged_amount", failures)
@@ -84,25 +91,25 @@ func _run_weekly_inactivity_case(failures: Array[String]) -> void:
 
 
 func _run_debt_feedback_case(failures: Array[String]) -> void:
-	var run_manager := RunManager.new()
+	var run_manager = RUN_MANAGER_SCRIPT.new()
 	run_manager.reset_for_new_run(30, 260.0)
 	run_manager.current_day = 10
 
-	var portfolio := PlayerPortfolio.new()
+	var portfolio = PLAYER_PORTFOLIO_SCRIPT.new()
 	portfolio.reset_for_new_run(960.0)
 	portfolio.debt = 450.0
 
-	var market_manager := MarketManager.new()
-	var upgrade_manager := UpgradeManager.new()
+	var market_manager = MARKET_MANAGER_SCRIPT.new()
+	var upgrade_manager = UPGRADE_MANAGER_SCRIPT.new()
 	upgrade_manager.setup(37)
 
-	var snapshot := WEEKLY_CYCLE_SERVICE.build_debt_feedback_snapshot(
+	var snapshot: Dictionary = _weekly_cycle_service.callv("build_debt_feedback_snapshot", [
 		run_manager,
 		portfolio,
 		market_manager,
 		upgrade_manager,
 		960.0
-	)
+	])
 
 	var risk_label := str(snapshot.get("risk_label", ""))
 	if risk_label != "Alto":
@@ -114,27 +121,45 @@ func _run_debt_feedback_case(failures: Array[String]) -> void:
 
 
 func _run_outcome_cases(failures: Array[String]) -> void:
-	var run_manager := RunManager.new()
+	var run_manager = RUN_MANAGER_SCRIPT.new()
 	run_manager.reset_for_new_run(30, 260.0)
 	run_manager.current_day = 10
 
-	var portfolio := PlayerPortfolio.new()
+	var portfolio = PLAYER_PORTFOLIO_SCRIPT.new()
 	portfolio.reset_for_new_run(960.0)
-	var market_manager := MarketManager.new()
+	var market_manager = MARKET_MANAGER_SCRIPT.new()
 
 	portfolio.debt = 1001.0
-	var debt_outcome := RUN_OUTCOME_SERVICE.evaluate_run_outcome(false, false, run_manager, portfolio, market_manager)
+	var debt_outcome: Dictionary = _run_outcome_service.callv("evaluate_run_outcome", [
+		false,
+		false,
+		run_manager,
+		portfolio,
+		market_manager
+	])
 	_expect_bool(bool(debt_outcome.get("ended", false)), true, "run_outcome debt ended", failures)
 	_expect_bool(bool(debt_outcome.get("victory", true)), false, "run_outcome debt victory", failures)
 
 	run_manager.current_day = run_manager.max_days
 	portfolio.debt = 0.0
 	portfolio.cash = 960.0
-	var victory_outcome := RUN_OUTCOME_SERVICE.evaluate_run_outcome(false, false, run_manager, portfolio, market_manager)
+	var victory_outcome: Dictionary = _run_outcome_service.callv("evaluate_run_outcome", [
+		false,
+		false,
+		run_manager,
+		portfolio,
+		market_manager
+	])
 	_expect_bool(bool(victory_outcome.get("ended", false)), true, "run_outcome victory ended", failures)
 	_expect_bool(bool(victory_outcome.get("victory", false)), true, "run_outcome victory flag", failures)
 
-	var tutorial_outcome := RUN_OUTCOME_SERVICE.evaluate_run_outcome(true, true, run_manager, portfolio, market_manager)
+	var tutorial_outcome: Dictionary = _run_outcome_service.callv("evaluate_run_outcome", [
+		true,
+		true,
+		run_manager,
+		portfolio,
+		market_manager
+	])
 	_expect_bool(bool(tutorial_outcome.get("ended", false)), true, "run_outcome tutorial ended", failures)
 	_expect_bool(bool(tutorial_outcome.get("victory", false)), true, "run_outcome tutorial victory", failures)
 	_free_smoke_nodes([run_manager, portfolio, market_manager])
