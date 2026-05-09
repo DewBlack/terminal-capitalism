@@ -24,6 +24,7 @@ const SELECTION_CONTEXT_PRESENTER := preload("res://scripts/ui/selection_context
 const UI_FEEDBACK_CONTROLLER := preload("res://scripts/ui/ui_feedback_controller.gd")
 const UI_TRADE_ACTION_CONTROLLER := preload("res://scripts/ui/ui_trade_action_controller.gd")
 const UI_MARKET_SELECTION_CONTROLLER := preload("res://scripts/ui/ui_market_selection_controller.gd")
+const UI_HOTKEY_INPUT_CONTROLLER := preload("res://scripts/ui/ui_hotkey_input_controller.gd")
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
 const MOVEMENT_REASON_MAX_CHARS := 88
@@ -47,6 +48,7 @@ var _last_status_message: String = ""
 var _ui_feedback_controller = null
 var _trade_action_controller = null
 var _market_selection_controller = null
+var _hotkey_input_controller = null
 var _tutorial_state: Dictionary = {"active": false}
 
 @onready var _day_label: Label = $MainMargin/MainVBox/HeaderBar/DayLabel
@@ -144,6 +146,7 @@ func _ready() -> void:
 	)
 	_market_selection_controller = UI_MARKET_SELECTION_CONTROLLER.new()
 	_market_selection_controller.set_tutorial_state(_tutorial_state)
+	_hotkey_input_controller = UI_HOTKEY_INPUT_CONTROLLER.new()
 	if _run_manager != null:
 		_trade_action_controller.bind_managers(
 			_run_manager,
@@ -619,39 +622,21 @@ func _on_quantity_value_changed(_value: float) -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if not (event is InputEventKey):
+	if _hotkey_input_controller == null:
 		return
-	var key_event := event as InputEventKey
-	if key_event == null or not key_event.pressed or key_event.echo:
-		return
-	if _are_actions_locked():
-		return
-
-	match key_event.keycode:
-		KEY_UP:
-			if _market_selection_controller == null or not _market_selection_controller.should_handle_navigation_hotkey():
-				return
-			_select_relative_company(-1)
-			accept_event()
-		KEY_DOWN:
-			if _market_selection_controller == null or not _market_selection_controller.should_handle_navigation_hotkey():
-				return
-			_select_relative_company(1)
-			accept_event()
-		KEY_B:
-			if _trade_action_controller != null and _trade_action_controller.can_trigger_buy_hotkey(_tutorial_state):
-				_on_buy_button_pressed()
-				accept_event()
-		KEY_V:
-			if _trade_action_controller != null and _trade_action_controller.can_trigger_sell_hotkey(_tutorial_state):
-				_on_sell_button_pressed()
-				accept_event()
-		KEY_ENTER, KEY_KP_ENTER:
-			if _trade_action_controller != null and _trade_action_controller.can_trigger_end_day_hotkey(_tutorial_state):
-				_on_end_day_button_pressed()
-				accept_event()
-		_:
-			pass
+	var handled: bool = bool(_hotkey_input_controller.handle_unhandled_key_input(
+		event,
+		_tutorial_state,
+		_are_actions_locked(),
+		_market_selection_controller,
+		_trade_action_controller,
+		_select_relative_company,
+		_on_buy_button_pressed,
+		_on_sell_button_pressed,
+		_on_end_day_button_pressed
+	))
+	if handled:
+		accept_event()
 
 
 func _select_relative_company(direction: int) -> void:
