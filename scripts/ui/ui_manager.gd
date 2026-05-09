@@ -11,6 +11,21 @@ signal company_selected(ticker: String)
 signal tutorial_continue_requested
 
 const WEEKLY_ACTIVITY_SERVICE := preload("res://scripts/run/weekly_activity_service.gd")
+const MARKET_TABLE_PRESENTER := preload("res://scripts/ui/market_table_presenter.gd")
+const MARKET_ROW_FACTORY := preload("res://scripts/ui/market_row_factory.gd")
+const NEWS_CARD_FACTORY := preload("res://scripts/ui/news_card_factory.gd")
+const NEWS_PANEL_PRESENTER := preload("res://scripts/ui/news_panel_presenter.gd")
+const RUN_CONTEXT_PRESENTER := preload("res://scripts/ui/run_context_presenter.gd")
+const UPGRADE_CHOICE_PRESENTER := preload("res://scripts/ui/upgrade_choice_presenter.gd")
+const UPGRADE_CHOICE_FACTORY := preload("res://scripts/ui/upgrade_choice_factory.gd")
+const TOAST_STYLE_PRESENTER := preload("res://scripts/ui/toast_style_presenter.gd")
+const COMPANY_DETAILS_PRESENTER := preload("res://scripts/ui/company_details_presenter.gd")
+const TRADE_PREVIEW_PRESENTER := preload("res://scripts/ui/trade_preview_presenter.gd")
+const HEADER_PRESENTER := preload("res://scripts/ui/header_presenter.gd")
+const DEBT_FEEDBACK_PRESENTER := preload("res://scripts/ui/debt_feedback_presenter.gd")
+const SELECTION_CONTEXT_PRESENTER := preload("res://scripts/ui/selection_context_presenter.gd")
+const EVENT_LOG_PRESENTER := preload("res://scripts/ui/event_log_presenter.gd")
+const STATUS_PRESENTER := preload("res://scripts/ui/status_presenter.gd")
 const STATUS_MAX_CHARS := 220
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
@@ -125,7 +140,8 @@ func _ready() -> void:
 	_setup_toast_timer()
 	_setup_trade_preview_label()
 	_apply_action_hints()
-	_refresh_news_panel_header()
+	_news_title.text = "Periodico del Dia"
+	_news_history_button.text = "Ver historico"
 
 
 func bind_managers(
@@ -164,10 +180,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 	_update_selection_context()
 	_update_trade_preview()
 	_update_feedback_panel()
-	var compact_status := _compact_status_text(_last_status_message)
-	_status_label.text = compact_status
-	_status_label.tooltip_text = _last_status_message
-	_apply_status_tone(compact_status)
+	_apply_status_model(STATUS_PRESENTER.build_model(_last_status_message, STATUS_MAX_CHARS))
 	_apply_tutorial_visual_state()
 
 
@@ -256,27 +269,17 @@ func show_weekly_upgrade_choices(choices: Array[RunUpgrade]) -> void:
 
 	if choices.is_empty():
 		var empty_label := Label.new()
-		empty_label.text = "No hay mejoras disponibles esta semana."
+		empty_label.text = UPGRADE_CHOICE_PRESENTER.empty_state_text()
 		_upgrade_options.add_child(empty_label)
 		return
 
 	for upgrade in choices:
-		var card := VBoxContainer.new()
-		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		card.add_theme_constant_override("separation", 4)
-
-		var pick_button := Button.new()
-		pick_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		pick_button.text = "Elegir: %s" % upgrade.name
-		pick_button.pressed.connect(_on_upgrade_choice_pressed.bind(upgrade.id))
-
-		var details_label := Label.new()
-		details_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		details_label.text = _build_upgrade_details(upgrade)
-
-		card.add_child(pick_button)
-		card.add_child(details_label)
-		card.add_child(HSeparator.new())
+		var choice_model := UPGRADE_CHOICE_PRESENTER.build_choice_model(upgrade)
+		var card := UPGRADE_CHOICE_FACTORY.build_choice_card(
+			choice_model,
+			upgrade.id,
+			_on_upgrade_choice_pressed
+		)
 		_upgrade_options.add_child(card)
 
 
@@ -332,248 +335,126 @@ func _update_header() -> void:
 	_day_label.text = "Dia %02d/%02d" % [_run_manager.current_day, _run_manager.max_days]
 	var objective_display := _run_manager.get_weekly_objective_display()
 	var objective_brief := str(objective_display.get("brief", ""))
-	var week_text := "Semana %d | Actividad %s" % [week, activity_label]
-	if not objective_brief.is_empty():
-		week_text += " | Objetivos %s" % objective_brief
-	_week_label.text = _compact_week_label(week_text)
-	_week_label.tooltip_text = "Notional valido %s / objetivo %s%s" % [
-		_money(weekly_notional),
-		_money(weekly_target_notional),
-		" | intradia excluido %s" % _money(raw_weekly_notional - weekly_notional) if raw_weekly_notional > weekly_notional + 0.01 else ""
-	]
-	_cash_label.text = "Caja %s" % _money(_player_portfolio.cash)
 	var debt_limit := float(_debt_feedback_snapshot.get("debt_limit", 1000.0))
-	var debt_usage := (_player_portfolio.debt / maxf(1.0, debt_limit)) * 100.0
-	_debt_label.text = "Deuda %s / %s (%.0f%%)" % [
-		_money(_player_portfolio.debt),
-		_money(debt_limit),
-		debt_usage
-	]
-	_net_worth_label.text = "Patrimonio %s | Cartera %s" % [_money(net_worth), _money(holdings_value)]
-	_upgrade_label.text = "Mejora: %s" % _upgrade_manager.get_active_upgrade_text()
+	var header_model := HEADER_PRESENTER.build_model(
+		_run_manager.current_day,
+		_run_manager.max_days,
+		week,
+		activity_label,
+		objective_brief,
+		weekly_notional,
+		weekly_target_notional,
+		raw_weekly_notional,
+		_player_portfolio.cash,
+		_player_portfolio.debt,
+		debt_limit,
+		net_worth,
+		holdings_value,
+		_upgrade_manager.get_active_upgrade_text(),
+		WEEK_LABEL_MAX_CHARS
+	)
+	_apply_header_model(header_model)
+
+
+func _apply_header_model(header_model: Dictionary) -> void:
+	_day_label.text = str(header_model.get("day_text", "Dia --/--"))
+	_week_label.text = str(header_model.get("week_text", "Semana -"))
+	_week_label.tooltip_text = str(header_model.get("week_tooltip", ""))
+	_cash_label.text = str(header_model.get("cash_text", "Caja $0.00"))
+	_debt_label.text = str(header_model.get("debt_text", "Deuda $0.00 / $0.00 (0%)"))
+	_net_worth_label.text = str(header_model.get("net_worth_text", "Patrimonio $0.00 | Cartera $0.00"))
+	_upgrade_label.text = str(header_model.get("upgrade_text", "Mejora: -"))
 
 
 func _update_news_panel() -> void:
 	_clear_container(_news_content)
-	_refresh_news_panel_header()
-	if _news_history_visible:
-		_update_news_history_panel()
-		return
+	var history_entries: Array = []
+	if _news_manager != null and _news_history_visible:
+		history_entries = _news_manager.get_news_history_entries(60)
 
-	if _run_manager.current_day <= 1:
-		_add_run_context_card()
-
-	if _news_manager.latest_headlines.is_empty():
-		var placeholder := Label.new()
-		placeholder.text = "Sin titulares nuevos hoy."
-		_news_content.add_child(placeholder)
-		return
-
-	for news_event in _news_manager.latest_headlines:
-		_add_news_card(news_event.title, news_event.description, Color(0.95, 0.89, 0.35))
-
-
-func _update_news_history_panel() -> void:
-	var history_entries := _news_manager.get_news_history_entries(60)
-	if history_entries.is_empty():
-		var placeholder := Label.new()
-		placeholder.text = "Todavia no hay historico de noticias."
-		_news_content.add_child(placeholder)
-		return
-
-	for entry in history_entries:
-		var day_value := int(entry.get("day", 0))
-		var title := str(entry.get("title", "Sin titular"))
-		var description := str(entry.get("description", ""))
-		var card_title := "D%02d | %s" % [day_value, title]
-		_add_news_card(card_title, description, Color(0.80, 0.88, 0.96))
-
-
-func _add_run_context_card() -> void:
-	var context_lines: Array[String] = []
-	context_lines.append("Empresas: %s" % _company_profile_text())
-	context_lines.append("Mercado: %s" % _market_profile_text())
-	context_lines.append("Noticias: %s" % _news_profile_text())
-	context_lines.append("Objetivos semana: %s" % _weekly_objective_context_text())
-	_add_news_card(
-		"Briefing de run (Dia 1)",
-		"\n".join(context_lines),
-		Color(0.66, 0.93, 0.83)
+	var run_context := RUN_CONTEXT_PRESENTER.build_news_run_context(_market_manager, _news_manager, _run_manager)
+	var current_day := 1
+	if _run_manager != null:
+		current_day = _run_manager.current_day
+	var latest_headlines: Array = []
+	if _news_manager != null:
+		latest_headlines = _news_manager.latest_headlines
+	var news_model := NEWS_PANEL_PRESENTER.build_model(
+		_news_history_visible,
+		current_day,
+		latest_headlines,
+		history_entries,
+		run_context
 	)
+	_apply_news_panel_model(news_model)
 
 
-func _company_profile_text() -> String:
-	if _market_manager == null:
-		return "-"
-	return _market_manager.get_run_company_profile_text()
-
-
-func _market_profile_text() -> String:
-	if _market_manager == null:
-		return "-"
-	return _market_manager.get_run_regime_text()
-
-
-func _news_profile_text() -> String:
-	if _news_manager == null:
-		return "-"
-	return _news_manager.get_run_news_profile_text()
-
-
-func _weekly_objective_context_text() -> String:
-	if _run_manager == null:
-		return "-"
-	var objective_display := _run_manager.get_weekly_objective_display()
-	var title := str(objective_display.get("title", ""))
-	var brief := str(objective_display.get("brief", ""))
-	var lines_variant: Variant = objective_display.get("lines", [])
-	if title.is_empty() and brief.is_empty():
-		return "sin objetivos activos"
-	var context := ""
-	if not title.is_empty():
-		context += title
-	if not brief.is_empty():
-		if not context.is_empty():
-			context += " | "
-		context += brief
-	if lines_variant is Array:
-		var lines_array: Array = lines_variant
-		if not lines_array.is_empty():
-			context += " | " + str(lines_array[0])
-	return context
-
-
-func _add_news_card(title_text: String, body_text: String, title_color: Color) -> void:
-	var card_panel := PanelContainer.new()
-	card_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var card := VBoxContainer.new()
-	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.add_theme_constant_override("separation", 4)
-	var title := Label.new()
-	title.text = title_text
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title.add_theme_color_override("font_color", title_color)
-	var body := Label.new()
-	body.text = body_text
-	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	card.add_child(title)
-	card.add_child(body)
-	card_panel.add_child(card)
-	_news_content.add_child(card_panel)
-
-
-func _refresh_news_panel_header() -> void:
-	if _news_history_visible:
-		_news_title.text = "Historico de Noticias"
-		_news_history_button.text = "Ver hoy"
+func _apply_news_panel_model(news_model: Dictionary) -> void:
+	_news_title.text = str(news_model.get("title_text", "Periodico del Dia"))
+	_news_history_button.text = str(news_model.get("history_button_text", "Ver historico"))
+	var cards_variant: Variant = news_model.get("cards", [])
+	if cards_variant is Array:
+		for card_data in cards_variant:
+			if not (card_data is Dictionary):
+				continue
+			var card := card_data as Dictionary
+			_news_content.add_child(
+				NEWS_CARD_FACTORY.build_news_card(
+					str(card.get("title", "Sin titular")),
+					str(card.get("body", "")),
+					card.get("title_color", Color(0.95, 0.89, 0.35))
+				)
+			)
+	var placeholder_text := str(news_model.get("placeholder_text", ""))
+	if placeholder_text.is_empty():
 		return
-	_news_title.text = "Periodico del Dia"
-	_news_history_button.text = "Ver historico"
-
+	var placeholder := Label.new()
+	placeholder.text = placeholder_text
+	_news_content.add_child(placeholder)
 
 func _update_market_table() -> void:
 	_clear_container(_market_rows)
 	_market_ticker_order.clear()
 	_company_row_controls_by_ticker.clear()
 	var companies := _market_manager.get_sorted_active_companies()
-	_market_title.text = "Mercado (%d activas)" % companies.size()
-	_market_header.text = "Selecciona una empresa para operar. %s" % HOTKEYS_HINT
-	_market_header.tooltip_text = HOTKEYS_HINT
+	var header_model := MARKET_TABLE_PRESENTER.build_table_header(companies.size(), HOTKEYS_HINT)
+	_market_title.text = str(header_model.get("title", "Mercado"))
+	_market_header.text = str(header_model.get("header", "Selecciona una empresa para operar."))
+	_market_header.tooltip_text = str(header_model.get("header_tooltip", HOTKEYS_HINT))
 	if companies.is_empty():
 		var empty_label := Label.new()
-		empty_label.text = "No quedan empresas cotizando."
+		empty_label.text = MARKET_TABLE_PRESENTER.build_empty_state_text()
 		_market_rows.add_child(empty_label)
 		return
 
 	for row_index in range(companies.size()):
 		var company: Company = companies[row_index]
 		_market_ticker_order.append(company.ticker)
-		var row_card := PanelContainer.new()
-		row_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var row_style := StyleBoxFlat.new()
-		row_style.bg_color = Color(0.16, 0.17, 0.20, 0.96) if row_index % 2 == 0 else Color(0.13, 0.14, 0.17, 0.96)
-		row_style.corner_radius_top_left = 6
-		row_style.corner_radius_top_right = 6
-		row_style.corner_radius_bottom_left = 6
-		row_style.corner_radius_bottom_right = 6
-		row_style.content_margin_left = 8
-		row_style.content_margin_right = 8
-		row_style.content_margin_top = 6
-		row_style.content_margin_bottom = 6
-		if company.ticker == _selected_ticker:
-			row_style.border_width_left = 2
-			row_style.border_width_top = 2
-			row_style.border_width_right = 2
-			row_style.border_width_bottom = 2
-			row_style.border_color = Color(0.99, 0.80, 0.23, 1.0)
-		row_card.add_theme_stylebox_override("panel", row_style)
-
-		var row_vbox := VBoxContainer.new()
-		row_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row_vbox.add_theme_constant_override("separation", 2)
-		row_card.add_child(row_vbox)
-
-		var top_row := HBoxContainer.new()
-		top_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		top_row.add_theme_constant_override("separation", 8)
-		row_vbox.add_child(top_row)
-
-		var badge := _build_company_logo_badge(company, 30)
-		top_row.add_child(badge)
-
-		var select_button := Button.new()
-		select_button.custom_minimum_size = Vector2(ROW_NAME_MIN_WIDTH, 0)
-		select_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		select_button.text = "%s · %s" % [company.ticker, company.name]
-		select_button.flat = true
-		select_button.clip_text = true
-		select_button.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
-		select_button.focus_mode = Control.FOCUS_NONE
-		if company.ticker == _selected_ticker:
-			select_button.text = "> %s" % select_button.text
-		select_button.tooltip_text = "Ver detalle de %s" % company.name
-		select_button.button_down.connect(_on_company_selected.bind(company.ticker))
-		top_row.add_child(select_button)
-
-		var price_label := Label.new()
-		price_label.custom_minimum_size = Vector2(ROW_PRICE_MIN_WIDTH, 0)
-		price_label.text = _money(company.current_price)
-		price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		top_row.add_child(price_label)
-
-		var change_label := Label.new()
-		change_label.custom_minimum_size = Vector2(ROW_CHANGE_MIN_WIDTH, 0)
-		change_label.text = _percent(company.last_daily_change)
-		change_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		if company.last_daily_change > 0.0:
-			change_label.add_theme_color_override("font_color", Color(0.45, 0.92, 0.45))
-		elif company.last_daily_change < 0.0:
-			change_label.add_theme_color_override("font_color", Color(0.95, 0.45, 0.45))
-		top_row.add_child(change_label)
-
-		var bottom_info_label := Label.new()
-		bottom_info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		bottom_info_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-		bottom_info_label.clip_text = true
 		var owned_amount := _player_portfolio.get_holding_amount(company.ticker)
-		var owned_value := float(owned_amount) * company.current_price
-		bottom_info_label.text = "Tags: %s | Posicion: x%d (%s)" % [
-			_truncate_text(company.to_short_tag_text(MARKET_TAGS_VISIBLE), MARKET_TAGS_MAX_CHARS),
+		var row_model := MARKET_TABLE_PRESENTER.build_company_row_model(
+			company,
+			row_index,
+			_selected_ticker,
 			owned_amount,
-			_money(owned_value)
-		]
-		bottom_info_label.tooltip_text = "Tags: %s\nPosicion: x%d (%s)" % [
-			", ".join(company.tags),
-			owned_amount,
-			_money(owned_value)
-		]
-		row_vbox.add_child(bottom_info_label)
-		_bind_company_row_click(row_card, company.ticker)
-		_bind_company_row_click(badge, company.ticker)
-		_bind_company_row_click(price_label, company.ticker)
-		_bind_company_row_click(change_label, company.ticker)
-		_bind_company_row_click(bottom_info_label, company.ticker)
-
+			MARKET_TAGS_VISIBLE,
+			MARKET_TAGS_MAX_CHARS
+		)
+		var row_view := MARKET_ROW_FACTORY.build_company_row(
+			row_model,
+			company,
+			ROW_NAME_MIN_WIDTH,
+			ROW_PRICE_MIN_WIDTH,
+			ROW_CHANGE_MIN_WIDTH,
+			_on_company_selected
+		)
+		var row_card := row_view.get("row_card", null) as Control
+		if row_card == null:
+			continue
+		var interactive_controls_variant: Variant = row_view.get("interactive_controls", [])
+		if interactive_controls_variant is Array:
+			for interactive_control in interactive_controls_variant:
+				if interactive_control is Control:
+					_bind_company_row_click(interactive_control as Control, company.ticker)
 		_market_rows.add_child(row_card)
 		_company_row_controls_by_ticker[company.ticker] = row_card
 
@@ -584,63 +465,40 @@ func _update_selected_company_details() -> void:
 	_ensure_selected_company_is_valid()
 	var company := _market_manager.get_company_by_ticker(_selected_ticker)
 	if company == null:
-		_details_title.text = "Detalle de Empresa"
-		_company_details_label.text = "Selecciona una empresa."
-		_movement_reasons_label.text = ""
-		_history_text.text = ""
-		_details_logo_text.text = "??"
-		_details_logo_swatch.color = Color(0.2, 0.2, 0.2, 1.0)
-		_price_chart.set_price_history([])
-		_price_chart.set_trade_markers([])
+		_apply_company_details_model(
+			COMPANY_DETAILS_PRESENTER.build_empty_model(),
+			[]
+		)
 		return
 
-	_details_title.text = "Detalle · %s" % company.ticker
-	_details_logo_text.text = company.logo_text
-	_details_logo_swatch.color = company.logo_color
-
 	var position_amount := _player_portfolio.get_holding_amount(company.ticker)
-	var position_value := float(position_amount) * company.current_price
-	var primary_sector := company.sectors[0] if not company.sectors.is_empty() else "sin sector"
-	var details_lines := [
-		"%s" % company.name,
-		"Sector: %s" % primary_sector,
-		"Tags: %s" % _compact_tag_line(company.tags),
-		"Precio: %s | Cambio hoy: %s" % [_money(company.current_price), _percent(company.last_daily_change)],
-		"Tu posicion: x%d (%s)" % [position_amount, _money(position_value)],
-		"Ritmo: vol %.2f · hype %.2f · rep %.2f" % [company.volatility, company.hype, company.reputation],
-		"Riesgo: legal %.2f · deuda %.2f · absurdo %.2f" % [company.legal_risk, company.debt, company.absurdity]
-	]
-	if not company.focus_text.is_empty():
-		details_lines.append("Narrativa: %s" % company.focus_text)
-	_company_details_label.text = "\n".join(details_lines)
+	var detail_model := COMPANY_DETAILS_PRESENTER.build_company_model(
+		company,
+		position_amount,
+		COMPANY_TAGS_VISIBLE,
+		MOVEMENT_REASONS_MAX_ITEMS,
+		MOVEMENT_REASON_MAX_CHARS,
+		_history_visible
+	)
+	var trade_markers := _player_portfolio.get_trade_markers_for_ticker(company.ticker)
+	_apply_company_details_model(detail_model, trade_markers)
 
-	if company.last_reasons.is_empty():
-		_movement_reasons_label.text = "Sin razones de movimiento registradas hoy."
-		_movement_reasons_label.tooltip_text = ""
+
+func _apply_company_details_model(detail_model: Dictionary, trade_markers: Array) -> void:
+	_details_title.text = str(detail_model.get("title", "Detalle de Empresa"))
+	_company_details_label.text = str(detail_model.get("details_text", ""))
+	_movement_reasons_label.text = str(detail_model.get("reasons_text", ""))
+	_movement_reasons_label.tooltip_text = str(detail_model.get("reasons_tooltip", ""))
+	_history_text.text = str(detail_model.get("history_text", ""))
+	_history_text.visible = bool(detail_model.get("history_visible", false))
+	_details_logo_text.text = str(detail_model.get("logo_text", "??"))
+	_details_logo_swatch.color = detail_model.get("logo_color", Color(0.2, 0.2, 0.2, 1.0))
+	var price_history_variant: Variant = detail_model.get("price_history", [])
+	if price_history_variant is Array:
+		_price_chart.set_price_history(price_history_variant)
 	else:
-		var visible_lines: Array[String] = []
-		var full_lines: Array[String] = []
-		var max_reasons: int = mini(MOVEMENT_REASONS_MAX_ITEMS, company.last_reasons.size())
-		for reason_index in range(max_reasons):
-			var reason_text := str(company.last_reasons[reason_index])
-			full_lines.append(reason_text)
-			visible_lines.append(_truncate_text(reason_text, MOVEMENT_REASON_MAX_CHARS))
-		_movement_reasons_label.text = "Motivos de hoy:\n- %s" % "\n- ".join(visible_lines)
-		_movement_reasons_label.tooltip_text = "Motivos completos:\n- %s" % "\n- ".join(full_lines)
-
-	_history_text.text = _build_history_text(company)
-	_history_text.visible = _history_visible
-	_price_chart.set_price_history(company.price_history)
-	_price_chart.set_trade_markers(_player_portfolio.get_trade_markers_for_ticker(company.ticker))
-
-
-func _build_history_text(company: Company) -> String:
-	var lines: Array[String] = ["Historial de precios (mas reciente abajo):"]
-	var history := company.price_history
-	var start_index: int = maxi(0, history.size() - 15)
-	for idx in range(start_index, history.size()):
-		lines.append("D%02d: %s" % [idx + 1, _money(history[idx])])
-	return "\n".join(lines)
+		_price_chart.set_price_history([])
+	_price_chart.set_trade_markers(trade_markers)
 
 
 func _on_buy_button_pressed() -> void:
@@ -935,67 +793,30 @@ func _update_feedback_panel() -> void:
 
 
 func _update_debt_risk_panel() -> void:
-	if _player_portfolio == null:
-		_debt_risk_label.text = "Sin datos de deuda."
-		_invoice_preview_label.text = "Sin datos de factura semanal."
-		return
-	var debt_limit := float(_debt_feedback_snapshot.get("debt_limit", PlayerPortfolio.MAX_TRADING_DEBT))
-	var debt_value := float(_debt_feedback_snapshot.get("debt", _player_portfolio.debt))
-	var usage_ratio := float(_debt_feedback_snapshot.get("debt_usage_ratio", debt_value / maxf(1.0, debt_limit)))
-	var margin := float(_debt_feedback_snapshot.get("debt_margin", debt_limit - debt_value))
-	var risk_label := str(_debt_feedback_snapshot.get("risk_label", "Bajo"))
-	var risk_hint := str(_debt_feedback_snapshot.get("risk_hint", "Sin alertas."))
-	var margin_text := _money_with_sign(margin)
-	if margin >= 0.0:
-		margin_text = _money(margin)
-	_debt_risk_label.text = "Deuda: %s / %s | Uso: %.0f%% | Margen: %s | Riesgo: %s\n%s" % [
-		_money(debt_value),
-		_money(debt_limit),
-		usage_ratio * 100.0,
-		margin_text,
-		risk_label,
-		risk_hint
-	]
-	_debt_risk_label.remove_theme_color_override("font_color")
-	if usage_ratio >= 0.95:
-		_debt_risk_label.add_theme_color_override("font_color", Color(0.98, 0.39, 0.39))
-	elif usage_ratio >= 0.75:
-		_debt_risk_label.add_theme_color_override("font_color", Color(0.99, 0.80, 0.35))
-	else:
-		_debt_risk_label.add_theme_color_override("font_color", Color(0.73, 0.93, 0.76))
+	var debt_model := DEBT_FEEDBACK_PRESENTER.build_empty_model()
+	if _player_portfolio != null:
+		debt_model = DEBT_FEEDBACK_PRESENTER.build_model(
+			_debt_feedback_snapshot,
+			_player_portfolio.debt,
+			PlayerPortfolio.MAX_TRADING_DEBT
+		)
+	_apply_debt_feedback_model(debt_model)
 
-	var estimated_charge := float(_debt_feedback_snapshot.get("estimated_next_weekly_charge", 0.0))
-	var base_expense := float(_debt_feedback_snapshot.get("base_weekly_expense", 0.0))
-	var estimated_surcharge := float(_debt_feedback_snapshot.get("estimated_inactivity_surcharge", 0.0))
-	var weekly_multiplier := float(_debt_feedback_snapshot.get("weekly_multiplier", 1.0))
-	var activity_label := str(_debt_feedback_snapshot.get("activity_label", "-"))
-	var grace_week := bool(_debt_feedback_snapshot.get("grace_week", false))
-	var days_until_charge := int(_debt_feedback_snapshot.get("days_until_weekly_charge", 0))
-	var charge_timing := "hoy"
-	if days_until_charge > 0:
-		charge_timing = "en %d dia(s)" % days_until_charge
-	_invoice_preview_label.text = "Factura semanal estimada: %s (%s base + %s actividad, x%.2f). Proximo cobro %s. Actividad: %s%s." % [
-		_money(estimated_charge),
-		_money(base_expense),
-		_money(estimated_surcharge),
-		weekly_multiplier,
-		charge_timing,
-		activity_label,
-		" | Semana de gracia" if grace_week else ""
-	]
+
+func _apply_debt_feedback_model(debt_model: Dictionary) -> void:
+	_debt_risk_label.text = str(debt_model.get("risk_text", "Sin datos de deuda."))
+	_invoice_preview_label.text = str(debt_model.get("invoice_text", "Sin datos de factura semanal."))
+	_debt_risk_label.remove_theme_color_override("font_color")
+	_debt_risk_label.add_theme_color_override(
+		"font_color",
+		debt_model.get("risk_color", Color(0.73, 0.93, 0.76))
+	)
 
 
 func _update_event_log_panel() -> void:
-	if _event_log_entries.is_empty():
-		_event_log_label.text = "Sin eventos importantes todavia."
-		_event_log_label.tooltip_text = ""
-		return
-	var visible_entries: Array[String] = []
-	var start_index := maxi(0, _event_log_entries.size() - EVENT_LOG_VISIBLE_MAX)
-	for index in range(_event_log_entries.size() - 1, start_index - 1, -1):
-		visible_entries.append("- %s" % _event_log_entries[index])
-	_event_log_label.text = "\n".join(visible_entries)
-	_event_log_label.tooltip_text = "\n".join(_event_log_entries)
+	var event_log_model := EVENT_LOG_PRESENTER.build_model(_event_log_entries, EVENT_LOG_VISIBLE_MAX)
+	_event_log_label.text = str(event_log_model.get("text", "Sin eventos importantes todavia."))
+	_event_log_label.tooltip_text = str(event_log_model.get("tooltip", ""))
 
 
 func _setup_toast_timer() -> void:
@@ -1028,29 +849,15 @@ func _show_next_runtime_alert() -> void:
 
 
 func _apply_toast_style(severity: String) -> void:
-	var normalized := severity.to_lower()
-	var background := Color(0.17, 0.22, 0.28, 0.95)
-	var font_color := Color(0.90, 0.96, 1.0, 1.0)
-	match normalized:
-		"success":
-			background = Color(0.12, 0.30, 0.19, 0.95)
-			font_color = Color(0.80, 0.97, 0.85, 1.0)
-		"warning":
-			background = Color(0.39, 0.30, 0.08, 0.95)
-			font_color = Color(1.0, 0.92, 0.62, 1.0)
-		"danger":
-			background = Color(0.36, 0.10, 0.10, 0.95)
-			font_color = Color(1.0, 0.78, 0.78, 1.0)
-		_:
-			pass
+	var style_model := TOAST_STYLE_PRESENTER.build_style_model(severity)
 	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = background
+	panel_style.bg_color = style_model.get("background", Color(0.17, 0.22, 0.28, 0.95))
 	panel_style.corner_radius_top_left = 10
 	panel_style.corner_radius_top_right = 10
 	panel_style.corner_radius_bottom_left = 10
 	panel_style.corner_radius_bottom_right = 10
 	_toast_panel.add_theme_stylebox_override("panel", panel_style)
-	_toast_label.add_theme_color_override("font_color", font_color)
+	_toast_label.add_theme_color_override("font_color", style_model.get("font_color", Color(0.90, 0.96, 1.0, 1.0)))
 
 
 func _on_toast_timeout() -> void:
@@ -1065,42 +872,6 @@ func _on_ui_resized() -> void:
 	_apply_tutorial_visual_state()
 
 
-func _build_upgrade_details(upgrade: RunUpgrade) -> String:
-	var lines: Array[String] = []
-	lines.append(upgrade.description)
-	lines.append("Duracion: %d dias" % upgrade.duration_days)
-	lines.append("Gasto semanal x%.2f | Compra x%.2f | Venta x%.2f" % [
-		upgrade.weekly_expense_multiplier,
-		upgrade.buy_price_multiplier,
-		upgrade.sell_price_multiplier
-	])
-	return "\n".join(lines)
-
-
-func _build_company_logo_badge(company: Company, side_size: int) -> Control:
-	var badge := PanelContainer.new()
-	badge.custom_minimum_size = Vector2(side_size, side_size)
-	var style := StyleBoxFlat.new()
-	style.bg_color = company.logo_color
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
-	badge.add_theme_stylebox_override("panel", style)
-
-	var text_label := Label.new()
-	text_label.text = company.logo_text
-	text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	text_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	text_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	text_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	text_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	text_label.add_theme_color_override("font_color", Color(0.07, 0.07, 0.07, 0.95))
-	badge.add_child(text_label)
-	return badge
-
-
 func _setup_trade_preview_label() -> void:
 	_trade_preview_label = Label.new()
 	_trade_preview_label.name = "TradePreviewLabel"
@@ -1113,17 +884,21 @@ func _setup_trade_preview_label() -> void:
 func _update_trade_preview() -> void:
 	if _trade_preview_label == null:
 		return
+	var quantity := maxi(1, int(_quantity_input.value))
 	if _run_manager == null or _player_portfolio == null or _market_manager == null or _upgrade_manager == null:
-		_trade_preview_label.text = ""
-		_update_action_buttons_state(null, maxi(1, int(_quantity_input.value)))
+		_apply_trade_preview_model(
+			TRADE_PREVIEW_PRESENTER.build_unavailable_model(quantity, ""),
+			null
+		)
 		return
 	var company := _market_manager.get_company_by_ticker(_selected_ticker)
 	if company == null:
-		_trade_preview_label.text = "Selecciona una empresa para ver coste estimado de compra/venta."
-		_update_action_buttons_state(null, maxi(1, int(_quantity_input.value)))
+		_apply_trade_preview_model(
+			TRADE_PREVIEW_PRESENTER.build_unavailable_model(quantity, "Selecciona una empresa para ver coste estimado de compra/venta."),
+			null
+		)
 		return
 
-	var quantity := maxi(1, int(_quantity_input.value))
 	var buy_preview := _player_portfolio.estimate_buy_order(
 		company,
 		quantity,
@@ -1135,53 +910,19 @@ func _update_trade_preview() -> void:
 		_upgrade_manager.get_sell_price_multiplier(),
 		_run_manager.current_day
 	)
+	var preview_model := TRADE_PREVIEW_PRESENTER.build_model(company, quantity, buy_preview, sell_preview)
+	_apply_trade_preview_model(preview_model, company)
 
-	var buy_line := ""
-	if bool(buy_preview.get("success", false)):
-		buy_line = "Compra estimada: %d x %s -> %s (comision %s)." % [
-			int(buy_preview.get("amount", quantity)),
-			_money(float(buy_preview.get("unit_price", company.current_price))),
-			_money(float(buy_preview.get("total_cost", 0.0))),
-			_money(float(buy_preview.get("fee_amount", 0.0)))
-		]
-		if bool(buy_preview.get("adjusted_by_debt_limit", false)):
-			buy_line += " Ajuste por limite de deuda."
-	else:
-		buy_line = "Compra estimada: %s" % str(buy_preview.get("message", "No disponible."))
-
-	var sell_line := ""
-	if bool(sell_preview.get("success", false)):
-		var intraday_amount := int(sell_preview.get("intraday_amount", 0))
-		sell_line = "Venta estimada: %d -> %s (comision %s)." % [
-			quantity,
-			_money(float(sell_preview.get("net_value", 0.0))),
-			_money(float(sell_preview.get("fee_amount", 0.0)))
-		]
-		if intraday_amount > 0:
-			sell_line += " %d intradia con penalizacion." % intraday_amount
-	else:
-		sell_line = "Venta estimada: %s" % str(sell_preview.get("message", "No disponible."))
-
-	_trade_preview_label.text = "Preview (%s): %s | %s" % [company.ticker, buy_line, sell_line]
-	_trade_preview_label.tooltip_text = "%s\n%s" % [buy_line, sell_line]
-	_update_action_buttons_state(company, quantity, buy_preview, sell_preview)
-
-
-func _update_action_buttons_state(
-	company: Company,
-	quantity: int,
-	buy_preview: Dictionary = {},
-	sell_preview: Dictionary = {}
-) -> void:
-	var buy_text := "Comprar x%d" % quantity
-	var sell_text := "Vender x%d" % quantity
-	_buy_button.text = buy_text
-	_sell_button.text = sell_text
-	_end_day_button.text = "Pasar Dia"
+func _apply_trade_preview_model(preview_model: Dictionary, company: Company) -> void:
+	_trade_preview_label.text = str(preview_model.get("preview_text", ""))
+	_trade_preview_label.tooltip_text = str(preview_model.get("preview_tooltip", ""))
+	_buy_button.text = str(preview_model.get("buy_button_text", _buy_button.text))
+	_sell_button.text = str(preview_model.get("sell_button_text", _sell_button.text))
+	_end_day_button.text = str(preview_model.get("end_day_button_text", _end_day_button.text))
+	_buy_button.tooltip_text = str(preview_model.get("buy_tooltip", _buy_button.tooltip_text))
+	_sell_button.tooltip_text = str(preview_model.get("sell_tooltip", _sell_button.tooltip_text))
 
 	if company == null:
-		_buy_button.tooltip_text = "Selecciona una empresa para comprar."
-		_sell_button.tooltip_text = "Selecciona una empresa para vender."
 		if not _are_actions_locked():
 			_buy_button.disabled = true
 			_sell_button.disabled = true
@@ -1189,18 +930,8 @@ func _update_action_buttons_state(
 				_end_day_button.disabled = not _tutorial_allows("allow_end_day")
 		return
 
-	var can_buy := bool(buy_preview.get("success", false))
-	var can_sell := bool(sell_preview.get("success", false))
-
-	if can_buy:
-		_buy_button.tooltip_text = "Coste estimado: %s" % _money(float(buy_preview.get("total_cost", 0.0)))
-	else:
-		_buy_button.tooltip_text = str(buy_preview.get("message", "Compra no disponible."))
-
-	if can_sell:
-		_sell_button.tooltip_text = "Ingreso neto estimado: %s" % _money(float(sell_preview.get("net_value", 0.0)))
-	else:
-		_sell_button.tooltip_text = str(sell_preview.get("message", "Venta no disponible."))
+	var can_buy := bool(preview_model.get("can_buy", false))
+	var can_sell := bool(preview_model.get("can_sell", false))
 
 	if _are_actions_locked():
 		return
@@ -1217,81 +948,24 @@ func _update_action_buttons_state(
 func _update_selection_context() -> void:
 	if _selection_label == null:
 		return
-	if _selected_ticker.is_empty():
-		_selection_label.text = "Selecciona una empresa para operar."
-		_selection_label.tooltip_text = HOTKEYS_HINT
-		return
-	var company := _market_manager.get_company_by_ticker(_selected_ticker)
-	if company == null:
-		_selection_label.text = "Selecciona una empresa para operar."
-		_selection_label.tooltip_text = HOTKEYS_HINT
-		return
-	var amount := _player_portfolio.get_holding_amount(company.ticker)
-	var value := float(amount) * company.current_price
-	var summary := "%s | %s | %s hoy | Pos x%d (%s)" % [
-		company.ticker,
-		_money(company.current_price),
-		_percent(company.last_daily_change),
-		amount,
-		_money(value)
-	]
-	_selection_label.text = summary
-	_selection_label.tooltip_text = "Empresa seleccionada: %s\n%s\n%s" % [company.name, summary, HOTKEYS_HINT]
+	var selection_model := SELECTION_CONTEXT_PRESENTER.build_empty_model(HOTKEYS_HINT)
+	if _market_manager != null and _player_portfolio != null and not _selected_ticker.is_empty():
+		var company := _market_manager.get_company_by_ticker(_selected_ticker)
+		if company != null:
+			var amount := _player_portfolio.get_holding_amount(company.ticker)
+			selection_model = SELECTION_CONTEXT_PRESENTER.build_model(company, amount, HOTKEYS_HINT)
+	_selection_label.text = str(selection_model.get("text", "Selecciona una empresa para operar."))
+	_selection_label.tooltip_text = str(selection_model.get("tooltip", HOTKEYS_HINT))
+
+
+func _apply_status_model(status_model: Dictionary) -> void:
+	_status_label.text = str(status_model.get("text", "Listo para operar."))
+	_status_label.tooltip_text = str(status_model.get("tooltip", ""))
+	_status_label.add_theme_color_override("font_color", status_model.get("color", Color(0.90, 0.96, 0.99)))
 
 
 func _weekly_activity_notional_target(net_worth: float) -> float:
 	return WEEKLY_ACTIVITY_SERVICE.weekly_target_notional(net_worth)
-
-
-func _money(value: float) -> String:
-	return "$%.2f" % value
-
-
-func _money_with_sign(value: float) -> String:
-	var prefix := "+" if value >= 0.0 else ""
-	return "%s%s" % [prefix, _money(value)]
-
-
-func _percent(value: float) -> String:
-	return "%+.2f%%" % (value * 100.0)
-
-
-func _compact_status_text(raw_text: String) -> String:
-	var compact := raw_text.replace("\n", " ").strip_edges()
-	if compact.is_empty():
-		return "Listo para operar."
-	if compact.contains("."):
-		compact = compact.split(".", false, 1)[0].strip_edges() + "."
-	if compact.length() <= STATUS_MAX_CHARS:
-		return compact
-	return "%s..." % compact.substr(0, STATUS_MAX_CHARS - 3)
-
-
-func _compact_week_label(raw_text: String) -> String:
-	var compact := raw_text.replace("\n", " ").strip_edges()
-	if compact.length() <= WEEK_LABEL_MAX_CHARS:
-		return compact
-	return "%s..." % compact.substr(0, WEEK_LABEL_MAX_CHARS - 3)
-
-
-func _truncate_text(value: String, max_chars: int) -> String:
-	if max_chars <= 3:
-		return value
-	if value.length() <= max_chars:
-		return value
-	return "%s..." % value.substr(0, max_chars - 3)
-
-
-func _compact_tag_line(tags: Array[String]) -> String:
-	if tags.is_empty():
-		return "-"
-	var visible: Array[String] = []
-	var max_tags := mini(COMPANY_TAGS_VISIBLE, tags.size())
-	for idx in range(max_tags):
-		visible.append(str(tags[idx]))
-	if tags.size() <= max_tags:
-		return ", ".join(visible)
-	return "%s, +%d" % [", ".join(visible), tags.size() - max_tags]
 
 
 func _apply_ui_tone() -> void:
@@ -1336,29 +1010,4 @@ func _apply_action_hints() -> void:
 	_market_header.tooltip_text = HOTKEYS_HINT
 
 
-func _apply_status_tone(status_text: String) -> void:
-	var color := Color(0.90, 0.96, 0.99)
-	var lowered := status_text.to_lower()
-	if (
-		lowered.contains("derrota")
-		or lowered.contains("deuda")
-		or lowered.contains("limite")
-		or lowered.contains("quiebra")
-		or lowered.contains("no puedes")
-	):
-		color = Color(0.98, 0.48, 0.48)
-	elif (
-		lowered.contains("riesgo")
-		or lowered.contains("penalizacion")
-		or lowered.contains("ajuste")
-		or lowered.contains("warning")
-	):
-		color = Color(0.99, 0.84, 0.45)
-	elif (
-		lowered.contains("compraste")
-		or lowered.contains("vendiste")
-		or lowered.contains("victoria")
-		or lowered.contains("mejora")
-	):
-		color = Color(0.77, 0.96, 0.80)
-	_status_label.add_theme_color_override("font_color", color)
+
