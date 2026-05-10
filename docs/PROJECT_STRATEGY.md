@@ -41,6 +41,7 @@ Smokes activos:
 - `ui_modal_locks_controller_smoke.gd`
 - `run_day_ui_orchestrator_service_smoke.gd`
 - `tutorial_target_rect_resolver_smoke.gd`
+- `tutorial_manager_flow_smoke.gd`
 
 ## Siguiente foco (fuera de este cierre)
 
