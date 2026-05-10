@@ -47,3 +47,19 @@ Smokes activos:
 1. Validacion automatica de contenido JSON (estructura + referencias cruzadas).
 2. Ajuste fino de balance de deuda y actividad semanal con telemetria local.
 3. Pulido final de onboarding/tutorial sin ampliar alcance de features.
+
+## Ajuste aplicado (2026-05-10)
+
+- Objetivo semanal de actividad endurecido:
+  - `WEEKLY_ACTIVITY_NOTIONAL_RATIO`: `0.28 -> 0.30`
+  - `WEEKLY_ACTIVITY_NOTIONAL_FLOOR`: `170 -> 180`
+  - `WEEKLY_LOW_ACTIVITY_RATIO`: `0.50 -> 0.55`
+  - `MIN_WEEKLY_HOLDINGS_FOR_ACTIVITY`: `180 -> 210`
+- Recargo semanal con rampa anti-espiral temprana:
+  - Semana 2: multiplicador `0.75`
+  - Semana 3: multiplicador `0.90`
+  - Semana 4+: multiplicador `1.0`
+- Riesgo de deuda mostrado antes en HUD:
+  - `Medio` desde `55%` de uso de deuda operativa
+  - `Alto` desde `82%`
+  - `Critico` desde `98%`

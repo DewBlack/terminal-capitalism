@@ -2,6 +2,7 @@ class_name WeeklyCycleService
 extends RefCounted
 
 const WEEKLY_ACTIVITY_SERVICE := preload("res://scripts/run/weekly_activity_service.gd")
+const RUN_BALANCE_CONFIG := preload("res://scripts/run/run_balance_config.gd")
 
 
 static func week_day_range(current_day: int, days_per_week: int) -> Dictionary:
@@ -44,6 +45,7 @@ static func build_weekly_activity_context(
 	var low_activity := bool(activity_state.get("low_activity", false))
 	var inactivity_surcharge := WEEKLY_ACTIVITY_SERVICE.resolve_inactivity_surcharge(
 		grace_week,
+		week_index,
 		traded_this_week,
 		full_activity,
 		low_activity
@@ -214,13 +216,13 @@ static func build_debt_feedback_snapshot(
 	var debt_usage_ratio := debt_value / maxf(1.0, debt_limit)
 	var risk_label := "Bajo"
 	var risk_hint := "Tienes margen para operar."
-	if debt_usage_ratio >= 1.0:
+	if debt_usage_ratio >= RUN_BALANCE_CONFIG.DEBT_RISK_CRITICAL_THRESHOLD:
 		risk_label = "Critico"
 		risk_hint = "Superaste el limite operativo: evita sumar deuda y reduce riesgo."
-	elif debt_usage_ratio >= 0.85:
+	elif debt_usage_ratio >= RUN_BALANCE_CONFIG.DEBT_RISK_HIGH_THRESHOLD:
 		risk_label = "Alto"
 		risk_hint = "Te queda poco margen. Una semana floja puede bloquear compras."
-	elif debt_usage_ratio >= 0.60:
+	elif debt_usage_ratio >= RUN_BALANCE_CONFIG.DEBT_RISK_MEDIUM_THRESHOLD:
 		risk_label = "Medio"
 		risk_hint = "Aun hay margen, pero vigila la factura semanal."
 	var day_in_week := ((_safe_day(run_manager.current_day) - 1) % maxi(1, run_manager.days_per_week)) + 1
