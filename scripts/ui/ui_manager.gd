@@ -15,8 +15,6 @@ const MARKET_ROW_FACTORY := preload("res://scripts/ui/market_row_factory.gd")
 const NEWS_CARD_FACTORY := preload("res://scripts/ui/news_card_factory.gd")
 const NEWS_PANEL_PRESENTER := preload("res://scripts/ui/news_panel_presenter.gd")
 const RUN_CONTEXT_PRESENTER := preload("res://scripts/ui/run_context_presenter.gd")
-const UPGRADE_CHOICE_PRESENTER := preload("res://scripts/ui/upgrade_choice_presenter.gd")
-const UPGRADE_CHOICE_FACTORY := preload("res://scripts/ui/upgrade_choice_factory.gd")
 const COMPANY_DETAILS_PRESENTER := preload("res://scripts/ui/company_details_presenter.gd")
 const HEADER_PRESENTER := preload("res://scripts/ui/header_presenter.gd")
 const HEADER_METRICS_PRESENTER := preload("res://scripts/ui/header_metrics_presenter.gd")
@@ -25,6 +23,7 @@ const UI_FEEDBACK_CONTROLLER := preload("res://scripts/ui/ui_feedback_controller
 const UI_TRADE_ACTION_CONTROLLER := preload("res://scripts/ui/ui_trade_action_controller.gd")
 const UI_MARKET_SELECTION_CONTROLLER := preload("res://scripts/ui/ui_market_selection_controller.gd")
 const UI_HOTKEY_INPUT_CONTROLLER := preload("res://scripts/ui/ui_hotkey_input_controller.gd")
+const UI_MODAL_LOCKS_CONTROLLER := preload("res://scripts/ui/ui_modal_locks_controller.gd")
 const TUTORIAL_OVERLAY_CONTROLLER := preload("res://scripts/ui/tutorial_overlay_controller.gd")
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
@@ -50,6 +49,7 @@ var _ui_feedback_controller = null
 var _trade_action_controller = null
 var _market_selection_controller = null
 var _hotkey_input_controller = null
+var _modal_locks_controller = null
 var _tutorial_overlay_controller = null
 var _tutorial_state: Dictionary = {"active": false}
 
@@ -120,9 +120,6 @@ func _ready() -> void:
 	_back_to_menu_button.pressed.connect(_on_back_to_menu_pressed)
 	_weekly_recap_continue_button.pressed.connect(_on_weekly_recap_continue_pressed)
 	resized.connect(_on_ui_resized)
-	_end_run_panel.visible = false
-	_upgrade_choice_panel.visible = false
-	_weekly_recap_panel.visible = false
 	_history_text.visible = false
 	_tutorial_overlay.visible = false
 	_tutorial_overlay.continue_requested.connect(_on_tutorial_continue_pressed)
@@ -145,6 +142,19 @@ func _ready() -> void:
 		_buy_button,
 		_sell_button,
 		_end_day_button
+	)
+	_modal_locks_controller = UI_MODAL_LOCKS_CONTROLLER.new()
+	_modal_locks_controller.setup(
+		_end_run_panel,
+		_end_run_title,
+		_end_run_description,
+		_upgrade_choice_panel,
+		_upgrade_subtitle,
+		_upgrade_options,
+		_weekly_recap_panel,
+		_weekly_recap_title,
+		_weekly_recap_body,
+		Callable(self, "_set_action_buttons_enabled")
 	)
 	_market_selection_controller = UI_MARKET_SELECTION_CONTROLLER.new()
 	_market_selection_controller.set_tutorial_state(_tutorial_state)
@@ -219,12 +229,9 @@ func refresh_all_ui(status_message: String = "") -> void:
 
 
 func show_run_end(title: String, description: String) -> void:
-	hide_weekly_upgrade_choices()
-	hide_weekly_recap()
-	_end_run_panel.visible = true
-	_end_run_title.text = title
-	_end_run_description.text = description
-	_set_action_buttons_enabled(false)
+	if _modal_locks_controller == null:
+		return
+	_modal_locks_controller.show_run_end(title, description)
 
 
 func set_event_log_entries(entries: Array[String]) -> void:
@@ -291,45 +298,30 @@ func get_selected_ticker() -> String:
 
 
 func show_weekly_upgrade_choices(choices: Array[RunUpgrade]) -> void:
-	_upgrade_choice_panel.visible = true
-	_upgrade_subtitle.text = "Se cobraron gastos. Ahora escoge una ventaja temporal:"
-	_clear_container(_upgrade_options)
-	_set_action_buttons_enabled(false)
-
-	if choices.is_empty():
-		var empty_label := Label.new()
-		empty_label.text = UPGRADE_CHOICE_PRESENTER.empty_state_text()
-		_upgrade_options.add_child(empty_label)
+	if _modal_locks_controller == null:
 		return
-
-	for upgrade in choices:
-		var choice_model := UPGRADE_CHOICE_PRESENTER.build_choice_model(upgrade)
-		var card := UPGRADE_CHOICE_FACTORY.build_choice_card(
-			choice_model,
-			upgrade.id,
-			_on_upgrade_choice_pressed
-		)
-		_upgrade_options.add_child(card)
+	_modal_locks_controller.show_weekly_upgrade_choices(
+		choices,
+		Callable(self, "_on_upgrade_choice_pressed")
+	)
 
 
 func hide_weekly_upgrade_choices() -> void:
-	_upgrade_choice_panel.visible = false
-	if not _weekly_recap_panel.visible and not _end_run_panel.visible:
-		_set_action_buttons_enabled(true)
-	_clear_container(_upgrade_options)
+	if _modal_locks_controller == null:
+		return
+	_modal_locks_controller.hide_weekly_upgrade_choices()
 
 
 func show_weekly_recap(week_index: int, summary_text: String) -> void:
-	_weekly_recap_panel.visible = true
-	_weekly_recap_title.text = "Resumen Semana %d" % week_index
-	_weekly_recap_body.text = summary_text
-	_set_action_buttons_enabled(false)
+	if _modal_locks_controller == null:
+		return
+	_modal_locks_controller.show_weekly_recap(week_index, summary_text)
 
 
 func hide_weekly_recap() -> void:
-	_weekly_recap_panel.visible = false
-	if not _upgrade_choice_panel.visible and not _end_run_panel.visible:
-		_set_action_buttons_enabled(true)
+	if _modal_locks_controller == null:
+		return
+	_modal_locks_controller.hide_weekly_recap()
 
 
 func _connect_manager_signals() -> void:
@@ -709,6 +701,8 @@ func _apply_tutorial_visual_state() -> void:
 
 
 func _are_actions_locked() -> bool:
+	if _modal_locks_controller != null:
+		return _modal_locks_controller.are_actions_locked()
 	return _upgrade_choice_panel.visible or _weekly_recap_panel.visible or _end_run_panel.visible
 
 
