@@ -45,7 +45,7 @@ func bind_managers(
 
 func validate_buy_action(selected_ticker: String, tutorial_state: Dictionary) -> Dictionary:
 	if not _tutorial_allows_action(tutorial_state, "allow_buy"):
-		return _build_blocked_action("Sigue el paso actual del tutorial.")
+		return _build_blocked_action(_tutorial_blocked_message(tutorial_state, "No puedes comprar en este paso."))
 	if selected_ticker.is_empty():
 		return _build_blocked_action("Selecciona una empresa para comprar.")
 	return {"allowed": true}
@@ -53,7 +53,7 @@ func validate_buy_action(selected_ticker: String, tutorial_state: Dictionary) ->
 
 func validate_sell_action(selected_ticker: String, tutorial_state: Dictionary) -> Dictionary:
 	if not _tutorial_allows_action(tutorial_state, "allow_sell"):
-		return _build_blocked_action("Sigue el paso actual del tutorial.")
+		return _build_blocked_action(_tutorial_blocked_message(tutorial_state, "No puedes vender en este paso."))
 	if selected_ticker.is_empty():
 		return _build_blocked_action("Selecciona una empresa para vender.")
 	return {"allowed": true}
@@ -61,7 +61,7 @@ func validate_sell_action(selected_ticker: String, tutorial_state: Dictionary) -
 
 func validate_end_day_action(tutorial_state: Dictionary) -> Dictionary:
 	if not _tutorial_allows_action(tutorial_state, "allow_end_day"):
-		return _build_blocked_action("Sigue el paso actual del tutorial.")
+		return _build_blocked_action(_tutorial_blocked_message(tutorial_state, "Aun no puedes pasar dia."))
 	return {"allowed": true}
 
 
@@ -89,19 +89,31 @@ func set_action_buttons_enabled(enabled: bool) -> void:
 func clear_tutorial_action_state() -> void:
 	if _quantity_input != null:
 		_quantity_input.editable = true
+		_quantity_input.tooltip_text = "Cantidad de acciones para comprar o vender."
 
 
 func apply_tutorial_action_state(tutorial_state: Dictionary, actions_locked: bool) -> void:
 	if _quantity_input != null:
 		_quantity_input.editable = _tutorial_allows_action(tutorial_state, "allow_buy") or _tutorial_allows_action(tutorial_state, "allow_sell")
+		if _quantity_input.editable:
+			_quantity_input.tooltip_text = "Cantidad de acciones para comprar o vender."
+		else:
+			_quantity_input.tooltip_text = _tutorial_blocked_message(
+				tutorial_state,
+				"Ajusta este campo cuando llegue el paso de compra o venta."
+			)
 	if actions_locked:
 		return
 	if not _tutorial_allows_action(tutorial_state, "allow_buy") and _buy_button != null:
 		_buy_button.disabled = true
+		_buy_button.tooltip_text = _tutorial_blocked_message(tutorial_state, "Compra bloqueada en este paso.")
 	if not _tutorial_allows_action(tutorial_state, "allow_sell") and _sell_button != null:
 		_sell_button.disabled = true
+		_sell_button.tooltip_text = _tutorial_blocked_message(tutorial_state, "Venta bloqueada en este paso.")
 	if _end_day_button != null:
 		_end_day_button.disabled = not _tutorial_allows_action(tutorial_state, "allow_end_day")
+		if _end_day_button.disabled:
+			_end_day_button.tooltip_text = _tutorial_blocked_message(tutorial_state, "Pasar dia bloqueado en este paso.")
 
 
 func update_trade_preview(selected_ticker: String, tutorial_state: Dictionary, actions_locked: bool) -> void:
@@ -191,10 +203,14 @@ func _apply_trade_preview_model(
 	if _is_tutorial_active(tutorial_state):
 		if not _tutorial_allows_action(tutorial_state, "allow_buy") and _buy_button != null:
 			_buy_button.disabled = true
+			_buy_button.tooltip_text = _tutorial_blocked_message(tutorial_state, "Compra bloqueada en este paso.")
 		if not _tutorial_allows_action(tutorial_state, "allow_sell") and _sell_button != null:
 			_sell_button.disabled = true
+			_sell_button.tooltip_text = _tutorial_blocked_message(tutorial_state, "Venta bloqueada en este paso.")
 		if _end_day_button != null:
 			_end_day_button.disabled = not _tutorial_allows_action(tutorial_state, "allow_end_day")
+			if _end_day_button.disabled:
+				_end_day_button.tooltip_text = _tutorial_blocked_message(tutorial_state, "Pasar dia bloqueado en este paso.")
 
 
 func _build_blocked_action(message: String) -> Dictionary:
@@ -209,3 +225,12 @@ func _tutorial_allows_action(tutorial_state: Dictionary, action_key: String) -> 
 	if not _is_tutorial_active(tutorial_state):
 		return true
 	return bool(tutorial_state.get(action_key, false))
+
+
+func _tutorial_blocked_message(tutorial_state: Dictionary, fallback: String) -> String:
+	if not _is_tutorial_active(tutorial_state):
+		return fallback
+	var hint := str(tutorial_state.get("hint", "")).strip_edges()
+	if hint.is_empty():
+		return fallback
+	return "Tutorial: %s" % hint
