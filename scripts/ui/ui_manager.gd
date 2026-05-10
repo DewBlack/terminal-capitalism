@@ -9,6 +9,7 @@ signal weekly_upgrade_selected(upgrade_id: String)
 signal weekly_recap_closed
 signal company_selected(ticker: String)
 signal tutorial_continue_requested
+signal tutorial_action_blocked(action_id: String, reason: String, source: String, metadata: Dictionary)
 
 const MARKET_TABLE_PRESENTER := preload("res://scripts/ui/market_table_presenter.gd")
 const MARKET_ROW_FACTORY := preload("res://scripts/ui/market_row_factory.gd")
@@ -514,7 +515,9 @@ func _apply_company_details_model(detail_model: Dictionary, trade_markers: Array
 func _on_buy_button_pressed() -> void:
 	var validation := _validate_trade_action("buy")
 	if not bool(validation.get("allowed", false)):
-		_last_status_message = str(validation.get("status_message", "No se puede comprar ahora."))
+		var status_message := str(validation.get("status_message", "No se puede comprar ahora."))
+		_emit_tutorial_action_blocked("buy", status_message, "ui_button")
+		_last_status_message = status_message
 		refresh_all_ui()
 		return
 	emit_signal("buy_requested", _get_selected_ticker(), int(_quantity_input.value))
@@ -523,7 +526,9 @@ func _on_buy_button_pressed() -> void:
 func _on_sell_button_pressed() -> void:
 	var validation := _validate_trade_action("sell")
 	if not bool(validation.get("allowed", false)):
-		_last_status_message = str(validation.get("status_message", "No se puede vender ahora."))
+		var status_message := str(validation.get("status_message", "No se puede vender ahora."))
+		_emit_tutorial_action_blocked("sell", status_message, "ui_button")
+		_last_status_message = status_message
 		refresh_all_ui()
 		return
 	emit_signal("sell_requested", _get_selected_ticker(), int(_quantity_input.value))
@@ -532,7 +537,9 @@ func _on_sell_button_pressed() -> void:
 func _on_end_day_button_pressed() -> void:
 	var validation := _validate_trade_action("end_day")
 	if not bool(validation.get("allowed", false)):
-		_last_status_message = str(validation.get("status_message", "No puedes cerrar el dia ahora."))
+		var status_message := str(validation.get("status_message", "No puedes cerrar el dia ahora."))
+		_emit_tutorial_action_blocked("end_day", status_message, "ui_button")
+		_last_status_message = status_message
 		refresh_all_ui()
 		return
 	emit_signal("end_day_requested")
@@ -568,6 +575,9 @@ func _on_company_selected(ticker: String) -> void:
 	var selection_result: Dictionary = _market_selection_controller.build_selection_result(ticker)
 	if not bool(selection_result.get("apply", false)):
 		var status_message := str(selection_result.get("status_message", ""))
+		if status_message.is_empty() and _is_tutorial_active():
+			status_message = _tutorial_blocked_hint_message("Sigue el paso resaltado del tutorial.")
+		_emit_tutorial_action_blocked("select", status_message, "ui_market_select")
 		if not status_message.is_empty():
 			_last_status_message = status_message
 			refresh_all_ui()
@@ -630,10 +640,23 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		_select_relative_company,
 		_on_buy_button_pressed,
 		_on_sell_button_pressed,
-		_on_end_day_button_pressed
+		_on_end_day_button_pressed,
+		Callable(self, "_on_hotkey_blocked")
 	))
 	if handled:
 		accept_event()
+
+
+func _on_hotkey_blocked(attempted_action: String, reason: String, keycode: int) -> void:
+	_emit_tutorial_action_blocked(
+		"hotkeys",
+		reason,
+		"ui_hotkey",
+		{
+			"attempted_action": attempted_action,
+			"keycode": keycode
+		}
+	)
 
 
 func _select_relative_company(direction: int) -> void:
@@ -786,3 +809,26 @@ func _apply_action_hints() -> void:
 	_end_day_button.tooltip_text = "Cierra el dia y procesa precios/noticias."
 	_selection_label.tooltip_text = "Selecciona una empresa en la tabla de mercado."
 	_market_header.tooltip_text = HOTKEYS_HINT
+
+
+func _emit_tutorial_action_blocked(
+	action_id: String,
+	reason: String,
+	source: String,
+	metadata: Dictionary = {}
+) -> void:
+	if not _is_tutorial_active():
+		return
+	var clean_reason := reason.strip_edges()
+	if clean_reason.is_empty():
+		clean_reason = _tutorial_blocked_hint_message("Sigue el paso actual del tutorial.")
+	emit_signal("tutorial_action_blocked", action_id, clean_reason, source, metadata.duplicate(true))
+
+
+func _tutorial_blocked_hint_message(fallback: String) -> String:
+	if not _is_tutorial_active():
+		return fallback
+	var hint := str(_tutorial_state.get("hint", "")).strip_edges()
+	if hint.is_empty():
+		return fallback
+	return "Tutorial: %s" % hint

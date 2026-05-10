@@ -73,6 +73,14 @@ func get_current_step() -> Dictionary:
 	return _steps[_step_index]
 
 
+func get_current_step_index() -> int:
+	return _step_index
+
+
+func get_total_steps() -> int:
+	return _steps.size()
+
+
 func get_current_step_message() -> String:
 	if not _tutorial_active:
 		return ""

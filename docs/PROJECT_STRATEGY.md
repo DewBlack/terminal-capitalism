@@ -42,6 +42,7 @@ Smokes activos:
 - `run_day_ui_orchestrator_service_smoke.gd`
 - `tutorial_target_rect_resolver_smoke.gd`
 - `tutorial_manager_flow_smoke.gd`
+- `tutorial_lifecycle_e2e_smoke.gd`
 
 ## Siguiente foco (fuera de este cierre)
 

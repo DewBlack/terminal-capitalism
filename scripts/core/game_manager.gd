@@ -4,6 +4,7 @@ extends Node
 const MENU_SCENE := preload("res://scenes/ui/main_menu.tscn")
 const GAME_SCENE := preload("res://scenes/game/game_screen.tscn")
 const TUTORIAL_MANAGER_SCRIPT := preload("res://scripts/run/tutorial_manager.gd")
+const TUTORIAL_TELEMETRY_SERVICE_SCRIPT := preload("res://scripts/run/tutorial_telemetry_service.gd")
 const RUN_END_DAY_ORCHESTRATOR_SERVICE := preload("res://scripts/run/run_end_day_orchestrator_service.gd")
 const WEEKLY_CYCLE_SERVICE := preload("res://scripts/run/weekly_cycle_service.gd")
 const UPGRADE_OFFER_GATE_SERVICE := preload("res://scripts/run/upgrade_offer_gate_service.gd")
@@ -17,6 +18,7 @@ const TUTORIAL_ACTION_CONTINUE := "continue"
 const TUTORIAL_ACTION_SELECT_TICKER := "select_ticker"
 const TUTORIAL_ACTION_BUY := "buy"
 const TUTORIAL_ACTION_SELL := "sell"
+const TUTORIAL_ACTION_END_DAY := "end_day"
 const RUN_STARTING_CASH := RUN_BALANCE_CONFIG.RUN_STARTING_CASH
 const RUN_BASE_WEEKLY_EXPENSE := RUN_BALANCE_CONFIG.RUN_BASE_WEEKLY_EXPENSE
 const INACTIVITY_WEEKLY_SURCHARGE := RUN_BALANCE_CONFIG.INACTIVITY_WEEKLY_SURCHARGE
@@ -39,6 +41,7 @@ var _tag_effect_system := TagEffectSystem.new()
 var _company_generator := CompanyGenerator.new()
 var _save_manager := SaveManager.new()
 var _tutorial_manager = TUTORIAL_MANAGER_SCRIPT.new()
+var _tutorial_telemetry_service = TUTORIAL_TELEMETRY_SERVICE_SCRIPT.new()
 
 var _current_screen: Node = null
 var _game_ui: UIManager = null
@@ -79,6 +82,7 @@ func _register_managers() -> void:
 
 
 func _show_main_menu() -> void:
+	_mark_tutorial_abandoned_if_needed("return_to_menu")
 	_run_active = false
 	_run_ended = false
 	_is_tutorial_run = false
@@ -118,6 +122,7 @@ func _show_game_screen() -> void:
 		_game_ui.weekly_recap_closed.connect(_on_weekly_recap_closed)
 		_game_ui.company_selected.connect(_on_company_selected)
 		_game_ui.tutorial_continue_requested.connect(_on_tutorial_continue_requested)
+		_game_ui.tutorial_action_blocked.connect(_on_tutorial_action_blocked)
 		_game_ui.refresh_all_ui(_last_status_message)
 
 
@@ -164,6 +169,7 @@ func _on_start_tutorial_requested() -> void:
 		_tutorial_manager
 	)
 	_apply_run_lifecycle_start_state(lifecycle_state)
+	_start_tutorial_telemetry_session()
 	_show_game_screen()
 	if bool(lifecycle_state.get("roll_daily_news_on_start", false)):
 		_news_manager.roll_daily_news(_run_manager.current_day, _market_manager.get_active_companies())
@@ -173,10 +179,13 @@ func _on_start_tutorial_requested() -> void:
 func _on_buy_requested(ticker: String, amount: int) -> void:
 	if not _run_active or _run_ended:
 		return
+	var previous_step := _tutorial_step_snapshot()
+	var previous_step_index := _tutorial_manager.get_current_step_index()
 	if _is_tutorial_run:
 		var tutorial_check: Dictionary = _tutorial_manager.validate_action(TUTORIAL_ACTION_BUY, ticker, amount, _run_manager.current_day)
 		if not bool(tutorial_check.get("allowed", false)):
 			_last_status_message = str(tutorial_check.get("message", "Sigue el paso actual del tutorial."))
+			_record_tutorial_blocked_action(TUTORIAL_ACTION_BUY, _last_status_message, "game_manager")
 			_refresh_all_ui()
 			return
 	var company := _market_manager.get_company_by_ticker(ticker)
@@ -187,6 +196,7 @@ func _on_buy_requested(ticker: String, amount: int) -> void:
 	if _is_tutorial_run and bool(result.get("success", false)):
 		var tutorial_step: Dictionary = _tutorial_manager.handle_buy_completed(ticker, amount)
 		if bool(tutorial_step.get("advanced", false)):
+			_record_tutorial_step_advance(TUTORIAL_ACTION_BUY, previous_step, previous_step_index)
 			_last_status_message = str(tutorial_step.get("message", _last_status_message))
 			print("[DEBUG][GameManager][Tutorial] paso completado por compra | ticker=%s cantidad=%d" % [ticker, amount])
 	_update_weekly_objective_display()
@@ -196,10 +206,13 @@ func _on_buy_requested(ticker: String, amount: int) -> void:
 func _on_sell_requested(ticker: String, amount: int) -> void:
 	if not _run_active or _run_ended:
 		return
+	var previous_step := _tutorial_step_snapshot()
+	var previous_step_index := _tutorial_manager.get_current_step_index()
 	if _is_tutorial_run:
 		var tutorial_check: Dictionary = _tutorial_manager.validate_action(TUTORIAL_ACTION_SELL, ticker, amount, _run_manager.current_day)
 		if not bool(tutorial_check.get("allowed", false)):
 			_last_status_message = str(tutorial_check.get("message", "Sigue el paso actual del tutorial."))
+			_record_tutorial_blocked_action(TUTORIAL_ACTION_SELL, _last_status_message, "game_manager")
 			_refresh_all_ui()
 			return
 	var company := _market_manager.get_company_by_ticker(ticker)
@@ -210,6 +223,7 @@ func _on_sell_requested(ticker: String, amount: int) -> void:
 	if _is_tutorial_run and bool(result.get("success", false)):
 		var tutorial_step: Dictionary = _tutorial_manager.handle_sell_completed(ticker, amount)
 		if bool(tutorial_step.get("advanced", false)):
+			_record_tutorial_step_advance(TUTORIAL_ACTION_SELL, previous_step, previous_step_index)
 			_last_status_message = str(tutorial_step.get("message", _last_status_message))
 			print("[DEBUG][GameManager][Tutorial] paso completado por venta | ticker=%s cantidad=%d" % [ticker, amount])
 	_update_weekly_objective_display()
@@ -217,6 +231,8 @@ func _on_sell_requested(ticker: String, amount: int) -> void:
 
 
 func _on_end_day_requested() -> void:
+	var tutorial_step_before_end_day := _tutorial_step_snapshot()
+	var tutorial_step_before_end_day_index := _tutorial_manager.get_current_step_index()
 	var branch_result := RUN_END_DAY_ORCHESTRATOR_SERVICE.process_end_day_branch(
 		_run_active,
 		_run_ended,
@@ -248,11 +264,19 @@ func _on_end_day_requested() -> void:
 	_print_debug_logs(branch_result.get("debug_logs", []))
 	_last_status_message = str(branch_result.get("status_message", _last_status_message))
 	if bool(branch_result.get("blocked", false)):
+		if _is_tutorial_run and str(branch_result.get("flow_kind", "")) == "tutorial":
+			_record_tutorial_blocked_action(TUTORIAL_ACTION_END_DAY, _last_status_message, "game_manager")
 		if bool(branch_result.get("should_refresh_ui", false)):
 			_refresh_all_ui()
 		return
 
 	_apply_end_day_branch_state(branch_result)
+	if _is_tutorial_run and str(branch_result.get("flow_kind", "")) == "tutorial":
+		_record_tutorial_step_advance(
+			TUTORIAL_ACTION_END_DAY,
+			tutorial_step_before_end_day,
+			tutorial_step_before_end_day_index
+		)
 	var market_report: Dictionary = {}
 	var market_report_variant: Variant = branch_result.get("market_report", {})
 	if market_report_variant is Dictionary:
@@ -290,6 +314,8 @@ func _on_end_day_requested() -> void:
 	if run_outcome_variant is Dictionary:
 		run_outcome = run_outcome_variant
 	if bool(run_outcome.get("ended", false)):
+		if _is_tutorial_run:
+			_mark_tutorial_completed_if_needed(str(run_outcome.get("reason", "Tutorial completado.")))
 		_finish_run(
 			bool(run_outcome.get("victory", false)),
 			str(run_outcome.get("reason", "Resultado de run no especificado."))
@@ -347,6 +373,8 @@ func _print_debug_logs(log_lines_variant: Variant) -> void:
 
 
 func _finish_run(victory: bool, reason: String) -> void:
+	if _is_tutorial_run and (_tutorial_manager.is_tutorial_completed() or _is_tutorial_completion_reason(reason)):
+		_mark_tutorial_completed_if_needed(reason)
 	var finish_result := RUN_LIFECYCLE_SERVICE.finish_run(
 		victory,
 		reason,
@@ -424,8 +452,16 @@ func _on_return_to_menu_requested() -> void:
 func _on_company_selected(ticker: String) -> void:
 	if not _is_tutorial_run or _run_ended:
 		return
+	var previous_step := _tutorial_step_snapshot()
+	var previous_step_index := _tutorial_manager.get_current_step_index()
 	var tutorial_result: Dictionary = _tutorial_manager.handle_company_selected(ticker)
+	if not bool(tutorial_result.get("allowed", true)):
+		_last_status_message = str(tutorial_result.get("message", "Sigue el paso actual del tutorial."))
+		_record_tutorial_blocked_action(TUTORIAL_ACTION_SELECT_TICKER, _last_status_message, "game_manager")
+		_refresh_all_ui()
+		return
 	if bool(tutorial_result.get("advanced", false)):
+		_record_tutorial_step_advance(TUTORIAL_ACTION_SELECT_TICKER, previous_step, previous_step_index)
 		_last_status_message = str(tutorial_result.get("message", _last_status_message))
 		print("[DEBUG][GameManager][Tutorial] paso completado por seleccion | ticker=%s" % ticker)
 		_refresh_all_ui()
@@ -435,21 +471,47 @@ func _on_tutorial_continue_requested() -> void:
 	if not _is_tutorial_run or _run_ended:
 		return
 	if _tutorial_manager.is_tutorial_completed():
+		_mark_tutorial_completed_if_needed("Tutorial completado.")
 		_finish_run(true, "Tutorial completado.")
 		return
+	var previous_step := _tutorial_step_snapshot()
+	var previous_step_index := _tutorial_manager.get_current_step_index()
 	var tutorial_result: Dictionary = _tutorial_manager.handle_continue()
 	if not bool(tutorial_result.get("advanced", false)):
 		var blocked_message := str(tutorial_result.get("message", "")).strip_edges()
 		if not blocked_message.is_empty():
 			_last_status_message = blocked_message
+			_record_tutorial_blocked_action(TUTORIAL_ACTION_CONTINUE, blocked_message, "game_manager")
 			_refresh_all_ui()
 		return
+	_record_tutorial_step_advance(TUTORIAL_ACTION_CONTINUE, previous_step, previous_step_index)
 	_last_status_message = str(tutorial_result.get("message", _last_status_message))
 	print("[DEBUG][GameManager][Tutorial] paso manual completado")
 	if _tutorial_manager.is_tutorial_completed():
+		_mark_tutorial_completed_if_needed("Tutorial completado.")
 		_finish_run(true, "Tutorial completado.")
 		return
 	_refresh_all_ui()
+
+
+func _on_tutorial_action_blocked(
+	action_id: String,
+	reason: String,
+	source: String,
+	metadata: Dictionary
+) -> void:
+	if not _is_tutorial_run:
+		return
+	var attempted_action := str(metadata.get("attempted_action", "")).strip_edges()
+	var keycode := int(metadata.get("keycode", -1))
+	_tutorial_telemetry_service.record_blocked_action(
+		action_id,
+		reason,
+		_run_manager.current_day,
+		source,
+		attempted_action,
+		keycode
+	)
 
 
 func _on_weekly_recap_closed() -> void:
@@ -652,6 +714,79 @@ func _format_objective_preview_text() -> String:
 			continue
 		previews.append(str(objective_data.get("title", "")))
 	return " | ".join(previews)
+
+
+func get_tutorial_telemetry_snapshot() -> Dictionary:
+	return _tutorial_telemetry_service.build_snapshot()
+
+
+func _start_tutorial_telemetry_session() -> void:
+	if not _is_tutorial_run:
+		return
+	_tutorial_telemetry_service.start_session(
+		_tutorial_step_snapshot(),
+		_tutorial_manager.get_current_step_index(),
+		_tutorial_manager.get_total_steps(),
+		_run_manager.current_day
+	)
+
+
+func _tutorial_step_snapshot() -> Dictionary:
+	var step := _tutorial_manager.get_current_step()
+	if step.is_empty():
+		return {}
+	return step.duplicate(true)
+
+
+func _record_tutorial_step_advance(
+	action_id: String,
+	previous_step: Dictionary,
+	previous_step_index: int
+) -> void:
+	if not _is_tutorial_run or previous_step.is_empty():
+		return
+	_tutorial_telemetry_service.record_step_advance(
+		previous_step,
+		previous_step_index,
+		_tutorial_step_snapshot(),
+		_tutorial_manager.get_current_step_index(),
+		_tutorial_manager.get_total_steps(),
+		action_id,
+		_run_manager.current_day
+	)
+
+
+func _record_tutorial_blocked_action(action_id: String, reason: String, source: String) -> void:
+	if not _is_tutorial_run:
+		return
+	_tutorial_telemetry_service.record_blocked_action(
+		action_id,
+		reason,
+		_run_manager.current_day,
+		source
+	)
+
+
+func _mark_tutorial_completed_if_needed(reason: String) -> void:
+	if not _is_tutorial_run:
+		return
+	if not _tutorial_telemetry_service.has_active_session() and not _is_tutorial_completion_reason(reason):
+		return
+	_tutorial_telemetry_service.mark_tutorial_completed(_run_manager.current_day, reason)
+
+
+func _mark_tutorial_abandoned_if_needed(reason: String) -> void:
+	if not _is_tutorial_run or _run_ended:
+		return
+	if _tutorial_manager.is_tutorial_completed():
+		return
+	if not _tutorial_telemetry_service.has_active_session():
+		return
+	_tutorial_telemetry_service.mark_tutorial_abandoned(_run_manager.current_day, reason)
+
+
+func _is_tutorial_completion_reason(reason: String) -> bool:
+	return reason.to_lower().find("tutorial completado") != -1
 
 
 func _swap_screen(scene_to_load: PackedScene) -> void:
