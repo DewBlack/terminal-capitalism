@@ -244,6 +244,9 @@ func _complete_step_if_expected(expected_action: String) -> Dictionary:
 
 
 func _hint_for_action(step: Dictionary) -> String:
+	var explicit_hint := str(step.get("hint", "")).strip_edges()
+	if not explicit_hint.is_empty():
+		return explicit_hint
 	var action := str(step.get("action", ACTION_CONTINUE))
 	var ticker := str(step.get("expected_ticker", ""))
 	match action:
@@ -434,21 +437,24 @@ func _build_tutorial_data() -> void:
 		{
 			"id": "welcome",
 			"title": "Tutorial guiado",
-			"body": "Bienvenido. Te guiaremos paso a paso para operar sin perderte.",
+			"body": "Bienvenido. Sigue el panel resaltado en cada paso para no bloquear acciones.",
+			"hint": "Pulsa Continuar para empezar. Durante el tutorial manda el paso resaltado.",
 			"action": ACTION_CONTINUE,
 			"target": "header"
 		},
 		{
 			"id": "news_intro",
 			"title": "Lee las noticias",
-			"body": "Mira el panel izquierdo: las noticias mueven precios por tags. Cuando termines, pulsa Continuar.",
+			"body": "Mira el panel izquierdo: las noticias mueven precios por tags. En este paso solo observa, aun no operes.",
+			"hint": "Revisa titulares y pulsa Continuar cuando termines.",
 			"action": ACTION_CONTINUE,
 			"target": "news_panel"
 		},
 		{
 			"id": "select_company",
 			"title": "Selecciona KMOO",
-			"body": "Selecciona KMOO en la tabla. Usaremos esa empresa para ver todo el flujo completo.",
+			"body": "Haz clic en KMOO en la tabla. Todavia no compres ni cierres dia.",
+			"hint": "Selecciona exactamente KMOO para desbloquear la compra guiada.",
 			"action": ACTION_SELECT_TICKER,
 			"target": "market_row",
 			"expected_ticker": "KMOO"
@@ -456,7 +462,8 @@ func _build_tutorial_data() -> void:
 		{
 			"id": "buy_step",
 			"title": "Compra KMOO",
-			"body": "Ajusta la cantidad a 3 o mas y compra KMOO.",
+			"body": "Ajusta la cantidad a 3 o mas y compra KMOO. Si falla, revisa que sigues en KMOO.",
+			"hint": "Cantidad minima 3 en KMOO y luego pulsa Comprar.",
 			"action": ACTION_BUY,
 			"target": "buy_button",
 			"expected_ticker": "KMOO",
@@ -465,7 +472,8 @@ func _build_tutorial_data() -> void:
 		{
 			"id": "end_day_1",
 			"title": "Cierra el dia",
-			"body": "Pulsa Pasar Dia para aplicar noticias y ver el movimiento en precios.",
+			"body": "Ahora si: pulsa Pasar Dia para aplicar noticias y ver el primer movimiento guiado.",
+			"hint": "Usa Pasar Dia ahora. Si sigue bloqueado, completa antes el paso de compra.",
 			"action": ACTION_END_DAY,
 			"target": "end_day_button",
 			"expected_day": 1
@@ -473,14 +481,16 @@ func _build_tutorial_data() -> void:
 		{
 			"id": "review_step",
 			"title": "Interpreta el resultado",
-			"body": "Revisa en Detalle los motivos del movimiento de KMOO y el marcador de tu compra. Pulsa Continuar al terminar.",
+			"body": "En Detalle, lee los motivos del movimiento de KMOO y comprueba el impacto en tu posicion.",
+			"hint": "Cuando entiendas los motivos del cambio de precio, pulsa Continuar.",
 			"action": ACTION_CONTINUE,
 			"target": "details_panel"
 		},
 		{
 			"id": "sell_step",
 			"title": "Vende una parte",
-			"body": "Vende al menos 1 accion de KMOO para practicar salida parcial.",
+			"body": "Vende al menos 1 accion de KMOO para practicar salida parcial y reducir exposicion.",
+			"hint": "Con KMOO seleccionada, vende 1 o mas acciones.",
 			"action": ACTION_SELL,
 			"target": "sell_button",
 			"expected_ticker": "KMOO",
@@ -489,7 +499,8 @@ func _build_tutorial_data() -> void:
 		{
 			"id": "end_day_2",
 			"title": "Cierra un dia mas",
-			"body": "Pulsa Pasar Dia otra vez para ver una correccion de mercado guiada.",
+			"body": "Pulsa Pasar Dia otra vez para ver la correccion guiada y cerrar el ciclo base.",
+			"hint": "Cierra este dia para completar el flujo compra-venta-cierre.",
 			"action": ACTION_END_DAY,
 			"target": "end_day_button",
 			"expected_day": 2
@@ -497,7 +508,8 @@ func _build_tutorial_data() -> void:
 		{
 			"id": "finish",
 			"title": "Fin del tutorial",
-			"body": "Perfecto. Ya sabes leer noticias, comprar, vender y cerrar dia. Pulsa Continuar para cerrar el tutorial.",
+			"body": "Perfecto. Ya sabes leer noticias, comprar, vender y cerrar dia.",
+			"hint": "Pulsa Continuar para cerrar el tutorial y volver al menu principal.",
 			"action": ACTION_CONTINUE,
 			"target": "header"
 		}
