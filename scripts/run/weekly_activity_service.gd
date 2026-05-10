@@ -43,16 +43,20 @@ static func evaluate_activity(
 
 static func resolve_inactivity_surcharge(
 	grace_week: bool,
+	week_index: int,
 	traded_meaningful: bool,
 	full_activity: bool,
 	low_activity: bool
 ) -> float:
 	if grace_week:
 		return 0.0
+	var base_surcharge := 0.0
 	if not traded_meaningful:
-		return RUN_BALANCE_CONFIG.INACTIVITY_WEEKLY_SURCHARGE
-	if low_activity:
-		return RUN_BALANCE_CONFIG.LOW_ACTIVITY_WEEKLY_SURCHARGE
-	if not full_activity:
-		return RUN_BALANCE_CONFIG.INACTIVITY_WEEKLY_SURCHARGE
-	return 0.0
+		base_surcharge = RUN_BALANCE_CONFIG.INACTIVITY_WEEKLY_SURCHARGE
+	elif low_activity:
+		base_surcharge = RUN_BALANCE_CONFIG.LOW_ACTIVITY_WEEKLY_SURCHARGE
+	elif not full_activity:
+		base_surcharge = RUN_BALANCE_CONFIG.INACTIVITY_WEEKLY_SURCHARGE
+	if base_surcharge <= 0.0:
+		return 0.0
+	return base_surcharge * RUN_BALANCE_CONFIG.weekly_surcharge_multiplier(week_index)

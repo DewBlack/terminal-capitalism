@@ -2,6 +2,7 @@ extends SceneTree
 
 const WEEKLY_CYCLE_SERVICE := preload("res://scripts/run/weekly_cycle_service.gd")
 const RUN_OUTCOME_SERVICE := preload("res://scripts/run/run_outcome_service.gd")
+const RUN_BALANCE_CONFIG := preload("res://scripts/run/run_balance_config.gd")
 const RUN_MANAGER_SCRIPT := preload("res://scripts/run/run_manager.gd")
 const PLAYER_PORTFOLIO_SCRIPT := preload("res://scripts/player/player_portfolio.gd")
 const MARKET_MANAGER_SCRIPT := preload("res://scripts/market/market_manager.gd")
@@ -32,7 +33,7 @@ func _initialize() -> void:
 
 func _run_weekly_grace_case(failures: Array[String]) -> void:
 	var run_manager = RUN_MANAGER_SCRIPT.new()
-	run_manager.reset_for_new_run(30, 260.0)
+	run_manager.reset_for_new_run(30, RUN_BALANCE_CONFIG.RUN_BASE_WEEKLY_EXPENSE)
 	run_manager.current_day = 7
 
 	var portfolio = PLAYER_PORTFOLIO_SCRIPT.new()
@@ -52,7 +53,13 @@ func _run_weekly_grace_case(failures: Array[String]) -> void:
 		Callable(self, "_objective_eval_stub")
 	])
 
-	_expect_float_eq(float(result.get("charged_amount", -1.0)), 260.0, 0.001, "grace_week charged_amount", failures)
+	_expect_float_eq(
+		float(result.get("charged_amount", -1.0)),
+		RUN_BALANCE_CONFIG.RUN_BASE_WEEKLY_EXPENSE,
+		0.001,
+		"grace_week charged_amount",
+		failures
+	)
 	_expect_bool(bool(result.get("should_offer_weekly_upgrade", true)), false, "grace_week should_offer_weekly_upgrade", failures)
 	var note := str(result.get("weekly_note", ""))
 	if note.find("Semana 1 en modo gracia.") == -1:
@@ -64,7 +71,7 @@ func _run_weekly_grace_case(failures: Array[String]) -> void:
 
 func _run_weekly_inactivity_case(failures: Array[String]) -> void:
 	var run_manager = RUN_MANAGER_SCRIPT.new()
-	run_manager.reset_for_new_run(30, 260.0)
+	run_manager.reset_for_new_run(30, RUN_BALANCE_CONFIG.RUN_BASE_WEEKLY_EXPENSE)
 	run_manager.current_day = 14
 
 	var portfolio = PLAYER_PORTFOLIO_SCRIPT.new()
@@ -84,15 +91,17 @@ func _run_weekly_inactivity_case(failures: Array[String]) -> void:
 		Callable(self, "_objective_eval_stub")
 	])
 
-	_expect_float_eq(float(result.get("inactivity_surcharge", -1.0)), 110.0, 0.001, "week2 inactivity_surcharge", failures)
-	_expect_float_eq(float(result.get("charged_amount", -1.0)), 370.0, 0.001, "week2 charged_amount", failures)
+	var expected_surcharge := RUN_BALANCE_CONFIG.INACTIVITY_WEEKLY_SURCHARGE * RUN_BALANCE_CONFIG.weekly_surcharge_multiplier(2)
+	var expected_charge := RUN_BALANCE_CONFIG.RUN_BASE_WEEKLY_EXPENSE + expected_surcharge
+	_expect_float_eq(float(result.get("inactivity_surcharge", -1.0)), expected_surcharge, 0.001, "week2 inactivity_surcharge", failures)
+	_expect_float_eq(float(result.get("charged_amount", -1.0)), expected_charge, 0.001, "week2 charged_amount", failures)
 	_expect_bool(bool(result.get("should_offer_weekly_upgrade", true)), false, "week2 should_offer_weekly_upgrade", failures)
 	_free_smoke_nodes([run_manager, portfolio, market_manager, upgrade_manager])
 
 
 func _run_debt_feedback_case(failures: Array[String]) -> void:
 	var run_manager = RUN_MANAGER_SCRIPT.new()
-	run_manager.reset_for_new_run(30, 260.0)
+	run_manager.reset_for_new_run(30, RUN_BALANCE_CONFIG.RUN_BASE_WEEKLY_EXPENSE)
 	run_manager.current_day = 10
 
 	var portfolio = PLAYER_PORTFOLIO_SCRIPT.new()
@@ -122,7 +131,7 @@ func _run_debt_feedback_case(failures: Array[String]) -> void:
 
 func _run_outcome_cases(failures: Array[String]) -> void:
 	var run_manager = RUN_MANAGER_SCRIPT.new()
-	run_manager.reset_for_new_run(30, 260.0)
+	run_manager.reset_for_new_run(30, RUN_BALANCE_CONFIG.RUN_BASE_WEEKLY_EXPENSE)
 	run_manager.current_day = 10
 
 	var portfolio = PLAYER_PORTFOLIO_SCRIPT.new()

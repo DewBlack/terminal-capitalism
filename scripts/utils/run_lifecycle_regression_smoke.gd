@@ -1,6 +1,7 @@
 extends SceneTree
 
 const RUN_LIFECYCLE_SERVICE := preload("res://scripts/run/run_lifecycle_service.gd")
+const RUN_BALANCE_CONFIG := preload("res://scripts/run/run_balance_config.gd")
 const CONTENT_PACK_LOADER_SCRIPT := preload("res://scripts/core/content_pack_loader.gd")
 const RUN_MANAGER_SCRIPT := preload("res://scripts/run/run_manager.gd")
 const PLAYER_PORTFOLIO_SCRIPT := preload("res://scripts/player/player_portfolio.gd")
@@ -51,10 +52,10 @@ func _run_standard_start_case(failures: Array[String]) -> void:
 		context["company_generator"],
 		context["tutorial_manager"],
 		RandomNumberGenerator.new(),
-		960.0,
-		260.0,
-		110.0,
-		35.0,
+		RUN_BALANCE_CONFIG.RUN_STARTING_CASH,
+		RUN_BALANCE_CONFIG.RUN_BASE_WEEKLY_EXPENSE,
+		RUN_BALANCE_CONFIG.INACTIVITY_WEEKLY_SURCHARGE,
+		RUN_BALANCE_CONFIG.LOW_ACTIVITY_WEEKLY_SURCHARGE,
 		3,
 		2,
 		Callable(self, "_roll_weekly_objectives_stub"),
@@ -76,8 +77,20 @@ func _run_standard_start_case(failures: Array[String]) -> void:
 	_expect_string(str(lifecycle_state.get("last_debt_risk_label", "")), "Bajo", "standard_start last_debt_risk_label", failures)
 	_expect_int(int(lifecycle_state.get("last_upgrade_offer_day", 0)), -1000, "standard_start last_upgrade_offer_day", failures)
 	_expect_int(context["run_manager"].max_days, 30, "standard_start run_manager.max_days", failures)
-	_expect_float_eq(context["run_manager"].weekly_expense, 260.0, 0.001, "standard_start run_manager.weekly_expense", failures)
-	_expect_float_eq(context["portfolio"].cash, 960.0, 0.001, "standard_start portfolio.cash", failures)
+	_expect_float_eq(
+		context["run_manager"].weekly_expense,
+		RUN_BALANCE_CONFIG.RUN_BASE_WEEKLY_EXPENSE,
+		0.001,
+		"standard_start run_manager.weekly_expense",
+		failures
+	)
+	_expect_float_eq(
+		context["portfolio"].cash,
+		RUN_BALANCE_CONFIG.RUN_STARTING_CASH,
+		0.001,
+		"standard_start portfolio.cash",
+		failures
+	)
 
 	var active_companies: Array = (context["market_manager"] as MarketManager).get_active_companies()
 	if active_companies.size() < 7 or active_companies.size() > 11:
@@ -165,10 +178,10 @@ func _run_standard_finish_case(failures: Array[String]) -> void:
 		context["company_generator"],
 		context["tutorial_manager"],
 		RandomNumberGenerator.new(),
-		960.0,
-		260.0,
-		110.0,
-		35.0,
+		RUN_BALANCE_CONFIG.RUN_STARTING_CASH,
+		RUN_BALANCE_CONFIG.RUN_BASE_WEEKLY_EXPENSE,
+		RUN_BALANCE_CONFIG.INACTIVITY_WEEKLY_SURCHARGE,
+		RUN_BALANCE_CONFIG.LOW_ACTIVITY_WEEKLY_SURCHARGE,
 		3,
 		2,
 		Callable(self, "_roll_weekly_objectives_stub"),

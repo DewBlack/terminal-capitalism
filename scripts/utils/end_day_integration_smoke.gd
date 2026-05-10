@@ -2,6 +2,7 @@ extends SceneTree
 
 const RUN_END_DAY_ORCHESTRATOR_SERVICE := preload("res://scripts/run/run_end_day_orchestrator_service.gd")
 const RUN_LIFECYCLE_SERVICE := preload("res://scripts/run/run_lifecycle_service.gd")
+const RUN_BALANCE_CONFIG := preload("res://scripts/run/run_balance_config.gd")
 const CONTENT_PACK_LOADER_SCRIPT := preload("res://scripts/core/content_pack_loader.gd")
 const RUN_MANAGER_SCRIPT := preload("res://scripts/run/run_manager.gd")
 const PLAYER_PORTFOLIO_SCRIPT := preload("res://scripts/player/player_portfolio.gd")
@@ -12,10 +13,10 @@ const TAG_EFFECT_SYSTEM_SCRIPT := preload("res://scripts/market/tag_effect_syste
 const COMPANY_GENERATOR_SCRIPT := preload("res://scripts/market/company_generator.gd")
 const TUTORIAL_MANAGER_SCRIPT := preload("res://scripts/run/tutorial_manager.gd")
 
-const RUN_STARTING_CASH := 960.0
-const RUN_BASE_WEEKLY_EXPENSE := 260.0
-const INACTIVITY_WEEKLY_SURCHARGE := 110.0
-const LOW_ACTIVITY_WEEKLY_SURCHARGE := 35.0
+const RUN_STARTING_CASH := RUN_BALANCE_CONFIG.RUN_STARTING_CASH
+const RUN_BASE_WEEKLY_EXPENSE := RUN_BALANCE_CONFIG.RUN_BASE_WEEKLY_EXPENSE
+const INACTIVITY_WEEKLY_SURCHARGE := RUN_BALANCE_CONFIG.INACTIVITY_WEEKLY_SURCHARGE
+const LOW_ACTIVITY_WEEKLY_SURCHARGE := RUN_BALANCE_CONFIG.LOW_ACTIVITY_WEEKLY_SURCHARGE
 const UPGRADE_OFFER_MIN_DAYS_BETWEEN := 3
 const UPGRADE_OFFER_TRIGGER_LOOKBACK_DAYS := 2
 const UPGRADE_OFFER_TRIGGER_ON_BANKRUPTCY := true
