@@ -25,6 +25,7 @@ const UI_MARKET_SELECTION_CONTROLLER := preload("res://scripts/ui/ui_market_sele
 const UI_HOTKEY_INPUT_CONTROLLER := preload("res://scripts/ui/ui_hotkey_input_controller.gd")
 const UI_MODAL_LOCKS_CONTROLLER := preload("res://scripts/ui/ui_modal_locks_controller.gd")
 const TUTORIAL_OVERLAY_CONTROLLER := preload("res://scripts/ui/tutorial_overlay_controller.gd")
+const TUTORIAL_TARGET_RECT_RESOLVER := preload("res://scripts/ui/tutorial_target_rect_resolver.gd")
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
 const MOVEMENT_REASON_MAX_CHARS := 88
@@ -51,6 +52,7 @@ var _market_selection_controller = null
 var _hotkey_input_controller = null
 var _modal_locks_controller = null
 var _tutorial_overlay_controller = null
+var _tutorial_target_rect_resolver = null
 var _tutorial_state: Dictionary = {"active": false}
 
 @onready var _day_label: Label = $MainMargin/MainVBox/HeaderBar/DayLabel
@@ -160,6 +162,7 @@ func _ready() -> void:
 	_market_selection_controller.set_tutorial_state(_tutorial_state)
 	_hotkey_input_controller = UI_HOTKEY_INPUT_CONTROLLER.new()
 	_tutorial_overlay_controller = TUTORIAL_OVERLAY_CONTROLLER.new()
+	_tutorial_target_rect_resolver = TUTORIAL_TARGET_RECT_RESOLVER.new()
 	_tutorial_overlay_controller.setup(
 		_tutorial_overlay,
 		_news_history_button,
@@ -263,34 +266,25 @@ func set_tutorial_state(state: Dictionary) -> void:
 
 
 func get_tutorial_target_rect(target_id: String, ticker_hint: String = "") -> Rect2:
-	match target_id:
-		"header":
-			return _header_bar.get_global_rect()
-		"news_panel":
-			return _news_panel.get_global_rect()
-		"market_panel":
-			return _market_panel.get_global_rect()
-		"details_panel":
-			return _details_panel.get_global_rect()
-		"bottom_panel":
-			return _bottom_panel.get_global_rect()
-		"buy_button":
-			return _buy_button.get_global_rect()
-		"sell_button":
-			return _sell_button.get_global_rect()
-		"end_day_button":
-			return _end_day_button.get_global_rect()
-		"quantity_input":
-			return _quantity_input.get_global_rect()
-		"market_row":
-			if _market_selection_controller != null:
-				var target_control: Control = _market_selection_controller.get_row_control_for_ticker(ticker_hint)
-				if target_control != null:
-					return target_control.get_global_rect()
-			return _market_panel.get_global_rect()
-		_:
-			pass
-	return _header_bar.get_global_rect()
+	if _tutorial_target_rect_resolver == null:
+		return _header_bar.get_global_rect()
+	return _tutorial_target_rect_resolver.resolve_target_rect(
+		target_id,
+		ticker_hint,
+		_header_bar.get_global_rect(),
+		_market_selection_controller,
+		{
+			"header": _header_bar,
+			"news_panel": _news_panel,
+			"market_panel": _market_panel,
+			"details_panel": _details_panel,
+			"bottom_panel": _bottom_panel,
+			"buy_button": _buy_button,
+			"sell_button": _sell_button,
+			"end_day_button": _end_day_button,
+			"quantity_input": _quantity_input
+		}
+	)
 
 
 func get_selected_ticker() -> String:

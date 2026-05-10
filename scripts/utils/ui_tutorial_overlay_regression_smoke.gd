@@ -8,6 +8,8 @@ const BUY_BUTTON_PATH := NodePath("MainMargin/MainVBox/BottomPanel/BottomBar/Buy
 const SELL_BUTTON_PATH := NodePath("MainMargin/MainVBox/BottomPanel/BottomBar/SellButton")
 const END_DAY_BUTTON_PATH := NodePath("MainMargin/MainVBox/BottomPanel/BottomBar/EndDayButton")
 const TUTORIAL_OVERLAY_PATH := NodePath("TutorialOverlay")
+const TUTORIAL_FOCUS_FRAME_PATH := NodePath("TutorialOverlay/FocusFrame")
+const MARKET_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel")
 
 
 func _initialize() -> void:
@@ -31,6 +33,8 @@ func _run_smoke() -> void:
 	var sell_button := ui.get_node_or_null(SELL_BUTTON_PATH) as Button
 	var end_day_button := ui.get_node_or_null(END_DAY_BUTTON_PATH) as Button
 	var tutorial_overlay := ui.get_node_or_null(TUTORIAL_OVERLAY_PATH) as TutorialOverlay
+	var tutorial_focus_frame := ui.get_node_or_null(TUTORIAL_FOCUS_FRAME_PATH) as Control
+	var market_panel := ui.get_node_or_null(MARKET_PANEL_PATH) as Control
 	if news_history_button == null or history_button == null or quantity_input == null:
 		failures.append("No se pudieron resolver nodos de tutorial/historico en GameScreen")
 		_finish_smoke(ui, failures)
@@ -39,10 +43,14 @@ func _run_smoke() -> void:
 		failures.append("No se pudieron resolver nodos de accion u overlay en GameScreen")
 		_finish_smoke(ui, failures)
 		return
+	if tutorial_focus_frame == null or market_panel == null:
+		failures.append("No se pudieron resolver nodos de foco tutorial/market panel en GameScreen")
+		_finish_smoke(ui, failures)
+		return
 
 	_run_inactive_case(ui, news_history_button, history_button, quantity_input, tutorial_overlay, failures)
 	_run_locked_tutorial_case(ui, news_history_button, history_button, quantity_input, buy_button, sell_button, end_day_button, tutorial_overlay, failures)
-	_run_resize_case(ui, news_history_button, history_button, tutorial_overlay, failures)
+	_run_resize_case(ui, news_history_button, history_button, tutorial_overlay, tutorial_focus_frame, market_panel, failures)
 
 	_finish_smoke(ui, failures)
 
@@ -100,6 +108,8 @@ func _run_resize_case(
 	news_history_button: Button,
 	history_button: Button,
 	tutorial_overlay: TutorialOverlay,
+	tutorial_focus_frame: Control,
+	_market_panel: Control,
 	failures: Array[String]
 ) -> void:
 	ui.set_tutorial_state({
@@ -113,6 +123,7 @@ func _run_resize_case(
 	_expect_bool(tutorial_overlay.visible, true, "resize_active overlay_visible", failures)
 	_expect_bool(news_history_button.disabled, true, "resize_active news_history_disabled", failures)
 	_expect_bool(history_button.disabled, true, "resize_active history_disabled", failures)
+	_expect_rect_non_trivial(tutorial_focus_frame.get_global_rect(), "resize_active focus_frame_rect", failures)
 	ui.set_tutorial_state({"active": false})
 
 
@@ -120,6 +131,12 @@ func _expect_bool(actual: bool, expected: bool, label: String, failures: Array[S
 	if actual == expected:
 		return
 	failures.append("%s esperado=%s real=%s" % [label, str(expected), str(actual)])
+
+
+func _expect_rect_non_trivial(rect: Rect2, label: String, failures: Array[String]) -> void:
+	if rect.size.x > 8.0 and rect.size.y > 8.0:
+		return
+	failures.append("%s esperado tamano > 8px real=(%.2f, %.2f)" % [label, rect.size.x, rect.size.y])
 
 
 func _finish_smoke(ui: UIManager, failures: Array[String]) -> void:

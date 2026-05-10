@@ -511,11 +511,8 @@ func _sync_tutorial_ui_state() -> void:
 		_game_ui.set_tutorial_state({"active": false})
 		return
 
-	var step: Dictionary = _tutorial_manager.get_current_step()
-	var target_id := str(step.get("target", "header"))
-	var ticker_hint := str(step.get("expected_ticker", ""))
-	var highlight_rect := _game_ui.get_tutorial_target_rect(target_id, ticker_hint)
-	var state: Dictionary = _tutorial_manager.build_ui_state(highlight_rect)
+	# El overlay resuelve rects desde la UI; GameManager solo publica estado de tutorial.
+	var state: Dictionary = _tutorial_manager.build_ui_state(Rect2())
 	_game_ui.set_tutorial_state(state)
 
 
