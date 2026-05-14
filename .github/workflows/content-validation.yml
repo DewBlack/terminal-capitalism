@@ -55,6 +55,15 @@ jobs:
           unzip -o godot.zip
           chmod +x "${GODOT_BIN}"
 
+      - name: Warm project cache
+        run: |
+          mkdir -p .godot
+          ./"${GODOT_BIN}" --headless --path ./ --editor --import --quit-after 2
+          if [ ! -f ".godot/global_script_class_cache.cfg" ]; then
+            echo "Missing .godot/global_script_class_cache.cfg after warmup."
+            exit 1
+          fi
+
       - name: Run smoke script
         run: |
           echo "Running smoke: ${{ matrix.smoke.name }}"
