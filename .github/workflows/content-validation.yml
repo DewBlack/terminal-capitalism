@@ -8,7 +8,40 @@ on:
 
 jobs:
   headless-smoke:
+    name: Headless Smoke - ${{ matrix.smoke.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        smoke:
+          - name: Parse Smoke
+            script: scripts/utils/script_parse_smoke.gd
+          - name: Weekly Balance Smoke
+            script: scripts/utils/weekly_cycle_regression_smoke.gd
+          - name: Validate JSON Content
+            script: scripts/utils/validate_content_json.gd
+          - name: UI Tutorial Overlay Regression Smoke
+            script: scripts/utils/ui_tutorial_overlay_regression_smoke.gd
+          - name: UI Hotkey Input Regression Smoke
+            script: scripts/utils/ui_hotkey_input_regression_smoke.gd
+          - name: UI Trade Action Locks Smoke
+            script: scripts/utils/ui_trade_action_locks_smoke.gd
+          - name: Run Lifecycle Regression Smoke
+            script: scripts/utils/run_lifecycle_regression_smoke.gd
+          - name: End Day Integration Smoke
+            script: scripts/utils/end_day_integration_smoke.gd
+          - name: UI Modal Locks Controller Smoke
+            script: scripts/utils/ui_modal_locks_controller_smoke.gd
+          - name: Run Day UI Orchestrator Service Smoke
+            script: scripts/utils/run_day_ui_orchestrator_service_smoke.gd
+          - name: Tutorial Target Rect Resolver Smoke
+            script: scripts/utils/tutorial_target_rect_resolver_smoke.gd
+          - name: Tutorial Manager Flow Smoke
+            script: scripts/utils/tutorial_manager_flow_smoke.gd
+          - name: Tutorial Lifecycle E2E Smoke
+            script: scripts/utils/tutorial_lifecycle_e2e_smoke.gd
+          - name: Tutorial Friction Budget Smoke
+            script: scripts/utils/tutorial_friction_budget_smoke.gd
     env:
       GODOT_VERSION: 4.6-stable
       GODOT_BIN: Godot_v4.6-stable_linux.x86_64
@@ -22,14 +55,8 @@ jobs:
           unzip -o godot.zip
           chmod +x "${GODOT_BIN}"
 
-      - name: Parse Smoke
+      - name: Run smoke script
         run: |
-          ./"${GODOT_BIN}" --headless --path ./ --script scripts/utils/script_parse_smoke.gd
-
-      - name: Weekly Balance Smoke
-        run: |
-          ./"${GODOT_BIN}" --headless --path ./ --script scripts/utils/weekly_cycle_regression_smoke.gd
-
-      - name: Validate JSON content
-        run: |
-          ./"${GODOT_BIN}" --headless --path ./ --script scripts/utils/validate_content_json.gd
+          echo "Running smoke: ${{ matrix.smoke.name }}"
+          echo "Script path: ${{ matrix.smoke.script }}"
+          ./"${GODOT_BIN}" --headless --path ./ --script "${{ matrix.smoke.script }}"

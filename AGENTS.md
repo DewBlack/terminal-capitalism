@@ -12,9 +12,63 @@ Objetivo de una run:
 ## Flujo Git por chat (obligatorio)
 
 - En cada chat nuevo, crear una rama nueva desde el ultimo `dev` antes de aplicar cambios.
+- Si el chat arranca con "siguiente tarea", seleccionar primero la issue y crear la rama justo despues, siempre antes del primer cambio de archivos.
 - Mantener todos los cambios de ese chat en esa misma rama.
 - No crear ramas nuevas por cada cambio dentro del mismo chat.
-- Proponer nombres de rama tipo `chat/YYYY-MM-DD-<tema>`.
+- Nombrar la rama segun la issue tomada, no segun un tema adivinado.
+- Formato obligatorio: `chat/YYYY-MM-DD-issue-<numero>-<slug-corto>`.
+
+## Gestion de tareas en GitHub (obligatorio)
+
+Fuente de verdad de trabajo:
+- Project: `https://github.com/users/DewBlack/projects/2`
+- Repo issues: `https://github.com/DewBlack/terminal-capitalism/issues`
+- Backlog maestro: issue `#19`
+
+### Regla para "siguiente tarea"
+
+Cuando en chat se pida "siguiente tarea" (o equivalente), el agente debe:
+
+1. Buscar tareas abiertas en GitHub del repo con prioridad y estado.
+2. Priorizar por este orden:
+   - `status-ready` + `priority-p0`
+   - `status-ready` + `priority-p1`
+   - `status-ready` + `priority-p2`
+   - si no hay `status-ready`, tomar `status-backlog` por el mismo orden de prioridad.
+3. Marcar la tarea elegida como en curso:
+   - agregar `status-in-progress`
+   - quitar `status-ready` o `status-backlog` si estaban.
+4. Crear/switch a rama de trabajo vinculada a la issue seleccionada:
+   - formato: `chat/YYYY-MM-DD-issue-<numero>-<slug-corto>`
+   - ejemplo: `chat/2026-05-14-issue-21-run-variability-leaks`
+5. Empezar ejecucion directamente sobre esa issue, sin pedir mas contexto, salvo bloqueo real.
+
+### Regla de cierre de tarea
+
+Al terminar una tarea:
+- Validar criterios de aceptacion definidos en la issue.
+- Cerrar la issue como `completed`.
+- Reflejar en la issue maestra `#19` (si aplica) el avance del bloque.
+
+### Regla para trabajo no contemplado
+
+Si durante la ejecucion aparece trabajo faltante o nuevo no contemplado:
+
+1. Crear una issue nueva en GitHub inmediatamente.
+2. La issue nueva debe incluir como minimo:
+   - Objetivo
+   - Implementacion concreta
+   - Archivos objetivo
+   - Validacion
+   - Definicion de hecho
+3. Etiquetar siempre con:
+   - un `area-*` (`area-ci`, `area-qa`, `area-devex`, `area-tutorial`, `area-ui`, `area-art`)
+   - una prioridad (`priority-p0`, `priority-p1`, `priority-p2`)
+   - estado inicial (`status-backlog` o `status-ready`)
+   - fase (`phase-mvp-base` o `phase-visual`)
+4. Referenciar la issue nueva desde la issue en curso.
+
+No dejar trabajo implcito fuera de issues.
 
 ## Pilares de diseno
 
