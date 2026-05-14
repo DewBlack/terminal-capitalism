@@ -27,6 +27,7 @@ const UI_HOTKEY_INPUT_CONTROLLER := preload("res://scripts/ui/ui_hotkey_input_co
 const UI_MODAL_LOCKS_CONTROLLER := preload("res://scripts/ui/ui_modal_locks_controller.gd")
 const TUTORIAL_OVERLAY_CONTROLLER := preload("res://scripts/ui/tutorial_overlay_controller.gd")
 const TUTORIAL_TARGET_RECT_RESOLVER := preload("res://scripts/ui/tutorial_target_rect_resolver.gd")
+const UI_THEME_TOKENS := preload("res://scripts/ui/ui_theme_tokens.gd")
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
 const MOVEMENT_REASON_MAX_CHARS := 88
@@ -406,7 +407,7 @@ func _apply_news_panel_model(news_model: Dictionary) -> void:
 				NEWS_CARD_FACTORY.build_news_card(
 					str(card.get("title", "Sin titular")),
 					str(card.get("body", "")),
-					card.get("title_color", Color(0.95, 0.89, 0.35))
+					card.get("title_color", UI_THEME_TOKENS.TEXT_NEWS_TITLE)
 				)
 			)
 	var placeholder_text := str(news_model.get("placeholder_text", ""))
@@ -503,7 +504,7 @@ func _apply_company_details_model(detail_model: Dictionary, trade_markers: Array
 	_history_text.text = str(detail_model.get("history_text", ""))
 	_history_text.visible = bool(detail_model.get("history_visible", false))
 	_details_logo_text.text = str(detail_model.get("logo_text", "??"))
-	_details_logo_swatch.color = detail_model.get("logo_color", Color(0.2, 0.2, 0.2, 1.0))
+	_details_logo_swatch.color = detail_model.get("logo_color", UI_THEME_TOKENS.SURFACE_LOGO_FALLBACK)
 	var price_history_variant: Variant = detail_model.get("price_history", [])
 	if price_history_variant is Array:
 		_price_chart.set_price_history(price_history_variant)
@@ -770,18 +771,18 @@ func _update_selection_context() -> void:
 
 
 func _apply_ui_tone() -> void:
-	var shell_style := _build_shell_style(Color(0.10, 0.11, 0.14, 0.96), Color(0.24, 0.29, 0.36, 1.0))
+	var shell_style := _build_shell_style(UI_THEME_TOKENS.SURFACE_BACKGROUND, UI_THEME_TOKENS.BORDER_DEFAULT)
 	_news_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
 	_market_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
 	_details_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
 	_feedback_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
 	_bottom_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
 
-	_market_header.add_theme_color_override("font_color", Color(0.75, 0.81, 0.88))
-	_week_label.add_theme_color_override("font_color", Color(0.90, 0.93, 0.99))
-	_upgrade_label.add_theme_color_override("font_color", Color(0.84, 0.96, 0.85))
-	_status_label.add_theme_color_override("font_color", Color(0.90, 0.96, 0.99))
-	_selection_label.add_theme_color_override("font_color", Color(0.93, 0.93, 0.84))
+	_market_header.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_SECONDARY)
+	_week_label.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_PRIMARY)
+	_upgrade_label.add_theme_color_override("font_color", UI_THEME_TOKENS.STATE_SUCCESS_SOFT)
+	_status_label.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_PRIMARY)
+	_selection_label.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_ACCENT)
 	_bottom_bar.add_theme_constant_override("separation", 8)
 
 
