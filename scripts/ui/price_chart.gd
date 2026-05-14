@@ -1,6 +1,8 @@
 class_name PriceChart
 extends Control
 
+const UI_THEME_TOKENS := preload("res://scripts/ui/ui_theme_tokens.gd")
+
 var _price_history: Array[float] = []
 var _trade_markers: Array[Dictionary] = []
 
@@ -17,8 +19,8 @@ func set_trade_markers(markers: Array[Dictionary]) -> void:
 
 func _draw() -> void:
 	var chart_rect := Rect2(Vector2.ZERO, size)
-	draw_rect(chart_rect, Color(0.08, 0.08, 0.10, 1.0), true)
-	draw_rect(chart_rect, Color(0.28, 0.28, 0.35, 1.0), false, 1.5)
+	draw_rect(chart_rect, UI_THEME_TOKENS.SURFACE_CHART, true)
+	draw_rect(chart_rect, UI_THEME_TOKENS.BORDER_CHART, false, 1.5)
 
 	if _price_history.size() < 2:
 		return
@@ -41,7 +43,7 @@ func _draw() -> void:
 	for grid_idx in range(grid_lines + 1):
 		var t := float(grid_idx) / float(grid_lines)
 		var y := lerpf(top, bottom, t)
-		draw_line(Vector2(left, y), Vector2(right, y), Color(0.2, 0.2, 0.25, 0.8), 1.0)
+		draw_line(Vector2(left, y), Vector2(right, y), UI_THEME_TOKENS.BORDER_GRID, 1.0)
 
 	var points: Array[Vector2] = []
 	var count := _price_history.size()
@@ -50,11 +52,14 @@ func _draw() -> void:
 		var x := lerpf(left, right, x_ratio)
 		var normalized := (_price_history[idx] - min_price) / spread
 		var y := lerpf(bottom, top, normalized)
-		var bar_color := Color(0.28, 0.58, 0.95, 0.28)
-		draw_rect(Rect2(Vector2(x - 2.0, y), Vector2(4.0, maxf(1.0, baseline_y - y))), bar_color, true)
+		draw_rect(
+			Rect2(Vector2(x - 2.0, y), Vector2(4.0, maxf(1.0, baseline_y - y))),
+			UI_THEME_TOKENS.SURFACE_CHART_BAR,
+			true
+		)
 		points.append(Vector2(x, y))
 
-	var line_color := Color(0.25, 0.95, 0.35, 1.0) if _price_history.back() >= _price_history[0] else Color(0.95, 0.34, 0.34, 1.0)
+	var line_color := UI_THEME_TOKENS.STATE_SUCCESS if _price_history.back() >= _price_history[0] else UI_THEME_TOKENS.STATE_DANGER
 	for idx in range(1, points.size()):
 		draw_line(points[idx - 1], points[idx], line_color, 3.0, true)
 
@@ -88,8 +93,8 @@ func _draw_trade_markers(points: Array[Vector2]) -> void:
 		var horizontal_jitter: float = float(offset_slot) * 6.0
 
 		var anchor: Vector2 = points[point_index] + Vector2(horizontal_jitter, 0.0)
-		var marker_color := Color(0.26, 1.0, 0.35, 0.95) if marker_type == "buy" else Color(1.0, 0.34, 0.34, 0.95)
-		var marker_outline := Color(0.03, 0.03, 0.03, 0.9)
+		var marker_color := UI_THEME_TOKENS.STATE_MARKER_SUCCESS if marker_type == "buy" else UI_THEME_TOKENS.STATE_MARKER_DANGER
+		var marker_outline := UI_THEME_TOKENS.BORDER_CONTRAST
 		var marker_size := 7.0
 
 		var triangle := PackedVector2Array()

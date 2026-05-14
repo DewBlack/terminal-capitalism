@@ -1,6 +1,8 @@
 class_name MarketRowFactory
 extends RefCounted
 
+const UI_THEME_TOKENS := preload("res://scripts/ui/ui_theme_tokens.gd")
+
 
 static func build_company_row(
 	row_model: Dictionary,
@@ -13,7 +15,7 @@ static func build_company_row(
 	var row_card := PanelContainer.new()
 	row_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var row_style := StyleBoxFlat.new()
-	row_style.bg_color = row_model.get("row_bg_color", Color(0.16, 0.17, 0.20, 0.96))
+	row_style.bg_color = row_model.get("row_bg_color", UI_THEME_TOKENS.SURFACE_PANEL)
 	row_style.corner_radius_top_left = 6
 	row_style.corner_radius_top_right = 6
 	row_style.corner_radius_bottom_left = 6
@@ -27,7 +29,7 @@ static func build_company_row(
 		row_style.border_width_top = 2
 		row_style.border_width_right = 2
 		row_style.border_width_bottom = 2
-		row_style.border_color = row_model.get("row_border_color", Color(0.99, 0.80, 0.23, 1.0))
+		row_style.border_color = row_model.get("row_border_color", UI_THEME_TOKENS.BORDER_ACCENT)
 	row_card.add_theme_stylebox_override("panel", row_style)
 
 	var row_vbox := VBoxContainer.new()
@@ -66,7 +68,7 @@ static func build_company_row(
 	change_label.custom_minimum_size = Vector2(row_change_min_width, 0)
 	change_label.text = str(row_model.get("change_text", "+0.00%"))
 	change_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	change_label.add_theme_color_override("font_color", row_model.get("change_color", Color(0.82, 0.84, 0.87, 1.0)))
+	change_label.add_theme_color_override("font_color", row_model.get("change_color", UI_THEME_TOKENS.TEXT_TERTIARY))
 	top_row.add_child(change_label)
 
 	var bottom_info_label := Label.new()
@@ -102,6 +104,6 @@ static func _build_company_logo_badge(company: Company, side_size: int) -> Contr
 	text_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	text_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	text_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	text_label.add_theme_color_override("font_color", Color(0.07, 0.07, 0.07, 0.95))
+	text_label.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_ON_ACCENT)
 	badge.add_child(text_label)
 	return badge

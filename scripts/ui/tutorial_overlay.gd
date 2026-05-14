@@ -1,6 +1,8 @@
 class_name TutorialOverlay
 extends Control
 
+const UI_THEME_TOKENS := preload("res://scripts/ui/ui_theme_tokens.gd")
+
 signal continue_requested
 
 const HIGHLIGHT_PADDING := 8.0
@@ -147,8 +149,8 @@ func _on_overlay_resized() -> void:
 
 func _apply_styles() -> void:
 	var frame_style := StyleBoxFlat.new()
-	frame_style.bg_color = Color(0, 0, 0, 0)
-	frame_style.border_color = Color(1.0, 0.83, 0.30, 0.98)
+	frame_style.bg_color = UI_THEME_TOKENS.SURFACE_TRANSPARENT
+	frame_style.border_color = UI_THEME_TOKENS.BORDER_ACCENT
 	frame_style.border_width_left = 3
 	frame_style.border_width_top = 3
 	frame_style.border_width_right = 3
@@ -160,8 +162,8 @@ func _apply_styles() -> void:
 	_focus_frame.add_theme_stylebox_override("panel", frame_style)
 
 	var card_style := StyleBoxFlat.new()
-	card_style.bg_color = Color(0.08, 0.11, 0.16, 0.96)
-	card_style.border_color = Color(0.24, 0.35, 0.50, 1.0)
+	card_style.bg_color = UI_THEME_TOKENS.SURFACE_CARD
+	card_style.border_color = UI_THEME_TOKENS.BORDER_CARD
 	card_style.border_width_left = 1
 	card_style.border_width_top = 1
 	card_style.border_width_right = 1
@@ -172,5 +174,5 @@ func _apply_styles() -> void:
 	card_style.corner_radius_bottom_right = 12
 	$CardPanel.add_theme_stylebox_override("panel", card_style)
 	_card_panel.clip_contents = true
-	_title_label.add_theme_color_override("font_color", Color(0.96, 0.93, 0.63))
-	_hint_label.add_theme_color_override("font_color", Color(0.74, 0.92, 0.99))
+	_title_label.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_TUTORIAL_TITLE)
+	_hint_label.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_INFO)
