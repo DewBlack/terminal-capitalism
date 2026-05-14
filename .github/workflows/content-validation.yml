@@ -43,8 +43,8 @@ jobs:
           - name: Tutorial Friction Budget Smoke
             script: scripts/utils/tutorial_friction_budget_smoke.gd
     env:
-      GODOT_VERSION: 4.6-stable
-      GODOT_BIN: Godot_v4.6-stable_linux.x86_64
+      GODOT_VERSION: 4.6.2-stable
+      GODOT_BIN: Godot_v4.6.2-stable_linux.x86_64
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4

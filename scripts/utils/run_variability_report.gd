@@ -72,6 +72,9 @@ func _initialize() -> void:
 	_print_market_table(report_rows, strategy_names)
 	_print_market_summary(report_rows)
 	_print_strategy_summary(report_rows, strategy_names, max_days)
+	report_rows.clear()
+	content.clear()
+	_free_node_if_valid(loader)
 	quit()
 
 
@@ -235,8 +238,9 @@ func _simulate_run(
 			strategy_state["defeat_day"] = max_days
 			strategy_state["defeat_reason"] = "survived"
 
+	var strategy_states_snapshot := _snapshot_strategy_states(strategy_states, strategy_names)
 	var dispersion := _std_dev(final_prices)
-	return {
+	var row := {
 		"run": run_number,
 		"seed": seed_base,
 		"days": days_simulated,
@@ -253,8 +257,47 @@ func _simulate_run(
 		"company_profile": company_generator.get_run_profile_text(),
 		"market_regime": market_manager.get_run_regime_text(),
 		"news_profile": news_manager.get_run_news_profile_text(),
-		"strategy_states": strategy_states
+		"strategy_states": strategy_states_snapshot
 	}
+	_dispose_strategy_states(strategy_states, strategy_names)
+	_free_node_if_valid(market_manager)
+	_free_node_if_valid(news_manager)
+	_free_node_if_valid(company_generator)
+	_free_node_if_valid(tag_effect_system)
+	return row
+
+
+func _snapshot_strategy_states(strategy_states: Dictionary, strategy_names: Array[String]) -> Dictionary:
+	var snapshot := {}
+	for strategy_name in strategy_names:
+		var strategy_state_variant: Variant = strategy_states.get(strategy_name, {})
+		if strategy_state_variant is Dictionary:
+			var strategy_state: Dictionary = strategy_state_variant
+			var copied_state: Dictionary = strategy_state.duplicate(true)
+			copied_state.erase("portfolio")
+			copied_state.erase("upgrade_manager")
+			snapshot[strategy_name] = copied_state
+	return snapshot
+
+
+func _dispose_strategy_states(strategy_states: Dictionary, strategy_names: Array[String]) -> void:
+	for strategy_name in strategy_names:
+		var strategy_state_variant: Variant = strategy_states.get(strategy_name, {})
+		if not (strategy_state_variant is Dictionary):
+			continue
+		var strategy_state: Dictionary = strategy_state_variant
+		_free_node_if_valid(strategy_state.get("portfolio"))
+		_free_node_if_valid(strategy_state.get("upgrade_manager"))
+	strategy_states.clear()
+
+
+func _free_node_if_valid(node_variant: Variant) -> void:
+	if node_variant == null:
+		return
+	if node_variant is Node:
+		var node: Node = node_variant
+		if is_instance_valid(node):
+			node.free()
 
 
 func _build_strategy_states(strategy_names: Array[String], seed_base: int) -> Dictionary:
