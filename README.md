@@ -2,11 +2,11 @@
 
 Juego roguelike bursatil absurdo hecho con **Godot 4 + GDScript**.
 
-Tu objetivo es sobrevivir una run de 30 dias operando acciones mientras el mercado reacciona a noticias satiricas por sistema de tags.
+Objetivo: sobrevivir una run de 30 dias operando acciones mientras el mercado reacciona a noticias satiricas por sistema de tags.
 
-## Estado actual
+## Estado actual (post-refactor, mayo 2026)
 
-MVP jugable con:
+MVP jugable completo:
 - Menu principal
 - Run normal
 - Tutorial guiado
@@ -15,6 +15,11 @@ MVP jugable con:
 - Quiebras, fusiones y aparicion de nuevas empresas
 - Gastos semanales y mejoras temporales
 - Condiciones de victoria/derrota
+
+Hardening anti-espagueti aplicado sin cambios visibles de UX:
+- Hotkeys, tutorial locks y modal locks preservados
+- Flujo semanal intacto
+- Suite de smokes de regresion ampliada y en verde
 
 ## Loop de juego
 
@@ -26,21 +31,31 @@ MVP jugable con:
 6. Pagas gastos semanales.
 7. Intentas llegar al dia 30.
 
-## Arquitectura (resumen)
+## Arquitectura (estado real)
 
-- `GameManager`: orquestacion global de la run.
+- `GameManager`: orquestacion global de run y transiciones.
 - `RunManager`: dia/semana y estado de objetivos.
-- `MarketManager`: empresas y movimientos de mercado.
+- `MarketManager`: empresas, pricing diario y eventos de mercado.
 - `NewsManager`: titulares, clima narrativo e historial.
-- `PlayerPortfolio`: cash/deuda/holdings y operaciones.
+- `PlayerPortfolio`: caja/deuda/holdings y operaciones.
 - `UpgradeManager`: mejoras semanales temporales.
 - `ContentPackLoader`: carga data-driven de base + packs.
-- `UIManager`: interfaz y feedback visual.
-- `RunBalanceConfig`: constantes compartidas de balance semanal.
-- `WeeklyActivityService`: reglas de actividad y recargos semanales.
-- `WeeklyObjectiveService`: construccion/evaluacion de objetivos por semana.
+- `UIManager`: composicion de HUD y wiring de controladores UI.
 
-Nota: el sistema de guardado actual (`SaveManager`) es un **stub** y se mantiene asi por alcance de MVP.
+Servicios/Controladores clave de desacople:
+- `RunEndDayOrchestratorService`
+- `RunDayUiOrchestratorService`
+- `WeeklyCycleService`
+- `WeeklyActivityService`
+- `WeeklyObjectiveService`
+- `TutorialDayFlowService`
+- `UiTradeActionController`
+- `UiModalLocksController`
+- `UiHotkeyInputController`
+- `TutorialOverlayController`
+- `TutorialTargetRectResolver`
+
+Nota: `SaveManager` sigue siendo un stub por alcance de MVP.
 
 ## Estructura del proyecto
 
@@ -79,7 +94,7 @@ Archivos principales:
 - `data/base/news_events.json`
 - `data/base/name_parts.json`
 
-Puedes extender con packs en `data/packs/<mi_pack>/` con `pack_manifest.json`.
+Extensiones en `data/packs/<mi_pack>/` con `pack_manifest.json`.
 
 ## Ejecutar
 
@@ -87,20 +102,34 @@ Puedes extender con packs en `data/packs/<mi_pack>/` con `pack_manifest.json`.
 2. Ejecuta `res://scenes/main/main.tscn`.
 3. Elige `Nueva Run` o `Tutorial Guiado`.
 
+## Smokes de regresion
+
+Cada smoke se ejecuta en headless:
+
+```powershell
+Godot_v4.6.2-stable_win64_console.exe --headless --path . --script res://scripts/utils/<smoke>.gd
+```
+
+Suite actual:
+- `script_parse_smoke.gd`
+- `weekly_cycle_regression_smoke.gd`
+- `ui_tutorial_overlay_regression_smoke.gd`
+- `ui_hotkey_input_regression_smoke.gd`
+- `ui_trade_action_locks_smoke.gd`
+- `run_lifecycle_regression_smoke.gd`
+- `end_day_integration_smoke.gd`
+- `ui_modal_locks_controller_smoke.gd`
+- `run_day_ui_orchestrator_service_smoke.gd`
+- `tutorial_target_rect_resolver_smoke.gd`
+- `tutorial_manager_flow_smoke.gd`
+- `tutorial_lifecycle_e2e_smoke.gd`
+- `tutorial_friction_budget_smoke.gd`
+
 ## Deploy web
 
 Workflow CI:
 - `.github/workflows/deploy-itch-web.yml`
 
-Secrets usados actualmente en el workflow:
+Secrets usados:
 - `GH_TOKEN`
 - `ITCHIO_TOKEN`
-
-El usuario/juego de itch.io esta definido en el workflow (`andreullorens/capitalismo-terminal`).
-
-## Prioridades inmediatas
-
-1. Reducir tamano de `GameManager` y `UIManager` extrayendo modulos.
-2. Anadir validacion automatica de JSON de contenido.
-3. Cerrar balance semanal (actividad, recargos, riesgo de deuda).
-4. Pulir UX del tutorial y feedback de decisiones.

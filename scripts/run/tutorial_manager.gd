@@ -73,15 +73,23 @@ func get_current_step() -> Dictionary:
 	return _steps[_step_index]
 
 
+func get_current_step_index() -> int:
+	return _step_index
+
+
+func get_total_steps() -> int:
+	return _steps.size()
+
+
 func get_current_step_message() -> String:
 	if not _tutorial_active:
 		return ""
 	if _tutorial_completed:
-		return "Tutorial completado. Ya puedes iniciar una run normal."
+		return "Tutorial completado. Pulsa Continuar para cerrar el tutorial."
 	var step := get_current_step()
 	if step.is_empty():
 		return "Tutorial finalizado."
-	return str(step.get("body", "Sigue las instrucciones del tutorial."))
+	return "%s %s" % [_current_step_progress_label(), str(step.get("body", "Sigue las instrucciones del tutorial."))]
 
 
 func build_ui_state(highlight_rect: Rect2) -> Dictionary:
@@ -91,8 +99,8 @@ func build_ui_state(highlight_rect: Rect2) -> Dictionary:
 		return {
 			"active": true,
 			"title": "Tutorial completado",
-			"body": "Pulsa continuar para cerrar el tutorial.",
-			"hint": "",
+			"body": "Has completado todos los pasos. Pulsa Continuar para volver al menu principal.",
+			"hint": "Al continuar se cierra el tutorial guiado.",
 			"action": ACTION_CONTINUE,
 			"show_continue": true,
 			"allow_company_select": false,
@@ -112,7 +120,7 @@ func build_ui_state(highlight_rect: Rect2) -> Dictionary:
 	var required_ticker := str(step.get("expected_ticker", ""))
 	return {
 		"active": true,
-		"title": str(step.get("title", "Tutorial")),
+		"title": _build_step_title(step),
 		"body": str(step.get("body", "")),
 		"hint": _hint_for_action(step),
 		"action": action,
@@ -139,14 +147,14 @@ func validate_action(action: String, ticker: String = "", amount: int = 0, curre
 	if action != expected_action:
 		return {
 			"allowed": false,
-			"message": "Paso actual: %s" % _hint_for_action(step)
+			"message": _build_wrong_action_message(step)
 		}
 
 	var expected_ticker := str(step.get("expected_ticker", ""))
 	if action in [ACTION_SELECT_TICKER, ACTION_BUY, ACTION_SELL] and not expected_ticker.is_empty() and ticker != expected_ticker:
 		return {
 			"allowed": false,
-			"message": "Para este paso debes usar %s." % expected_ticker
+			"message": "%s Usa %s para este paso." % [_current_step_progress_label(), expected_ticker]
 		}
 
 	if action in [ACTION_BUY, ACTION_SELL]:
@@ -154,7 +162,7 @@ func validate_action(action: String, ticker: String = "", amount: int = 0, curre
 		if amount < min_amount:
 			return {
 				"allowed": false,
-				"message": "Debes operar al menos %d accion(es) en este paso." % min_amount
+				"message": "%s Opera al menos %d accion(es) en este paso y vuelve a intentarlo." % [_current_step_progress_label(), min_amount]
 			}
 
 	if action == ACTION_END_DAY:
@@ -162,7 +170,11 @@ func validate_action(action: String, ticker: String = "", amount: int = 0, curre
 		if expected_day > 0 and current_day != expected_day:
 			return {
 				"allowed": false,
-				"message": "Todavia no toca pasar dia en este punto del tutorial."
+				"message": "%s Pasar Dia se habilita en el dia %d (ahora estas en dia %d)." % [
+					_current_step_progress_label(),
+					expected_day,
+					current_day
+				]
 			}
 
 	return {"allowed": true, "message": ""}
@@ -213,7 +225,7 @@ func _complete_step_if_expected(expected_action: String) -> Dictionary:
 	if str(step.get("action", "")) != expected_action:
 		return {
 			"advanced": false,
-			"message": "Paso actual: %s" % _hint_for_action(step)
+			"message": _build_wrong_action_message(step)
 		}
 
 	_step_index += 1
@@ -232,6 +244,9 @@ func _complete_step_if_expected(expected_action: String) -> Dictionary:
 
 
 func _hint_for_action(step: Dictionary) -> String:
+	var explicit_hint := str(step.get("hint", "")).strip_edges()
+	if not explicit_hint.is_empty():
+		return explicit_hint
 	var action := str(step.get("action", ACTION_CONTINUE))
 	var ticker := str(step.get("expected_ticker", ""))
 	match action:
@@ -252,6 +267,9 @@ func _hint_for_action(step: Dictionary) -> String:
 				return "Vende al menos %d accion(es)." % min_amount_sell
 			return "Vende al menos %d accion(es) de %s." % [min_amount_sell, ticker]
 		ACTION_END_DAY:
+			var expected_day := int(step.get("expected_day", 0))
+			if expected_day > 0:
+				return "Pulsa Pasar Dia cuando el encabezado marque dia %d." % expected_day
 			return "Pulsa Pasar Dia para aplicar noticias y movimientos."
 		_:
 			return "Sigue la instruccion actual."
@@ -419,36 +437,43 @@ func _build_tutorial_data() -> void:
 		{
 			"id": "welcome",
 			"title": "Tutorial guiado",
-			"body": "Bienvenido. Aprenderas el flujo base paso a paso.",
+			"body": "Bienvenido. Sigue el panel resaltado en cada paso para no bloquear acciones.",
+			"hint": "Pulsa Continuar para empezar. Durante el tutorial manda el paso resaltado.",
 			"action": ACTION_CONTINUE,
 			"target": "header"
 		},
 		{
 			"id": "news_intro",
 			"title": "Lee las noticias",
-			"body": "Mira el panel izquierdo: las noticias mueven precios por tags. Pulsa Continuar.",
+			"body": "Mira el panel izquierdo: las noticias mueven precios por tags. En este paso solo observa, aun no operes.",
+			"hint": "Revisa titulares y pulsa Continuar cuando termines.",
 			"action": ACTION_CONTINUE,
 			"target": "news_panel"
 		},
 		{
 			"id": "select_company",
-			"title": "Selecciona empresa",
-			"body": "Selecciona cualquier empresa de la tabla de mercado.",
+			"title": "Selecciona KMOO",
+			"body": "Haz clic en KMOO en la tabla. Todavia no compres ni cierres dia.",
+			"hint": "Selecciona exactamente KMOO para desbloquear la compra guiada.",
 			"action": ACTION_SELECT_TICKER,
-			"target": "market_panel"
+			"target": "market_row",
+			"expected_ticker": "KMOO"
 		},
 		{
 			"id": "buy_step",
-			"title": "Compra acciones",
-			"body": "Compra al menos 3 acciones de la empresa que has seleccionado.",
+			"title": "Compra KMOO",
+			"body": "Ajusta la cantidad a 3 o mas y compra KMOO. Si falla, revisa que sigues en KMOO.",
+			"hint": "Cantidad minima 3 en KMOO y luego pulsa Comprar.",
 			"action": ACTION_BUY,
-			"target": "bottom_panel",
+			"target": "buy_button",
+			"expected_ticker": "KMOO",
 			"min_amount": 3
 		},
 		{
 			"id": "end_day_1",
 			"title": "Cierra el dia",
-			"body": "Pulsa Pasar Dia para aplicar noticias y ver el movimiento.",
+			"body": "Ahora si: pulsa Pasar Dia para aplicar noticias y ver el primer movimiento guiado.",
+			"hint": "Usa Pasar Dia ahora. Si sigue bloqueado, completa antes el paso de compra.",
 			"action": ACTION_END_DAY,
 			"target": "end_day_button",
 			"expected_day": 1
@@ -456,22 +481,26 @@ func _build_tutorial_data() -> void:
 		{
 			"id": "review_step",
 			"title": "Interpreta el resultado",
-			"body": "En detalle veras motivos del movimiento y la grafica con marcador de compra.",
+			"body": "En Detalle, lee los motivos del movimiento de KMOO y comprueba el impacto en tu posicion.",
+			"hint": "Cuando entiendas los motivos del cambio de precio, pulsa Continuar.",
 			"action": ACTION_CONTINUE,
 			"target": "details_panel"
 		},
 		{
 			"id": "sell_step",
-			"title": "Vende parte",
-			"body": "Vende al menos 1 accion para practicar salida de posicion.",
+			"title": "Vende una parte",
+			"body": "Vende al menos 1 accion de KMOO para practicar salida parcial y reducir exposicion.",
+			"hint": "Con KMOO seleccionada, vende 1 o mas acciones.",
 			"action": ACTION_SELL,
-			"target": "bottom_panel",
+			"target": "sell_button",
+			"expected_ticker": "KMOO",
 			"min_amount": 1
 		},
 		{
 			"id": "end_day_2",
 			"title": "Cierra un dia mas",
-			"body": "Pulsa Pasar Dia otra vez para ver una correccion de mercado.",
+			"body": "Pulsa Pasar Dia otra vez para ver la correccion guiada y cerrar el ciclo base.",
+			"hint": "Cierra este dia para completar el flujo compra-venta-cierre.",
 			"action": ACTION_END_DAY,
 			"target": "end_day_button",
 			"expected_day": 2
@@ -479,7 +508,8 @@ func _build_tutorial_data() -> void:
 		{
 			"id": "finish",
 			"title": "Fin del tutorial",
-			"body": "Perfecto. Ya sabes leer noticias, comprar, vender y cerrar dia. Pulsa Continuar.",
+			"body": "Perfecto. Ya sabes leer noticias, comprar, vender y cerrar dia.",
+			"hint": "Pulsa Continuar para cerrar el tutorial y volver al menu principal.",
 			"action": ACTION_CONTINUE,
 			"target": "header"
 		}
@@ -497,3 +527,16 @@ func _duplicate_scripted_dictionary(source: Dictionary) -> Dictionary:
 		else:
 			output[key] = value
 	return output
+
+
+func _current_step_progress_label() -> String:
+	return "Paso %d/%d" % [_step_index + 1, _steps.size()]
+
+
+func _build_step_title(step: Dictionary) -> String:
+	var title := str(step.get("title", "Tutorial"))
+	return "%s | %s" % [_current_step_progress_label(), title]
+
+
+func _build_wrong_action_message(step: Dictionary) -> String:
+	return "%s. %s" % [_build_step_title(step), _hint_for_action(step)]

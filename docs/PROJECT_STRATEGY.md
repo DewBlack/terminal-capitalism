@@ -1,53 +1,68 @@
-# Project Strategy (May 2026)
+# Project Strategy (May 2026, post-refactor)
 
 ## Objetivo
 
 Cerrar MVP estable sin romper el principio central:
 **mercado absurdo pero explicable**.
 
-## Diagnostico rapido
+## Estado real despues del hardening
 
-- `GameManager` y `UIManager` concentran demasiadas responsabilidades.
-- Hay reglas de negocio repetidas entre capas (ahora mitigado con `RunBalanceConfig`).
-- Falta una rutina automatica para validar consistencia de JSON.
-- Hay ruido de artefactos de build en el repo.
+Frente anti-espagueti (fase de cierre) aplicado:
+- `GameManager` reducido a rol de orquestacion.
+- `UIManager` enfocado en composicion UI + delegacion en controladores.
+- Flujo diario/semanal separado en servicios dedicados de `scripts/run/`.
+- Locks de tutorial/modales/hotkeys cubiertos por smokes de regresion.
+- Sin cambios visibles de experiencia jugable.
 
-## Plan por fases
+Indicadores actuales del frente:
+- `scripts/core/game_manager.gd`: 577 lineas.
+- `scripts/ui/ui_manager.gd`: 674 lineas.
+- Ambos por debajo del estado previo (>1000 lineas).
 
-### Fase 1 - Higiene de base
+## Cierre del frente anti-espagueti
 
-- Consolidar reglas compartidas de balance en modulos de `scripts/run/`.
-- Evitar nuevas reglas de negocio directas en `UIManager`.
-- Ajustar `.gitignore` para artefactos generados.
+Completado:
+1. Orquestacion de fin de dia desacoplada (`RunEndDayOrchestratorService`, `RunDayUiOrchestratorService`).
+2. Ciclo semanal y objetivos delegados (`WeeklyCycleService`, `WeeklyActivityService`, `WeeklyObjectiveService`).
+3. UI locks/hotkeys/tutorial en controladores dedicados.
+4. Resolucion de targets del overlay tutorial aislada (`TutorialTargetRectResolver`).
+5. Smokes obligatorios + smokes nuevos de orquestacion/resolver en verde.
 
-### Fase 2 - Refactor estructural
+## Suite de no-regresion vigente
 
-- Extraer de `GameManager`:
-  - `WeeklyCycleService` (actividad, recargos, recap)
-  - `RunOutcomeService` (victoria/derrota)
-  - `ObjectiveService` (roll + evaluacion de objetivos)
-- Extraer de `UIManager`:
-  - `MarketTablePresenter`
-  - `CompanyDetailsPresenter`
-  - `TutorialOverlayController`
+Smokes activos:
+- `script_parse_smoke.gd`
+- `weekly_cycle_regression_smoke.gd`
+- `ui_tutorial_overlay_regression_smoke.gd`
+- `ui_hotkey_input_regression_smoke.gd`
+- `ui_trade_action_locks_smoke.gd`
+- `run_lifecycle_regression_smoke.gd`
+- `end_day_integration_smoke.gd`
+- `ui_modal_locks_controller_smoke.gd`
+- `run_day_ui_orchestrator_service_smoke.gd`
+- `tutorial_target_rect_resolver_smoke.gd`
+- `tutorial_manager_flow_smoke.gd`
+- `tutorial_lifecycle_e2e_smoke.gd`
+- `tutorial_friction_budget_smoke.gd`
 
-### Fase 3 - Estabilidad de contenido
+## Siguiente foco (fuera de este cierre)
 
-- Script de validacion de JSON:
-  - IDs duplicados
-  - tags no existentes
-  - estructura minima por tipo
-- Integrarlo en CI como paso previo al deploy.
+1. Validacion automatica de contenido JSON (estructura + referencias cruzadas).
+2. Ajuste fino de balance de deuda y actividad semanal con telemetria local.
+3. Pulido final de onboarding/tutorial sin ampliar alcance de features.
 
-### Fase 4 - Balance y UX final MVP
+## Ajuste aplicado (2026-05-10)
 
-- Ajuste de dificultad por semanas.
-- Mejoras de legibilidad de razones de precio.
-- Pulido del tutorial para primeras runs.
-
-## Criterios de prioridad
-
-1. Riesgo de romper gameplay.
-2. Impacto en claridad del jugador.
-3. Coste de mantenimiento.
-4. Facilidad de testeo.
+- Objetivo semanal de actividad endurecido:
+  - `WEEKLY_ACTIVITY_NOTIONAL_RATIO`: `0.28 -> 0.30`
+  - `WEEKLY_ACTIVITY_NOTIONAL_FLOOR`: `170 -> 180`
+  - `WEEKLY_LOW_ACTIVITY_RATIO`: `0.50 -> 0.55`
+  - `MIN_WEEKLY_HOLDINGS_FOR_ACTIVITY`: `180 -> 210`
+- Recargo semanal con rampa anti-espiral temprana:
+  - Semana 2: multiplicador `0.75`
+  - Semana 3: multiplicador `0.90`
+  - Semana 4+: multiplicador `1.0`
+- Riesgo de deuda mostrado antes en HUD:
+  - `Medio` desde `55%` de uso de deuda operativa
+  - `Alto` desde `82%`
+  - `Critico` desde `98%`
