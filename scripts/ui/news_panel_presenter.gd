@@ -42,9 +42,13 @@ static func build_model(
 	if current_day <= 1:
 		cards.append(_build_run_context_card(run_context))
 	for news_event in latest_headlines:
+		var body_text := str(news_event.description)
+		var trace_text := _build_trace_text(news_event)
+		if not trace_text.is_empty():
+			body_text = "%s\n%s" % [body_text, trace_text]
 		cards.append({
 			"title": news_event.title,
-			"body": news_event.description,
+			"body": body_text,
 			"title_color": TODAY_TITLE_COLOR
 		})
 	model["cards"] = cards
@@ -63,3 +67,19 @@ static func _build_run_context_card(run_context: Dictionary) -> Dictionary:
 		"body": "\n".join(context_lines),
 		"title_color": BRIEFING_TITLE_COLOR
 	}
+
+
+static func _build_trace_text(news_event) -> String:
+	if news_event == null:
+		return ""
+	var segments: Array[String] = []
+	if not news_event.trace_affected_tickers.is_empty():
+		segments.append("Impacto: %s" % ", ".join(news_event.trace_affected_tickers))
+	if not news_event.trace_causal_tags.is_empty():
+		var readable_tags: Array[String] = []
+		for tag_id in news_event.trace_causal_tags:
+			readable_tags.append(str(tag_id).replace("_", " "))
+		segments.append("Tags: %s" % ", ".join(readable_tags))
+	if segments.is_empty():
+		return ""
+	return "Traza -> %s" % " | ".join(segments)
