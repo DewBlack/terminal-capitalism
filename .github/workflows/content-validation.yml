@@ -20,6 +20,8 @@ jobs:
             script: scripts/utils/weekly_cycle_regression_smoke.gd
           - name: Validate JSON Content
             script: scripts/utils/validate_content_json.gd
+          - name: News Generation Quality Smoke
+            script: scripts/utils/news_generation_quality_smoke.gd
           - name: UI Tutorial Overlay Regression Smoke
             script: scripts/utils/ui_tutorial_overlay_regression_smoke.gd
           - name: UI Hotkey Input Regression Smoke

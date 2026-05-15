@@ -80,6 +80,49 @@ static func _build_trace_text(news_event) -> String:
 		for tag_id in news_event.trace_causal_tags:
 			readable_tags.append(str(tag_id).replace("_", " "))
 		segments.append("Tags: %s" % ", ".join(readable_tags))
+	var signal_hint := _build_signal_hint(news_event)
+	if not signal_hint.is_empty():
+		segments.append(signal_hint)
 	if segments.is_empty():
 		return ""
 	return "Traza -> %s" % " | ".join(segments)
+
+
+static func _build_signal_hint(news_event) -> String:
+	if news_event == null:
+		return ""
+
+	var positive_tags: Array[String] = []
+	for tag_id in news_event.positive_tags:
+		positive_tags.append(str(tag_id))
+
+	var negative_tags: Array[String] = []
+	for tag_id in news_event.negative_tags:
+		negative_tags.append(str(tag_id))
+
+	var positive_score := _tag_score(news_event, positive_tags, 0.024)
+	var negative_score := _tag_score(news_event, negative_tags, 0.026)
+	if positive_score <= 0.0 and negative_score <= 0.0:
+		return ""
+	if positive_score > negative_score * 1.15:
+		return "Sesgo: potencialmente alcista"
+	if negative_score > positive_score * 1.15:
+		return "Sesgo: potencialmente bajista"
+	return "Sesgo: mixta o volatil"
+
+
+static func _tag_score(news_event, tags: Array[String], fallback_value: float) -> float:
+	var score := 0.0
+	var seen := {}
+	for raw_tag in tags:
+		var tag_id := str(raw_tag).strip_edges()
+		if tag_id.is_empty():
+			continue
+		if seen.has(tag_id):
+			continue
+		seen[tag_id] = true
+		if news_event.tag_effects.has(tag_id):
+			score += absf(float(news_event.tag_effects[tag_id]))
+		else:
+			score += fallback_value
+	return score
