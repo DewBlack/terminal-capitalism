@@ -33,6 +33,7 @@ Completado:
 Smokes activos:
 - `script_parse_smoke.gd`
 - `weekly_cycle_regression_smoke.gd`
+- `news_generation_quality_smoke.gd`
 - `ui_tutorial_overlay_regression_smoke.gd`
 - `ui_hotkey_input_regression_smoke.gd`
 - `ui_trade_action_locks_smoke.gd`
