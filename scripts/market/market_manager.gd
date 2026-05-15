@@ -1,6 +1,8 @@
 class_name MarketManager
 extends Node
 
+const RUN_BALANCE_CONFIG := preload("res://scripts/run/run_balance_config.gd")
+
 signal market_updated
 signal company_spawned(company: Company)
 signal company_bankrupt(company: Company, reason: String)
@@ -42,11 +44,17 @@ func setup(
 
 
 func get_run_regime_text() -> String:
+	var price_scale_text := "Escala nominal x%.2f" % RUN_BALANCE_CONFIG.PRICE_DENOMINATION_SCALE
 	if _tutorial_mode:
-		return "Tutorial guiado | Mercado fijo sin ruido ni eventos aleatorios."
+		return "Tutorial guiado | Mercado fijo sin ruido ni eventos aleatorios. | %s" % price_scale_text
 	var tailwind_text := ", ".join(_regime_tailwind_tags) if not _regime_tailwind_tags.is_empty() else "ninguno"
 	var headwind_text := ", ".join(_regime_headwind_tags) if not _regime_headwind_tags.is_empty() else "ninguno"
-	return "%s | Viento a favor: %s | Viento en contra: %s" % [_run_regime_label, tailwind_text, headwind_text]
+	return "%s | %s | Viento a favor: %s | Viento en contra: %s" % [
+		_run_regime_label,
+		price_scale_text,
+		tailwind_text,
+		headwind_text
+	]
 
 
 func get_run_company_profile_text() -> String:
@@ -239,17 +247,17 @@ func _process_natural_bankruptcies(report: Dictionary) -> void:
 	var active_count := get_active_companies().size()
 	var doomed: Array[Company] = []
 	for company in get_active_companies():
-		if company.current_price <= 0.7:
+		if company.current_price <= RUN_BALANCE_CONFIG.NATURAL_BANKRUPTCY_HARD_FLOOR:
 			doomed.append(company)
 			continue
-		if company.current_price < 2.5:
+		if company.current_price < RUN_BALANCE_CONFIG.NATURAL_BANKRUPTCY_RISK_FLOOR:
 			var bankruptcy_chance := 0.08 + company.debt * 0.16 + company.legal_risk * 0.08
 			if active_count <= 4:
 				bankruptcy_chance *= 0.45
 			if _rng.randf() < bankruptcy_chance:
 				doomed.append(company)
 				continue
-		if company.current_price < 1.6 and _rng.randf() < 0.05:
+		if company.current_price < RUN_BALANCE_CONFIG.NATURAL_BANKRUPTCY_PANIC_FLOOR and _rng.randf() < 0.05:
 			doomed.append(company)
 	for company in doomed:
 		_mark_bankrupt(company, "Colapso por precio bajo.")
@@ -270,7 +278,8 @@ func _pick_vulnerable_company() -> Company:
 
 
 func _vulnerability_score(company: Company) -> float:
-	var low_price_pressure: float = 1.0 / maxf(1.0, company.current_price)
+	var scale_floor := maxf(0.0001, RUN_BALANCE_CONFIG.PRICE_DENOMINATION_SCALE)
+	var low_price_pressure: float = scale_floor / maxf(scale_floor, company.current_price)
 	return low_price_pressure + company.debt + company.legal_risk * 0.8 + company.volatility * 0.3
 
 
@@ -425,7 +434,7 @@ func _valuation_reversion_delta(company: Company) -> float:
 	if company == null or company.price_history.is_empty():
 		return 0.0
 
-	var anchor_price := maxf(1.0, company.price_history[0])
+	var anchor_price := maxf(RUN_BALANCE_CONFIG.VALUATION_ANCHOR_FLOOR, company.price_history[0])
 	var valuation_ratio := company.current_price / anchor_price
 	var delta := 0.0
 

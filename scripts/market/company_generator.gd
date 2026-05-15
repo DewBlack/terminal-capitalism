@@ -1,6 +1,8 @@
 class_name CompanyGenerator
 extends Node
 
+const RUN_BALANCE_CONFIG := preload("res://scripts/run/run_balance_config.gd")
+
 var _rng := RandomNumberGenerator.new()
 var _sectors: Array[Dictionary] = []
 var _sectors_by_id: Dictionary = {}
@@ -83,7 +85,11 @@ func create_random_company(day_index: int) -> Company:
 	company.sectors = sectors
 
 	company.tags = _compose_company_tags(primary_sector, secondary_sector)
-	company.current_price = max(2.0, _rng.randf_range(8.0, 85.0) + float(day_index) * _rng.randf_range(0.4, 1.2))
+	var base_price := _rng.randf_range(8.0, 85.0) + float(day_index) * _rng.randf_range(0.4, 1.2)
+	company.current_price = maxf(
+		RUN_BALANCE_CONFIG.COMPANY_LISTING_PRICE_FLOOR,
+		RUN_BALANCE_CONFIG.scale_price_by_denomination(base_price)
+	)
 	company.volatility = clamp(_rng.randf_range(0.25, 0.75) + float(primary_sector.get("volatility_bias", 0.0)), 0.05, 1.0)
 	company.reputation = clamp(_rng.randf_range(0.20, 0.85) + float(primary_sector.get("reputation_bias", 0.0)), 0.0, 1.0)
 	company.hype = clamp(_rng.randf_range(0.20, 0.90) + float(primary_sector.get("hype_bias", 0.0)), 0.0, 1.0)
@@ -110,7 +116,10 @@ func generate_merged_company(company_a: Company, company_b: Company, day_index: 
 		if not merged.tags.has(bonus_tag):
 			merged.tags.append(bonus_tag)
 
-	merged.current_price = max(2.0, ((company_a.current_price + company_b.current_price) * 0.55))
+	merged.current_price = maxf(
+		RUN_BALANCE_CONFIG.COMPANY_LISTING_PRICE_FLOOR,
+		((company_a.current_price + company_b.current_price) * 0.55)
+	)
 	merged.volatility = clamp((company_a.volatility + company_b.volatility) * 0.50 + 0.12, 0.05, 1.0)
 	merged.reputation = clamp((company_a.reputation + company_b.reputation) * 0.50 - 0.05, 0.0, 1.0)
 	merged.hype = clamp((company_a.hype + company_b.hype) * 0.50 + 0.20, 0.0, 1.0)
@@ -692,7 +701,10 @@ func _rebalance_template_company(company: Company) -> void:
 		price_multiplier *= 0.92
 		company.legal_risk = clamp(company.legal_risk + _rng.randf_range(0.02, 0.10), 0.0, 1.0)
 
-	company.current_price = max(2.0, company.current_price * price_multiplier)
+	company.current_price = maxf(
+		RUN_BALANCE_CONFIG.COMPANY_LISTING_PRICE_FLOOR,
+		company.current_price * price_multiplier
+	)
 	company.volatility = _jitter_stat(company.volatility, 0.12)
 	company.reputation = _jitter_stat(company.reputation, 0.10)
 	company.hype = _jitter_stat(company.hype, 0.12)
