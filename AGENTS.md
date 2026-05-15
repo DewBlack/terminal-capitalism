@@ -49,6 +49,9 @@ Al terminar una tarea:
 - Validar criterios de aceptacion definidos en la issue.
 - Cerrar la issue como `completed`.
 - Reflejar en la issue maestra `#19` (si aplica) el avance del bloque.
+- Abrir PR inmediatamente despues del cierre exitoso:
+  - desde la rama `chat/...` hacia `dev`
+  - incluyendo resumen de cambios, validaciones ejecutadas y referencia a la issue (`Closes #<numero>`).
 
 ### Regla para trabajo no contemplado
 
