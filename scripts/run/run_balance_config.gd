@@ -5,6 +5,13 @@ const RUN_STARTING_CASH := 960.0
 const RUN_BASE_WEEKLY_EXPENSE := 260.0
 const INACTIVITY_WEEKLY_SURCHARGE := 110.0
 const LOW_ACTIVITY_WEEKLY_SURCHARGE := 35.0
+const PRICE_DENOMINATION_SCALE := 0.25
+const PRICE_MIN_FLOOR := 0.10 * PRICE_DENOMINATION_SCALE
+const COMPANY_LISTING_PRICE_FLOOR := 2.0 * PRICE_DENOMINATION_SCALE
+const NATURAL_BANKRUPTCY_HARD_FLOOR := 0.70 * PRICE_DENOMINATION_SCALE
+const NATURAL_BANKRUPTCY_RISK_FLOOR := 2.50 * PRICE_DENOMINATION_SCALE
+const NATURAL_BANKRUPTCY_PANIC_FLOOR := 1.60 * PRICE_DENOMINATION_SCALE
+const VALUATION_ANCHOR_FLOOR := 1.0 * PRICE_DENOMINATION_SCALE
 const WEEKLY_ACTIVITY_NOTIONAL_FLOOR := 180.0
 const WEEKLY_ACTIVITY_NOTIONAL_RATIO := 0.30
 const WEEKLY_LOW_ACTIVITY_RATIO := 0.55
@@ -19,6 +26,10 @@ const DEBT_RISK_CRITICAL_THRESHOLD := 0.98
 static func weekly_activity_notional_target(reference_net_worth: float) -> float:
 	var scaled_target := maxf(0.0, reference_net_worth) * WEEKLY_ACTIVITY_NOTIONAL_RATIO
 	return maxf(WEEKLY_ACTIVITY_NOTIONAL_FLOOR, scaled_target)
+
+
+static func scale_price_by_denomination(raw_price: float) -> float:
+	return maxf(PRICE_MIN_FLOOR, raw_price * PRICE_DENOMINATION_SCALE)
 
 
 static func weekly_surcharge_multiplier(week_index: int) -> float:

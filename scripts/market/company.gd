@@ -1,6 +1,7 @@
 class_name Company
 extends RefCounted
 
+const RUN_BALANCE_CONFIG := preload("res://scripts/run/run_balance_config.gd")
 const STATUS_ACTIVE := "active"
 const STATUS_BANKRUPT := "bankrupt"
 const STATUS_MERGED := "merged"
@@ -31,7 +32,7 @@ static func from_dict(data: Dictionary) -> Company:
 	company.id = str(data.get("id", "company_%s" % randi()))
 	company.name = str(data.get("name", "Unnamed Corp"))
 	company.ticker = str(data.get("ticker", "UNKN")).to_upper()
-	company.current_price = max(0.1, float(data.get("current_price", 10.0)))
+	company.current_price = maxf(_price_floor(), float(data.get("current_price", 10.0)))
 	company.sectors = []
 	for sector in data.get("sectors", []):
 		company.sectors.append(str(sector))
@@ -85,12 +86,12 @@ func to_dict() -> Dictionary:
 
 
 func apply_price_change(percent_change: float, reasons: Array[String]) -> void:
-	var new_price: float = maxf(0.1, current_price * (1.0 + percent_change))
+	var new_price: float = maxf(_price_floor(), current_price * (1.0 + percent_change))
 	push_price_point(new_price, percent_change, reasons)
 
 
 func push_price_point(price: float, daily_change: float, reasons: Array[String]) -> void:
-	current_price = maxf(0.1, price)
+	current_price = maxf(_price_floor(), price)
 	last_daily_change = daily_change
 	last_reasons = reasons.duplicate()
 	price_history.append(current_price)
@@ -126,3 +127,7 @@ static func _default_logo_color(company: Company) -> Color:
 	var hash_value: int = absi(seed_text.hash())
 	var hue: float = float(hash_value % 360) / 360.0
 	return Color.from_hsv(hue, 0.62, 0.88, 1.0)
+
+
+static func _price_floor() -> float:
+	return RUN_BALANCE_CONFIG.PRICE_MIN_FLOOR
