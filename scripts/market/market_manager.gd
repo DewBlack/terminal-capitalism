@@ -32,6 +32,8 @@ func setup(
 	_rng.seed = seed_value
 	_company_generator = company_generator
 	_tag_effect_system = tag_effect_system
+	if _tag_effect_system != null:
+		_tag_effect_system.configure(content_data.get("tags", []))
 	_configure_run_regime(content_data)
 
 	companies.clear()
@@ -116,11 +118,7 @@ func apply_day_events(news_events: Array, day_index: int) -> Dictionary:
 			var stacking_mult := _event_stacking_multiplier(impactful_events)
 			var adjusted_delta := event_delta * stacking_mult
 			cumulative_delta += adjusted_delta
-			var compact_reason := _compact_reasons(impact.get("reasons", []))
-			if stacking_mult < 0.999:
-				reasons.append("%s -> %s (x%.2f por saturacion de titulares)" % [news_event.title, compact_reason, stacking_mult])
-			else:
-				reasons.append("%s -> %s" % [news_event.title, compact_reason])
+			reasons.append(_format_news_impact_reason(news_event, company, impact, stacking_mult))
 
 		var regime_delta := _market_regime_delta(company)
 		if absf(regime_delta) > 0.0001:
@@ -352,6 +350,67 @@ func _compact_reasons(reasons: Array) -> String:
 	for idx in range(min(2, reasons.size())):
 		text_parts.append(str(reasons[idx]))
 	return " | ".join(text_parts)
+
+
+func _format_news_impact_reason(
+	news_event: NewsEvent,
+	company: Company,
+	impact: Dictionary,
+	stacking_mult: float
+) -> String:
+	var causal_tags := _array_to_string_list(impact.get("causal_labels", []))
+	if causal_tags.is_empty():
+		causal_tags = _array_to_string_list(news_event.trace_causal_tags)
+	var tag_chain := "tags mixtas"
+	if not causal_tags.is_empty():
+		var readable_tags: Array[String] = []
+		for tag_id in causal_tags:
+			readable_tags.append(_readable_tag_label(tag_id))
+		tag_chain = ", ".join(readable_tags)
+
+	var company_anchor := company.ticker
+	if _news_targets_company(news_event, company):
+		company_anchor = "%s (contexto directo)" % company.ticker
+
+	var compact_reason := _compact_reasons(impact.get("reasons", []))
+	var reason_line := "%s -> %s -> %s -> %s" % [
+		news_event.title,
+		tag_chain,
+		company_anchor,
+		compact_reason
+	]
+	if stacking_mult < 0.999:
+		reason_line += " (x%.2f por saturacion de titulares)" % stacking_mult
+	return reason_line
+
+
+func _news_targets_company(news_event: NewsEvent, company: Company) -> bool:
+	if news_event == null or company == null:
+		return false
+	if news_event.trace_primary_ticker == company.ticker:
+		return true
+	if news_event.trace_rival_ticker == company.ticker:
+		return true
+	for ticker in news_event.trace_affected_tickers:
+		if str(ticker) == company.ticker:
+			return true
+	return false
+
+
+func _array_to_string_list(raw_values: Variant) -> Array[String]:
+	var values: Array[String] = []
+	if not (raw_values is Array):
+		return values
+	for value in raw_values:
+		values.append(str(value))
+	return values
+
+
+func _readable_tag_label(tag_id: String) -> String:
+	var cleaned := str(tag_id).strip_edges()
+	if cleaned.is_empty():
+		return "mercado"
+	return cleaned.replace("_", " ")
 
 
 func _percent_text(value: float) -> String:

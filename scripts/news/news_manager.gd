@@ -8,6 +8,8 @@ const DAILY_FOCUS_MAX_TAGS := 6
 const DAILY_FOCUS_ARC_BONUS := 1.35
 const DAILY_FOCUS_CONTINUITY_BONUS := 1.22
 const DAILY_FOCUS_MISS_PENALTY := 0.84
+const MIN_EVENT_RELEVANCE_STRICT := 0.18
+const MIN_EVENT_RELEVANCE_RELAXED := 0.06
 const NEWS_TEXT_GENERATOR_SCRIPT := preload("res://scripts/news/news_text_generator.gd")
 
 var _rng := RandomNumberGenerator.new()
@@ -211,7 +213,29 @@ func _pick_new_events(count: int, active_companies: Array) -> Array[NewsEvent]:
 	var first_event := true
 
 	while selected.size() < count:
-		var candidate_template := _weighted_pick_event(blocked_ids, active_companies, daily_focus_tags, first_event)
+		var candidate_template := _weighted_pick_event(
+			blocked_ids,
+			active_companies,
+			daily_focus_tags,
+			first_event,
+			MIN_EVENT_RELEVANCE_STRICT if not active_companies.is_empty() else 0.0
+		)
+		if candidate_template == null and not active_companies.is_empty():
+			candidate_template = _weighted_pick_event(
+				blocked_ids,
+				active_companies,
+				daily_focus_tags,
+				first_event,
+				MIN_EVENT_RELEVANCE_RELAXED
+			)
+		if candidate_template == null:
+			candidate_template = _weighted_pick_event(
+				blocked_ids,
+				active_companies,
+				daily_focus_tags,
+				first_event,
+				0.0
+			)
 		if candidate_template == null:
 			break
 		var materialized := _materialize_news_event(candidate_template, active_companies)
@@ -226,7 +250,8 @@ func _weighted_pick_event(
 	blocked_ids: Dictionary,
 	active_companies: Array,
 	daily_focus_tags: Array[String],
-	first_event: bool
+	first_event: bool,
+	min_market_relevance: float = 0.0
 ) -> NewsEvent:
 	var weighted_candidates: Array[Dictionary] = []
 	var total_weight := 0.0
@@ -235,6 +260,8 @@ func _weighted_pick_event(
 		if blocked_ids.has(news_event.id):
 			continue
 		var market_relevance := _market_relevance_weight(news_event, active_companies)
+		if not active_companies.is_empty() and market_relevance < min_market_relevance:
+			continue
 		var event_weight := _base_weight_for_rarity(news_event.rarity)
 		event_weight += market_relevance * 1.15
 		event_weight *= _event_type_multiplier(news_event.event_type)
@@ -245,7 +272,7 @@ func _weighted_pick_event(
 		event_weight *= _recent_id_multiplier(news_event.id)
 		event_weight *= _daily_focus_multiplier(news_event, daily_focus_tags, first_event)
 		if market_relevance <= 0.05 and not active_companies.is_empty():
-			event_weight *= 0.55
+			event_weight *= 0.72
 		if event_weight <= 0.0:
 			continue
 		weighted_candidates.append({"event": news_event, "weight": event_weight})
@@ -579,22 +606,40 @@ func _materialize_news_event(template_event: NewsEvent, active_companies: Array)
 	)
 	event_copy.title = str(rendered_text.get("title", event_copy.title))
 	event_copy.description = str(rendered_text.get("description", event_copy.description))
+	event_copy.trace_primary_ticker = str(context.get("ticker", ""))
+	event_copy.trace_rival_ticker = str(context.get("rival_ticker", ""))
+	event_copy.trace_affected_tickers = _dictionary_to_string_array(context.get("trace_affected_tickers", []))
+	event_copy.trace_causal_tags = _dictionary_to_string_array(context.get("trace_causal_tags", []))
 	return event_copy
 
 
 func _build_event_context(template_event: NewsEvent, active_companies: Array) -> Dictionary:
 	var context := {}
-	var excluded: Array[Company] = []
-	var primary_company := _pick_context_company(template_event, active_companies, excluded)
-	if primary_company != null:
-		excluded.append(primary_company)
-	var rival_company := _pick_context_company(template_event, active_companies, excluded)
+	var ranked_companies := _rank_companies_for_event(template_event, active_companies)
+	var primary_company: Company = ranked_companies[0] if not ranked_companies.is_empty() else null
+	var rival_company: Company = null
+	for idx in range(1, ranked_companies.size()):
+		var candidate: Company = ranked_companies[idx]
+		if candidate == null:
+			continue
+		if primary_company != null and candidate.ticker == primary_company.ticker:
+			continue
+		rival_company = candidate
+		break
 	if rival_company == null:
 		rival_company = primary_company
 
 	var positive_tag := _pick_tag_from_event(template_event, "positive", "mercado")
 	var negative_tag := _pick_tag_from_event(template_event, "negative", "riesgo")
 	var sector_hint := _sector_hint(primary_company)
+	var trace_affected_tickers := _extract_impacted_tickers(template_event, ranked_companies)
+	if trace_affected_tickers.is_empty() and primary_company != null:
+		trace_affected_tickers.append(primary_company.ticker)
+	var trace_causal_tags := _event_causal_tags_for_company(template_event, primary_company)
+	if trace_causal_tags.is_empty():
+		trace_causal_tags = _event_tags(template_event)
+	if trace_causal_tags.size() > 3:
+		trace_causal_tags = trace_causal_tags.slice(0, 3)
 
 	context["company"] = primary_company.name if primary_company != null else "Consorcio Anonimo"
 	context["ticker"] = primary_company.ticker if primary_company != null else "ANON"
@@ -614,46 +659,106 @@ func _build_event_context(template_event: NewsEvent, active_companies: Array) ->
 		"foros coordinan nuevas apuestas",
 		"analistas debaten la sostenibilidad del movimiento"
 	], "la mesa mantiene cautela")
+	context["trace_affected_tickers"] = trace_affected_tickers
+	context["trace_causal_tags"] = trace_causal_tags
 	context["__primary_company"] = primary_company
 	context["__rival_company"] = rival_company
 	return context
 
 
-func _pick_context_company(template_event: NewsEvent, active_companies: Array, excluded: Array[Company]) -> Company:
-	var pool: Array[Company] = []
+func _rank_companies_for_event(template_event: NewsEvent, active_companies: Array) -> Array[Company]:
+	var scored_rows: Array[Dictionary] = []
 	for company in active_companies:
 		if company == null:
 			continue
-		if excluded.has(company):
-			continue
 		if not company.is_active():
 			continue
-		pool.append(company)
-	if pool.is_empty():
-		return null
+		var score := _company_context_score(company, template_event)
+		scored_rows.append({
+			"company": company,
+			"score": score,
+			"roll": _rng.randf() * 0.04
+		})
+	if scored_rows.is_empty():
+		return []
 
-	var event_tags := _event_tags(template_event)
-	var weighted_candidates: Array[Dictionary] = []
-	var total_weight := 0.0
-	for company in pool:
-		var score := 0.22
-		for event_tag in event_tags:
-			if company.tags.has(event_tag):
-				score += 1.0
-		score += company.hype * 0.15
-		weighted_candidates.append({"company": company, "weight": score})
-		total_weight += score
+	scored_rows.sort_custom(func(a: Dictionary, b: Dictionary):
+		var left := float(a.get("score", 0.0)) + float(a.get("roll", 0.0))
+		var right := float(b.get("score", 0.0)) + float(b.get("roll", 0.0))
+		return left > right
+	)
 
-	if total_weight <= 0.0:
-		return pool[_rng.randi_range(0, pool.size() - 1)]
+	var ranked: Array[Company] = []
+	for row in scored_rows:
+		ranked.append(row["company"])
+	return ranked
 
-	var roll := _rng.randf() * total_weight
-	var running := 0.0
-	for candidate in weighted_candidates:
-		running += float(candidate["weight"])
-		if roll <= running:
-			return candidate["company"]
-	return weighted_candidates.back()["company"]
+
+func _company_context_score(company: Company, template_event: NewsEvent) -> float:
+	if company == null or template_event == null:
+		return 0.0
+	var positive_hits := 0
+	for tag in template_event.positive_tags:
+		if company.tags.has(tag):
+			positive_hits += 1
+	var negative_hits := 0
+	for tag in template_event.negative_tags:
+		if company.tags.has(tag):
+			negative_hits += 1
+
+	var total_hits := positive_hits + negative_hits
+	var score := 0.08
+	score += float(positive_hits) * 1.10
+	score += float(negative_hits) * 1.06
+	score += company.hype * 0.22
+	score += company.volatility * 0.16
+
+	if _is_negative_pressure_event(template_event):
+		score += company.legal_risk * 0.30
+		score += company.debt * 0.10
+	else:
+		score += company.reputation * 0.11
+
+	if total_hits == 0:
+		score *= 0.20
+	return score
+
+
+func _is_negative_pressure_event(template_event: NewsEvent) -> bool:
+	if template_event == null:
+		return false
+	if template_event.event_type in ["regulation", "scandal"]:
+		return true
+	return not template_event.negative_tags.is_empty()
+
+
+func _extract_impacted_tickers(template_event: NewsEvent, ranked_companies: Array[Company]) -> Array[String]:
+	var tickers: Array[String] = []
+	for company in ranked_companies:
+		if company == null:
+			continue
+		var causal_tags := _event_causal_tags_for_company(template_event, company)
+		if causal_tags.is_empty():
+			continue
+		if tickers.has(company.ticker):
+			continue
+		tickers.append(company.ticker)
+		if tickers.size() >= 3:
+			break
+	return tickers
+
+
+func _event_causal_tags_for_company(template_event: NewsEvent, company: Company) -> Array[String]:
+	var tags: Array[String] = []
+	if template_event == null or company == null:
+		return tags
+	for tag_id in _event_tags(template_event):
+		if not company.tags.has(tag_id):
+			continue
+		if tags.has(tag_id):
+			continue
+		tags.append(tag_id)
+	return tags
 
 
 func _event_tags(template_event: NewsEvent) -> Array[String]:

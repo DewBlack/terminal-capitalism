@@ -67,8 +67,13 @@ func materialize_event_text(
 		context,
 		rng
 	)
-	var final_title := _normalize_text(str(flavored.get("title", title_text)), true)
-	var final_description := _normalize_text(str(flavored.get("description", description_text)), false)
+	var connected_text := _ensure_company_mentions(
+		str(flavored.get("title", title_text)),
+		str(flavored.get("description", description_text)),
+		context
+	)
+	var final_title := _normalize_text(str(connected_text.get("title", title_text)), true)
+	var final_description := _normalize_text(str(connected_text.get("description", description_text)), false)
 
 	if final_title.is_empty():
 		final_title = _normalize_text(_fallback_field_text("title", context), true)
@@ -250,6 +255,52 @@ func _uppercase_first(text: String) -> String:
 	if text.length() == 1:
 		return text.to_upper()
 	return text.left(1).to_upper() + text.substr(1)
+
+
+func _ensure_company_mentions(title_text: String, description_text: String, context: Dictionary) -> Dictionary:
+	var primary_company := str(context.get("company", "")).strip_edges()
+	var primary_ticker := str(context.get("ticker", "")).strip_edges()
+	var rival_company := str(context.get("rival_company", "")).strip_edges()
+	var rival_ticker := str(context.get("rival_ticker", "")).strip_edges()
+
+	var title_has_mention := _contains_any_company_marker(
+		title_text,
+		[primary_company, primary_ticker, rival_company, rival_ticker]
+	)
+	var description_has_mention := _contains_any_company_marker(
+		description_text,
+		[primary_company, primary_ticker, rival_company, rival_ticker]
+	)
+
+	var connected_title := title_text
+	var connected_description := description_text
+
+	if not title_has_mention and not primary_company.is_empty():
+		connected_title = "%s: %s" % [primary_company, title_text]
+
+	if not description_has_mention and not primary_company.is_empty():
+		var impact_line := "Impacta a %s (%s)." % [primary_company, primary_ticker if not primary_ticker.is_empty() else "ANON"]
+		if not rival_company.is_empty() and rival_company != primary_company:
+			impact_line = "Impacta a %s (%s) y %s (%s)." % [
+				primary_company,
+				primary_ticker if not primary_ticker.is_empty() else "ANON",
+				rival_company,
+				rival_ticker if not rival_ticker.is_empty() else "COMP"
+			]
+		connected_description = "%s %s" % [impact_line, description_text]
+
+	return {"title": connected_title, "description": connected_description}
+
+
+func _contains_any_company_marker(text: String, markers: Array[String]) -> bool:
+	var source := text.to_lower()
+	for marker in markers:
+		var needle := str(marker).strip_edges()
+		if needle.is_empty():
+			continue
+		if source.find(needle.to_lower()) >= 0:
+			return true
+	return false
 
 
 func _replace_legacy_company_mentions(

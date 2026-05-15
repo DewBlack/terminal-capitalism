@@ -3,28 +3,61 @@ extends Node
 
 const REGULATORY_TAGS := ["regulation", "legal_risk", "scandal", "lawsuit", "compliance"]
 
+var _tag_ui_labels: Dictionary = {}
+
+
+func configure(tags_data: Variant) -> void:
+	_tag_ui_labels.clear()
+	if not (tags_data is Array):
+		return
+	for item in tags_data:
+		if typeof(item) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = item
+		var tag_id := str(row.get("id", "")).strip_edges()
+		if tag_id.is_empty():
+			continue
+		var label := str(row.get("ui_label", "")).strip_edges()
+		if label.is_empty():
+			label = str(row.get("name", "")).strip_edges()
+		if label.is_empty():
+			label = tag_id.replace("_", " ").strip_edges()
+		_tag_ui_labels[tag_id] = label.to_lower()
+
 
 func evaluate_news_impact(company: Company, news_event: NewsEvent) -> Dictionary:
 	var base_delta := 0.0
 	var reasons: Array[String] = []
 	var matched_tags := 0
+	var matched_positive_tags: Array[String] = []
+	var matched_negative_tags: Array[String] = []
 
 	for positive_tag in news_event.positive_tags:
 		if company.tags.has(positive_tag):
 			matched_tags += 1
+			matched_positive_tags.append(positive_tag)
 			var magnitude := _tag_magnitude(news_event, positive_tag, 0.024)
 			base_delta += magnitude
-			reasons.append("+%s por tag '%s'" % [_percent_text(magnitude), positive_tag])
+			reasons.append("+%s por %s" % [_percent_text(magnitude), _tag_label(positive_tag)])
 
 	for negative_tag in news_event.negative_tags:
 		if company.tags.has(negative_tag):
 			matched_tags += 1
+			matched_negative_tags.append(negative_tag)
 			var magnitude := _tag_magnitude(news_event, negative_tag, 0.026)
 			base_delta -= magnitude
-			reasons.append("-%s por tag '%s'" % [_percent_text(magnitude), negative_tag])
+			reasons.append("-%s por %s" % [_percent_text(magnitude), _tag_label(negative_tag)])
 
 	if matched_tags == 0:
-		return {"percent_change": 0.0, "reasons": reasons, "matched_tags": matched_tags}
+		return {
+			"percent_change": 0.0,
+			"reasons": reasons,
+			"matched_tags": matched_tags,
+			"matched_positive_tags": matched_positive_tags,
+			"matched_negative_tags": matched_negative_tags,
+			"causal_tags": [],
+			"causal_labels": []
+		}
 
 	var volatility_mult := 1.0 + company.volatility * 0.45
 	var hype_mult := 1.0 + company.hype * 0.30
@@ -53,7 +86,23 @@ func evaluate_news_impact(company: Company, news_event: NewsEvent) -> Dictionary
 	if legal_mult > 1.0:
 		reasons.append("Riesgo legal x%.2f" % legal_mult)
 
-	return {"percent_change": final_delta, "reasons": reasons, "matched_tags": matched_tags}
+	var causal_tags: Array[String] = matched_positive_tags.duplicate()
+	for tag_id in matched_negative_tags:
+		if not causal_tags.has(tag_id):
+			causal_tags.append(tag_id)
+	var causal_labels: Array[String] = []
+	for tag_id in causal_tags:
+		causal_labels.append(_tag_label(tag_id))
+
+	return {
+		"percent_change": final_delta,
+		"reasons": reasons,
+		"matched_tags": matched_tags,
+		"matched_positive_tags": matched_positive_tags,
+		"matched_negative_tags": matched_negative_tags,
+		"causal_tags": causal_tags,
+		"causal_labels": causal_labels
+	}
 
 
 func market_noise(company: Company, rng: RandomNumberGenerator) -> float:
@@ -76,3 +125,12 @@ func _tag_magnitude(news_event: NewsEvent, tag: String, fallback_value: float) -
 
 func _percent_text(value: float) -> String:
 	return "%.1f%%" % (value * 100.0)
+
+
+func _tag_label(tag_id: String) -> String:
+	var normalized := str(tag_id).strip_edges()
+	if normalized.is_empty():
+		return "mercado"
+	if _tag_ui_labels.has(normalized):
+		return str(_tag_ui_labels[normalized])
+	return normalized.replace("_", " ").to_lower()

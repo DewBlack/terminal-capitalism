@@ -14,6 +14,10 @@ var duration_days: int = 1
 var event_type: String = "headline"
 var special_chances: Dictionary = {}
 var secondary_effects: Array[String] = []
+var trace_primary_ticker: String = ""
+var trace_rival_ticker: String = ""
+var trace_affected_tickers: Array[String] = []
+var trace_causal_tags: Array[String] = []
 
 
 static func from_dict(data: Dictionary) -> NewsEvent:
@@ -37,6 +41,14 @@ static func from_dict(data: Dictionary) -> NewsEvent:
 	event.secondary_effects = []
 	for effect_text in data.get("secondary_effects", []):
 		event.secondary_effects.append(str(effect_text))
+	event.trace_primary_ticker = str(data.get("trace_primary_ticker", ""))
+	event.trace_rival_ticker = str(data.get("trace_rival_ticker", ""))
+	event.trace_affected_tickers = []
+	for ticker in data.get("trace_affected_tickers", []):
+		event.trace_affected_tickers.append(str(ticker))
+	event.trace_causal_tags = []
+	for tag in data.get("trace_causal_tags", []):
+		event.trace_causal_tags.append(str(tag))
 	return event
 
 
@@ -58,5 +70,9 @@ func to_dict() -> Dictionary:
 		"duration_days": duration_days,
 		"event_type": event_type,
 		"special_chances": special_chances.duplicate(true),
-		"secondary_effects": secondary_effects.duplicate()
+		"secondary_effects": secondary_effects.duplicate(),
+		"trace_primary_ticker": trace_primary_ticker,
+		"trace_rival_ticker": trace_rival_ticker,
+		"trace_affected_tickers": trace_affected_tickers.duplicate(),
+		"trace_causal_tags": trace_causal_tags.duplicate()
 	}
