@@ -8,6 +8,7 @@ const DAILY_FOCUS_MAX_TAGS := 6
 const DAILY_FOCUS_ARC_BONUS := 1.35
 const DAILY_FOCUS_CONTINUITY_BONUS := 1.22
 const DAILY_FOCUS_MISS_PENALTY := 0.84
+const NEWS_TEXT_GENERATOR_SCRIPT := preload("res://scripts/news/news_text_generator.gd")
 
 var _rng := RandomNumberGenerator.new()
 var _news_pool: Array[NewsEvent] = []
@@ -19,6 +20,7 @@ var _run_event_type_multipliers: Dictionary = {}
 var _run_story_arc_label: String = "Narrativa dispersa"
 var _run_story_arc_tags: Array[String] = []
 var _known_company_mentions: Array[String] = []
+var _text_generator = NEWS_TEXT_GENERATOR_SCRIPT.new()
 var _recent_story_tags: Array[String] = []
 var _recent_event_types: Array[String] = []
 var _recent_event_ids: Array[String] = []
@@ -36,6 +38,7 @@ func setup(content_data: Dictionary, seed_value: int) -> void:
 	_configure_run_news_climate(content_data)
 	_configure_run_story_arc(content_data)
 	_known_company_mentions = _extract_company_mentions(content_data.get("companies", []))
+	_text_generator.configure(content_data.get("tags", []))
 	_recent_story_tags.clear()
 	_recent_event_types.clear()
 	_recent_event_ids.clear()
@@ -568,19 +571,14 @@ func _materialize_news_event(template_event: NewsEvent, active_companies: Array)
 		return null
 	var event_copy := template_event.clone()
 	var context := _build_event_context(template_event, active_companies)
-
-	var title_template := template_event.title_template if not template_event.title_template.is_empty() else template_event.title
-	var description_template := template_event.description_template if not template_event.description_template.is_empty() else template_event.description
-	event_copy.title = _render_template_text(title_template, context)
-	event_copy.description = _render_template_text(description_template, context)
-
-	var primary_company: Company = context.get("__primary_company", null)
-	var rival_company: Company = context.get("__rival_company", null)
-	var has_explicit_templates := (not template_event.title_template.is_empty() or not template_event.description_template.is_empty())
-	if not has_explicit_templates:
-		event_copy.title = _replace_legacy_company_mentions(event_copy.title, primary_company, rival_company)
-		event_copy.description = _replace_legacy_company_mentions(event_copy.description, primary_company, rival_company)
-	_apply_dynamic_text_flair(event_copy, template_event, context)
+	var rendered_text: Dictionary = _text_generator.materialize_event_text(
+		template_event,
+		context,
+		_rng,
+		_known_company_mentions
+	)
+	event_copy.title = str(rendered_text.get("title", event_copy.title))
+	event_copy.description = str(rendered_text.get("description", event_copy.description))
 	return event_copy
 
 
@@ -730,37 +728,6 @@ func _risk_hint(tag_id: String) -> String:
 			return "riesgo de ejecucion"
 
 
-func _apply_dynamic_text_flair(event_copy: NewsEvent, template_event: NewsEvent, context: Dictionary) -> void:
-	if event_copy == null or template_event == null:
-		return
-
-	if _rng.randf() < 0.36:
-		var tail := _pick_text([
-			"La mesa describe el pulso actual como {pulse}.",
-			"El mercado lee la noticia bajo un marco de {risk_signal}.",
-			"Detras del titular, {narrative}.",
-			"La reaccion inicial apunta a {pulse} con foco en {sector}."
-		], "")
-		if not tail.is_empty():
-			event_copy.description = "%s %s" % [event_copy.description, _render_template_text(tail, context)]
-
-	if _rng.randf() < 0.24:
-		var title_suffix := ""
-		match template_event.event_type:
-			"regulation":
-				title_suffix = "tras nueva circular"
-			"scandal":
-				title_suffix = "en plena tension reputacional"
-			"viral", "meme":
-				title_suffix = "y dispara foros"
-			"absurd":
-				title_suffix = "en giro improbable"
-			_:
-				title_suffix = "segun operadores"
-		if not title_suffix.is_empty():
-			event_copy.title = "%s %s" % [event_copy.title, title_suffix]
-
-
 func _pick_text(values: Array[String], fallback: String) -> String:
 	if values.is_empty():
 		return fallback
@@ -774,40 +741,6 @@ func _dictionary_to_string_array(raw_values: Variant) -> Array[String]:
 	for value in raw_values:
 		values.append(str(value))
 	return values
-
-
-func _render_template_text(raw_template: String, context: Dictionary) -> String:
-	var rendered := raw_template
-	for key in context.keys():
-		if not str(key).begins_with("__"):
-			var token := "{%s}" % str(key)
-			rendered = rendered.replace(token, str(context[key]))
-	return rendered
-
-
-func _replace_legacy_company_mentions(text: String, primary_company: Company, rival_company: Company) -> String:
-	if primary_company == null:
-		return text
-	var replaced_text := text
-	var company_aliases := _known_company_mentions
-	if company_aliases.is_empty():
-		return replaced_text
-
-	var first_replacement_done := false
-	for alias in company_aliases:
-		if replaced_text.find(alias) == -1:
-			continue
-		replaced_text = replaced_text.replace(alias, primary_company.name)
-		first_replacement_done = true
-		break
-
-	if rival_company != null and first_replacement_done:
-		for alias in company_aliases:
-			if replaced_text.find(alias) == -1:
-				continue
-			replaced_text = replaced_text.replace(alias, rival_company.name)
-			break
-	return replaced_text
 
 
 func _extract_company_mentions(raw_companies: Variant) -> Array[String]:
