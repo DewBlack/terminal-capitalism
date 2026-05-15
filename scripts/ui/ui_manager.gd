@@ -20,6 +20,10 @@ const COMPANY_DETAILS_PRESENTER := preload("res://scripts/ui/company_details_pre
 const HEADER_PRESENTER := preload("res://scripts/ui/header_presenter.gd")
 const HEADER_METRICS_PRESENTER := preload("res://scripts/ui/header_metrics_presenter.gd")
 const SELECTION_CONTEXT_PRESENTER := preload("res://scripts/ui/selection_context_presenter.gd")
+const HEADER_VIEW_RENDERER := preload("res://scripts/ui/header_view_renderer.gd")
+const NEWS_PANEL_RENDERER := preload("res://scripts/ui/news_panel_renderer.gd")
+const COMPANY_DETAILS_RENDERER := preload("res://scripts/ui/company_details_renderer.gd")
+const UI_CHROME_STYLER := preload("res://scripts/ui/ui_chrome_styler.gd")
 const UI_FEEDBACK_CONTROLLER := preload("res://scripts/ui/ui_feedback_controller.gd")
 const UI_TRADE_ACTION_CONTROLLER := preload("res://scripts/ui/ui_trade_action_controller.gd")
 const UI_MARKET_SELECTION_CONTROLLER := preload("res://scripts/ui/ui_market_selection_controller.gd")
@@ -358,21 +362,19 @@ func _update_header() -> void:
 		_upgrade_manager.get_active_upgrade_text(),
 		WEEK_LABEL_MAX_CHARS
 	)
-	_apply_header_model(header_model)
-
-
-func _apply_header_model(header_model: Dictionary) -> void:
-	_day_label.text = str(header_model.get("day_text", "Dia --/--"))
-	_week_label.text = str(header_model.get("week_text", "Semana -"))
-	_week_label.tooltip_text = str(header_model.get("week_tooltip", ""))
-	_cash_label.text = str(header_model.get("cash_text", "Caja $0.00"))
-	_debt_label.text = str(header_model.get("debt_text", "Deuda $0.00 / $0.00 (0%)"))
-	_net_worth_label.text = str(header_model.get("net_worth_text", "Patrimonio $0.00 | Cartera $0.00"))
-	_upgrade_label.text = str(header_model.get("upgrade_text", "Mejora: -"))
+	HEADER_VIEW_RENDERER.apply_model(
+		_day_label,
+		_week_label,
+		_cash_label,
+		_debt_label,
+		_net_worth_label,
+		_upgrade_label,
+		header_model
+	)
 
 
 func _update_news_panel() -> void:
-	_clear_container(_news_content)
+	NEWS_PANEL_RENDERER.clear_container(_news_content)
 	var history_entries: Array = []
 	if _news_manager != null and _news_history_visible:
 		history_entries = _news_manager.get_news_history_entries(60)
@@ -391,31 +393,14 @@ func _update_news_panel() -> void:
 		history_entries,
 		run_context
 	)
-	_apply_news_panel_model(news_model)
-
-
-func _apply_news_panel_model(news_model: Dictionary) -> void:
-	_news_title.text = str(news_model.get("title_text", "Periodico del Dia"))
-	_news_history_button.text = str(news_model.get("history_button_text", "Ver historico"))
-	var cards_variant: Variant = news_model.get("cards", [])
-	if cards_variant is Array:
-		for card_data in cards_variant:
-			if not (card_data is Dictionary):
-				continue
-			var card := card_data as Dictionary
-			_news_content.add_child(
-				NEWS_CARD_FACTORY.build_news_card(
-					str(card.get("title", "Sin titular")),
-					str(card.get("body", "")),
-					card.get("title_color", UI_THEME_TOKENS.TEXT_NEWS_TITLE)
-				)
-			)
-	var placeholder_text := str(news_model.get("placeholder_text", ""))
-	if placeholder_text.is_empty():
-		return
-	var placeholder := Label.new()
-	placeholder.text = placeholder_text
-	_news_content.add_child(placeholder)
+	NEWS_PANEL_RENDERER.apply_model(
+		_news_title,
+		_news_history_button,
+		_news_content,
+		news_model,
+		NEWS_CARD_FACTORY,
+		UI_THEME_TOKENS.TEXT_NEWS_TITLE
+	)
 
 func _update_market_table() -> void:
 	_clear_container(_market_rows)
@@ -477,9 +462,17 @@ func _update_selected_company_details() -> void:
 	_ensure_selected_company_is_valid()
 	var company := _market_manager.get_company_by_ticker(_get_selected_ticker())
 	if company == null:
-		_apply_company_details_model(
+		COMPANY_DETAILS_RENDERER.apply_model(
+			_details_title,
+			_company_details_label,
+			_movement_reasons_label,
+			_history_text,
+			_details_logo_text,
+			_details_logo_swatch,
+			_price_chart,
 			COMPANY_DETAILS_PRESENTER.build_empty_model(),
-			[]
+			[],
+			UI_THEME_TOKENS.SURFACE_LOGO_FALLBACK
 		)
 		return
 
@@ -493,24 +486,18 @@ func _update_selected_company_details() -> void:
 		_history_visible
 	)
 	var trade_markers := _player_portfolio.get_trade_markers_for_ticker(company.ticker)
-	_apply_company_details_model(detail_model, trade_markers)
-
-
-func _apply_company_details_model(detail_model: Dictionary, trade_markers: Array) -> void:
-	_details_title.text = str(detail_model.get("title", "Detalle de Empresa"))
-	_company_details_label.text = str(detail_model.get("details_text", ""))
-	_movement_reasons_label.text = str(detail_model.get("reasons_text", ""))
-	_movement_reasons_label.tooltip_text = str(detail_model.get("reasons_tooltip", ""))
-	_history_text.text = str(detail_model.get("history_text", ""))
-	_history_text.visible = bool(detail_model.get("history_visible", false))
-	_details_logo_text.text = str(detail_model.get("logo_text", "??"))
-	_details_logo_swatch.color = detail_model.get("logo_color", UI_THEME_TOKENS.SURFACE_LOGO_FALLBACK)
-	var price_history_variant: Variant = detail_model.get("price_history", [])
-	if price_history_variant is Array:
-		_price_chart.set_price_history(price_history_variant)
-	else:
-		_price_chart.set_price_history([])
-	_price_chart.set_trade_markers(trade_markers)
+	COMPANY_DETAILS_RENDERER.apply_model(
+		_details_title,
+		_company_details_label,
+		_movement_reasons_label,
+		_history_text,
+		_details_logo_text,
+		_details_logo_swatch,
+		_price_chart,
+		detail_model,
+		trade_markers,
+		UI_THEME_TOKENS.SURFACE_LOGO_FALLBACK
+	)
 
 
 func _on_buy_button_pressed() -> void:
@@ -771,45 +758,31 @@ func _update_selection_context() -> void:
 
 
 func _apply_ui_tone() -> void:
-	var shell_style := _build_shell_style(UI_THEME_TOKENS.SURFACE_BACKGROUND, UI_THEME_TOKENS.BORDER_DEFAULT)
-	_news_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
-	_market_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
-	_details_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
-	_feedback_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
-	_bottom_panel.add_theme_stylebox_override("panel", shell_style.duplicate(true))
-
-	_market_header.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_SECONDARY)
-	_week_label.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_PRIMARY)
-	_upgrade_label.add_theme_color_override("font_color", UI_THEME_TOKENS.STATE_SUCCESS_SOFT)
-	_status_label.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_PRIMARY)
-	_selection_label.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_ACCENT)
-	_bottom_bar.add_theme_constant_override("separation", 8)
-
-
-func _build_shell_style(background: Color, border_color: Color) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = background
-	style.border_color = border_color
-	style.border_width_left = 1
-	style.border_width_top = 1
-	style.border_width_right = 1
-	style.border_width_bottom = 1
-	style.corner_radius_top_left = 10
-	style.corner_radius_top_right = 10
-	style.corner_radius_bottom_left = 10
-	style.corner_radius_bottom_right = 10
-	style.content_margin_left = 10
-	style.content_margin_right = 10
-	style.content_margin_top = 8
-	style.content_margin_bottom = 8
-	return style
+	UI_CHROME_STYLER.apply_tone(
+		[_news_panel, _market_panel, _details_panel, _feedback_panel, _bottom_panel],
+		_market_header,
+		_week_label,
+		_upgrade_label,
+		_status_label,
+		_selection_label,
+		_bottom_bar,
+		UI_THEME_TOKENS.SURFACE_BACKGROUND,
+		UI_THEME_TOKENS.BORDER_DEFAULT,
+		UI_THEME_TOKENS.TEXT_SECONDARY,
+		UI_THEME_TOKENS.TEXT_PRIMARY,
+		UI_THEME_TOKENS.STATE_SUCCESS_SOFT,
+		UI_THEME_TOKENS.TEXT_ACCENT
+	)
 
 
 func _apply_action_hints() -> void:
-	_quantity_input.tooltip_text = "Cantidad de acciones para comprar o vender."
-	_end_day_button.tooltip_text = "Cierra el dia y procesa precios/noticias."
-	_selection_label.tooltip_text = "Selecciona una empresa en la tabla de mercado."
-	_market_header.tooltip_text = HOTKEYS_HINT
+	UI_CHROME_STYLER.apply_action_hints(
+		_quantity_input,
+		_end_day_button,
+		_selection_label,
+		_market_header,
+		HOTKEYS_HINT
+	)
 
 
 func _emit_tutorial_action_blocked(
