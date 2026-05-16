@@ -4,14 +4,17 @@ extends RefCounted
 const MONITOR_ASPECT_RATIO := 1.58
 const MONITOR_WIDTH_RATIO := 0.68
 const MONITOR_HEIGHT_LIMIT_RATIO := 0.80
+const MONITOR_HEIGHT_HARD_LIMIT_RATIO := 0.96
+const MONITOR_MAX_VIEWPORT_WIDTH_RATIO := 0.97
 const MONITOR_MIN_WIDTH := 760.0
 const MONITOR_MAX_WIDTH := 1500.0
 const MONITOR_VERTICAL_OFFSET_RATIO := -0.04
 
-const SCREEN_LEFT_PADDING_RATIO := 0.11
+const SCREEN_LEFT_PADDING_RATIO := 0.08
 const SCREEN_TOP_PADDING_RATIO := 0.12
-const SCREEN_RIGHT_PADDING_RATIO := 0.11
+const SCREEN_RIGHT_PADDING_RATIO := 0.08
 const SCREEN_BOTTOM_PADDING_RATIO := 0.22
+const SCREEN_MIN_WIDTH_FALLBACK := 1120.0
 
 const DOC_ZONE_WIDTH_RATIO := 0.23
 const DOC_ZONE_ASPECT_RATIO := 0.72
@@ -51,11 +54,14 @@ func apply_layout() -> void:
 	if viewport_size.x < 8.0 or viewport_size.y < 8.0:
 		return
 
-	var monitor_size := _build_monitor_size(viewport_size)
+	var required_screen_width: float = _resolve_required_screen_width(viewport_size.x)
+	var monitor_size := _build_monitor_size(viewport_size, required_screen_width)
 	var monitor_position := Vector2(
 		(viewport_size.x - monitor_size.x) * 0.5,
 		(viewport_size.y - monitor_size.y) * 0.5 + viewport_size.y * MONITOR_VERTICAL_OFFSET_RATIO
 	)
+	var max_top: float = maxf(0.0, viewport_size.y - monitor_size.y - DOC_ZONE_MARGIN)
+	monitor_position.y = clampf(monitor_position.y, DOC_ZONE_MARGIN, max_top)
 	var monitor_rect := Rect2(monitor_position, monitor_size)
 	_apply_rect(_monitor_frame, monitor_rect)
 
@@ -67,18 +73,38 @@ func apply_layout() -> void:
 	_layout_document_zone(_invoice_zone, monitor_rect, viewport_size, false)
 
 
-func _build_monitor_size(viewport_size: Vector2) -> Vector2:
-	var max_width: float = minf(MONITOR_MAX_WIDTH, viewport_size.x * 0.94)
-	var monitor_width: float = clampf(viewport_size.x * MONITOR_WIDTH_RATIO, MONITOR_MIN_WIDTH, max_width)
+func _build_monitor_size(viewport_size: Vector2, required_screen_width: float) -> Vector2:
+	var max_width: float = minf(MONITOR_MAX_WIDTH, viewport_size.x * MONITOR_MAX_VIEWPORT_WIDTH_RATIO)
+	var base_monitor_width: float = viewport_size.x * MONITOR_WIDTH_RATIO
+	var monitor_width_for_content: float = required_screen_width / _screen_inner_width_ratio()
+	var preferred_monitor_width: float = maxf(base_monitor_width, monitor_width_for_content)
+	var monitor_width: float = clampf(preferred_monitor_width, MONITOR_MIN_WIDTH, max_width)
 	var monitor_height: float = monitor_width / MONITOR_ASPECT_RATIO
 	var max_height: float = viewport_size.y * MONITOR_HEIGHT_LIMIT_RATIO
+	if monitor_width_for_content > base_monitor_width:
+		max_height = viewport_size.y * MONITOR_HEIGHT_HARD_LIMIT_RATIO
 	if monitor_height > max_height:
 		monitor_height = max_height
 		monitor_width = monitor_height * MONITOR_ASPECT_RATIO
-	if monitor_width > viewport_size.x * 0.95:
-		monitor_width = viewport_size.x * 0.95
+	if monitor_width > viewport_size.x * MONITOR_MAX_VIEWPORT_WIDTH_RATIO:
+		monitor_width = viewport_size.x * MONITOR_MAX_VIEWPORT_WIDTH_RATIO
 		monitor_height = monitor_width / MONITOR_ASPECT_RATIO
 	return Vector2(monitor_width, monitor_height)
+
+
+func _resolve_required_screen_width(viewport_width: float) -> float:
+	var required_screen_width: float = SCREEN_MIN_WIDTH_FALLBACK
+	if _monitor_content != null:
+		required_screen_width = maxf(
+			required_screen_width,
+			_monitor_content.get_combined_minimum_size().x
+		)
+	var max_screen_width: float = viewport_width * MONITOR_MAX_VIEWPORT_WIDTH_RATIO * _screen_inner_width_ratio()
+	return minf(required_screen_width, max_screen_width)
+
+
+func _screen_inner_width_ratio() -> float:
+	return maxf(0.01, 1.0 - SCREEN_LEFT_PADDING_RATIO - SCREEN_RIGHT_PADDING_RATIO)
 
 
 func _build_screen_rect(monitor_rect: Rect2) -> Rect2:
