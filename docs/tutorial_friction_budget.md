@@ -38,8 +38,8 @@ Se mide sobre snapshots de `TutorialTelemetryService` y se evalua con `TutorialF
 ## Uso recomendado
 
 1. Generar o cargar snapshots:
-   - `reports/tutorial_telemetry_snapshots_2026-05-10.json`
+   - `reports/tutorial_telemetry_snapshots_2026-05-16.json`
 2. Ejecutar analisis headless:
-   - `Godot_v4.6.2-stable_win64_console.exe --headless --path . --script res://scripts/utils/tutorial_telemetry_analysis.gd -- --input=reports/tutorial_telemetry_snapshots_2026-05-10.json --output=reports/tutorial_friction_report.md`
+   - `Godot_v4.6.2-stable_win64_console.exe --headless --path . --script res://scripts/utils/tutorial_telemetry_analysis.gd -- --input=reports/tutorial_telemetry_snapshots_2026-05-16.json --output=reports/tutorial_friction_report.md`
 3. Verificar budget con smoke:
    - `Godot_v4.6.2-stable_win64_console.exe --headless --path . --script res://scripts/utils/tutorial_friction_budget_smoke.gd`
