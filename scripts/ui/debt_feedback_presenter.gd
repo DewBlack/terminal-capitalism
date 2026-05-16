@@ -41,6 +41,11 @@ static func build_model(
 	var base_expense := float(snapshot.get("base_weekly_expense", 0.0))
 	var estimated_surcharge := float(snapshot.get("estimated_inactivity_surcharge", 0.0))
 	var weekly_multiplier := float(snapshot.get("weekly_multiplier", 1.0))
+	var weekly_notional := float(snapshot.get("weekly_notional", 0.0))
+	var weekly_target_notional := float(snapshot.get("weekly_target_notional", 0.0))
+	var low_activity_threshold := float(snapshot.get("low_activity_threshold", 0.0))
+	var activity_progress_ratio := float(snapshot.get("activity_progress_ratio", weekly_notional / maxf(1.0, weekly_target_notional)))
+	var activity_progress_percent := clampf(activity_progress_ratio * 100.0, 0.0, 999.0)
 	var activity_label := str(snapshot.get("activity_label", "-"))
 	var grace_week := bool(snapshot.get("grace_week", false))
 	var days_until_charge := int(snapshot.get("days_until_weekly_charge", 0))
@@ -48,14 +53,18 @@ static func build_model(
 	if days_until_charge > 0:
 		charge_timing = "en %d dia(s)" % days_until_charge
 
-	var invoice_text := "Factura semanal estimada: %s (%s base + %s actividad, x%.2f). Proximo cobro %s. Actividad: %s%s." % [
+	var invoice_text := "Factura semanal estimada: %s (%s base + %s actividad, x%.2f). Proximo cobro %s. Actividad: %s%s. Notional semanal: %s / %s (umbral medio %s, avance %.0f%%)." % [
 		UI_FORMAT_HELPER.money(estimated_charge),
 		UI_FORMAT_HELPER.money(base_expense),
 		UI_FORMAT_HELPER.money(estimated_surcharge),
 		weekly_multiplier,
 		charge_timing,
 		activity_label,
-		" | Semana de gracia" if grace_week else ""
+		" | Semana de gracia" if grace_week else "",
+		UI_FORMAT_HELPER.money(weekly_notional),
+		UI_FORMAT_HELPER.money(weekly_target_notional),
+		UI_FORMAT_HELPER.money(low_activity_threshold),
+		activity_progress_percent
 	]
 
 	return {

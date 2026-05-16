@@ -208,6 +208,13 @@ static func build_debt_feedback_snapshot(
 	var traded_this_week := bool(context.get("traded_this_week", false))
 	var inactivity_surcharge := float(context.get("inactivity_surcharge", 0.0))
 	var activity_label := str(context.get("activity_label", "Nula"))
+	var weekly_notional := float(context.get("weekly_notional", 0.0))
+	var weekly_target_notional := float(context.get("weekly_target_notional", 0.0))
+	var activity_state_variant: Variant = context.get("activity_state", {})
+	var low_activity_threshold := 0.0
+	if activity_state_variant is Dictionary:
+		low_activity_threshold = float((activity_state_variant as Dictionary).get("low_activity_threshold", 0.0))
+	var activity_progress_ratio := weekly_notional / maxf(1.0, weekly_target_notional)
 	var weekly_multiplier := upgrade_manager.get_weekly_expense_multiplier()
 	var estimated_charge := (run_manager.weekly_expense + inactivity_surcharge) * maxf(0.1, weekly_multiplier)
 	var debt_limit := PlayerPortfolio.MAX_TRADING_DEBT
@@ -238,6 +245,10 @@ static func build_debt_feedback_snapshot(
 		"base_weekly_expense": run_manager.weekly_expense,
 		"estimated_inactivity_surcharge": inactivity_surcharge,
 		"weekly_multiplier": weekly_multiplier,
+		"weekly_notional": weekly_notional,
+		"weekly_target_notional": weekly_target_notional,
+		"low_activity_threshold": low_activity_threshold,
+		"activity_progress_ratio": activity_progress_ratio,
 		"grace_week": grace_week,
 		"activity_label": activity_label,
 		"days_until_weekly_charge": days_until_charge,
