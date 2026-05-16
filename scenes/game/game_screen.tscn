@@ -287,9 +287,21 @@ text = "Cantidad:"
 [node name="QuantityInput" type="SpinBox" parent="MainMargin/MainVBox/BottomPanel/BottomBar"]
 layout_mode = 2
 min_value = 1.0
-max_value = 999.0
+max_value = 1.0
 value = 1.0
 step = 1.0
+
+[node name="QuantityPlusTenButton" type="Button" parent="MainMargin/MainVBox/BottomPanel/BottomBar"]
+layout_mode = 2
+text = "+10"
+
+[node name="QuantityPlusTwentyFiveButton" type="Button" parent="MainMargin/MainVBox/BottomPanel/BottomBar"]
+layout_mode = 2
+text = "+25"
+
+[node name="QuantityMaxButton" type="Button" parent="MainMargin/MainVBox/BottomPanel/BottomBar"]
+layout_mode = 2
+text = "Max"
 
 [node name="BuyButton" type="Button" parent="MainMargin/MainVBox/BottomPanel/BottomBar"]
 layout_mode = 2

@@ -86,6 +86,9 @@ var _tutorial_state: Dictionary = {"active": false}
 @onready var _history_text: RichTextLabel = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/HistoryText
 
 @onready var _quantity_input: SpinBox = $MainMargin/MainVBox/BottomPanel/BottomBar/QuantityInput
+@onready var _quantity_plus_ten_button: Button = $MainMargin/MainVBox/BottomPanel/BottomBar/QuantityPlusTenButton
+@onready var _quantity_plus_twenty_five_button: Button = $MainMargin/MainVBox/BottomPanel/BottomBar/QuantityPlusTwentyFiveButton
+@onready var _quantity_max_button: Button = $MainMargin/MainVBox/BottomPanel/BottomBar/QuantityMaxButton
 @onready var _buy_button: Button = $MainMargin/MainVBox/BottomPanel/BottomBar/BuyButton
 @onready var _sell_button: Button = $MainMargin/MainVBox/BottomPanel/BottomBar/SellButton
 @onready var _end_day_button: Button = $MainMargin/MainVBox/BottomPanel/BottomBar/EndDayButton
@@ -122,6 +125,9 @@ func _ready() -> void:
 	_sell_button.pressed.connect(_on_sell_button_pressed)
 	_end_day_button.pressed.connect(_on_end_day_button_pressed)
 	_quantity_input.value_changed.connect(_on_quantity_value_changed)
+	_quantity_plus_ten_button.pressed.connect(_on_quantity_plus_ten_pressed)
+	_quantity_plus_twenty_five_button.pressed.connect(_on_quantity_plus_twenty_five_pressed)
+	_quantity_max_button.pressed.connect(_on_quantity_max_pressed)
 	_market_panel.gui_input.connect(_on_market_panel_gui_input)
 	_history_button.pressed.connect(_on_history_button_pressed)
 	_news_history_button.pressed.connect(_on_news_history_button_pressed)
@@ -149,7 +155,10 @@ func _ready() -> void:
 		_quantity_input,
 		_buy_button,
 		_sell_button,
-		_end_day_button
+		_end_day_button,
+		_quantity_plus_ten_button,
+		_quantity_plus_twenty_five_button,
+		_quantity_max_button
 	)
 	_modal_locks_controller = UI_MODAL_LOCKS_CONTROLLER.new()
 	_modal_locks_controller.setup(
@@ -616,6 +625,18 @@ func _on_quantity_value_changed(_value: float) -> void:
 	refresh_all_ui()
 
 
+func _on_quantity_plus_ten_pressed() -> void:
+	_adjust_quantity_quick_action(10, false)
+
+
+func _on_quantity_plus_twenty_five_pressed() -> void:
+	_adjust_quantity_quick_action(25, false)
+
+
+func _on_quantity_max_pressed() -> void:
+	_adjust_quantity_quick_action(0, true)
+
+
 func _unhandled_key_input(event: InputEvent) -> void:
 	if _hotkey_input_controller == null:
 		return
@@ -741,6 +762,19 @@ func _update_trade_action_state() -> void:
 		_tutorial_state,
 		_are_actions_locked()
 	)
+
+
+func _adjust_quantity_quick_action(delta: int, use_max_value: bool) -> void:
+	if _trade_action_controller == null:
+		return
+	_trade_action_controller.adjust_quantity_quick_action(
+		delta,
+		use_max_value,
+		_get_selected_ticker(),
+		_tutorial_state,
+		_are_actions_locked()
+	)
+	refresh_all_ui()
 
 
 func _update_selection_context() -> void:
