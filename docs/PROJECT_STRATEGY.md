@@ -67,3 +67,19 @@ Smokes activos:
   - `Medio` desde `55%` de uso de deuda operativa
   - `Alto` desde `82%`
   - `Critico` desde `98%`
+
+## Ajuste aplicado (2026-05-16)
+
+- Recalibracion de economia semanal para regimen de precios bajos:
+  - `RUN_STARTING_CASH`: `960 -> 1000`
+  - `RUN_BASE_WEEKLY_EXPENSE`: `260 -> 270`
+  - `INACTIVITY_WEEKLY_SURCHARGE`: `110 -> 40`
+  - `LOW_ACTIVITY_WEEKLY_SURCHARGE`: `35 -> 1`
+- Reajuste del objetivo de actividad semanal (menos punitivo para baja rotacion):
+  - `WEEKLY_ACTIVITY_NOTIONAL_FLOOR`: `180 -> 105`
+  - `WEEKLY_ACTIVITY_NOTIONAL_RATIO`: `0.30 -> 0.18`
+  - `MIN_WEEKLY_HOLDINGS_FOR_ACTIVITY`: `210 -> 120`
+  - `WEEKLY_LOW_ACTIVITY_RATIO`: se mantiene en `0.55`
+- HUD de deuda/factura con legibilidad reforzada:
+  - Snapshot incluye progreso de actividad (`notional actual`, `objetivo`, `umbral medio`, `% avance`).
+  - La previsualizacion de factura semanal expone estos datos en texto explicable.
