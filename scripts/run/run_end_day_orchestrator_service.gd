@@ -8,6 +8,7 @@ const WEEKLY_EFFECTS_SERVICE := preload("res://scripts/run/weekly_effects_servic
 const RUN_DAY_UI_ORCHESTRATOR_SERVICE := preload("res://scripts/run/run_day_ui_orchestrator_service.gd")
 const UPGRADE_OFFER_GATE_SERVICE := preload("res://scripts/run/upgrade_offer_gate_service.gd")
 const RUN_LIFECYCLE_SERVICE := preload("res://scripts/run/run_lifecycle_service.gd")
+const LOGGER := preload("res://scripts/utils/logger.gd")
 
 const TUTORIAL_ACTION_END_DAY := "end_day"
 const BLOCKED_RECAP_MESSAGE := "Revisa el resumen semanal antes de continuar."
@@ -214,10 +215,15 @@ static func _process_tutorial_branch(
 	var day_transition_variant: Variant = tutorial_day_result.get("day_transition", {})
 	if day_transition_variant is Dictionary:
 		var day_transition: Dictionary = day_transition_variant
-		debug_logs.append("[DEBUG][GameManager][Tutorial] dia avanzado | %d -> %d" % [
-			int(day_transition.get("previous_day", run_manager.current_day)),
-			int(day_transition.get("current_day", run_manager.current_day))
-		])
+		debug_logs.append(
+			LOGGER.debug_line(
+				"GameManager][Tutorial",
+				"dia avanzado | %d -> %d" % [
+					int(day_transition.get("previous_day", run_manager.current_day)),
+					int(day_transition.get("current_day", run_manager.current_day))
+				]
+			)
+		)
 
 	response["debug_logs"] = debug_logs
 	response["market_report"] = _extract_dictionary(tutorial_day_result.get("market_report", {}))

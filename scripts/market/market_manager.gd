@@ -2,6 +2,7 @@ class_name MarketManager
 extends Node
 
 const RUN_BALANCE_CONFIG := preload("res://scripts/run/run_balance_config.gd")
+const LOGGER := preload("res://scripts/utils/logger.gd")
 
 signal market_updated
 signal company_spawned(company: Company)
@@ -140,12 +141,15 @@ func apply_day_events(news_events: Array, day_index: int) -> Dictionary:
 		)
 		company.apply_price_change(cumulative_delta, reasons)
 		if absf(cumulative_delta) > 0.0001:
-			print("[DEBUG][MarketManager] precio modificado | %s %s -> %s (%s)" % [
-				company.ticker,
-				_money(old_price),
-				_money(company.current_price),
-				_percent_text(cumulative_delta)
-			])
+			LOGGER.debug_scoped(
+				"MarketManager",
+				"precio modificado | %s %s -> %s (%s)" % [
+					company.ticker,
+					_money(old_price),
+					_money(company.current_price),
+					_percent_text(cumulative_delta)
+				]
+			)
 
 	_process_special_events(news_events, day_index, report)
 	_process_natural_bankruptcies(report)
@@ -207,12 +211,15 @@ func _apply_tutorial_day_events(day_index: int) -> Dictionary:
 
 		var old_price := company.current_price
 		company.apply_price_change(delta, reasons)
-		print("[DEBUG][MarketManager][Tutorial] precio modificado | %s %s -> %s (%s)" % [
-			company.ticker,
-			_money(old_price),
-			_money(company.current_price),
-			_percent_text(delta)
-		])
+		LOGGER.debug_scoped(
+			"MarketManager][Tutorial",
+			"precio modificado | %s %s -> %s (%s)" % [
+				company.ticker,
+				_money(old_price),
+				_money(company.current_price),
+				_percent_text(delta)
+			]
+		)
 
 	emit_signal("market_updated")
 	return report

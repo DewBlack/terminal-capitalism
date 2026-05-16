@@ -2,6 +2,7 @@ class_name RunLifecycleService
 extends RefCounted
 
 const RUN_OUTCOME_SERVICE := preload("res://scripts/run/run_outcome_service.gd")
+const LOGGER := preload("res://scripts/utils/logger.gd")
 
 const STANDARD_RUN_MAX_DAYS := 30
 const STANDARD_COMPANY_MIN := 7
@@ -207,13 +208,16 @@ static func finish_run(
 	)
 	save_manager.save_run_stub(snapshot)
 
-	var debug_log := "[DEBUG][GameManager] %s detectada | razon=%s dia=%d patrimonio=%s deuda=%s" % [
-		"victoria" if victory else "derrota",
-		reason,
-		run_manager.current_day,
-		_money_value(money_formatter, player_portfolio.get_net_worth(market_manager)),
-		_money_value(money_formatter, player_portfolio.debt)
-	]
+	var debug_log := LOGGER.debug_line(
+		"GameManager",
+		"%s detectada | razon=%s dia=%d patrimonio=%s deuda=%s" % [
+			"victoria" if victory else "derrota",
+			reason,
+			run_manager.current_day,
+			_money_value(money_formatter, player_portfolio.get_net_worth(market_manager)),
+			_money_value(money_formatter, player_portfolio.debt)
+		]
+	)
 	var event_log_entry := "D%02d | %s: %s" % [
 		run_manager.current_day,
 		"Victoria" if victory else "Derrota",

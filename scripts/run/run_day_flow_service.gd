@@ -5,6 +5,7 @@ const DAY_PROGRESSION_SERVICE := preload("res://scripts/run/day_progression_serv
 const DAY_SUMMARY_SERVICE := preload("res://scripts/run/day_summary_service.gd")
 const WEEKLY_RESOLUTION_SERVICE := preload("res://scripts/run/weekly_resolution_service.gd")
 const WEEKLY_TELEMETRY_SERVICE := preload("res://scripts/run/weekly_telemetry_service.gd")
+const LOGGER := preload("res://scripts/utils/logger.gd")
 
 
 static func process_regular_day(
@@ -66,16 +67,22 @@ static func process_regular_day(
 	return {
 		"day_transition": day_transition,
 		"market_report": market_report,
-		"day_transition_log": "[DEBUG][GameManager] dia avanzado | %d -> %d (semana %d)" % [
-			previous_day,
-			current_day,
-			week_index
-		],
-		"news_application_log": "[DEBUG][GameManager] noticias aplicadas | nuevas=%d activas=%d titulos=%s" % [
-			new_headline_count,
-			effective_news_count,
-			" | ".join(news_titles)
-		],
+		"day_transition_log": LOGGER.debug_line(
+			"GameManager",
+			"dia avanzado | %d -> %d (semana %d)" % [
+				previous_day,
+				current_day,
+				week_index
+			]
+		),
+		"news_application_log": LOGGER.debug_line(
+			"GameManager",
+			"noticias aplicadas | nuevas=%d activas=%d titulos=%s" % [
+				new_headline_count,
+				effective_news_count,
+				" | ".join(news_titles)
+			]
+		),
 		"status_message": status_message,
 		"effective_news": effective_news,
 		"weekly_result": weekly_result,
