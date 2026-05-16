@@ -133,7 +133,11 @@ func apply_day_events(news_events: Array, day_index: int) -> Dictionary:
 		var noise := _tag_effect_system.market_noise(company, _rng)
 		cumulative_delta += noise
 		reasons.append("Ruido diario: %s" % _percent_text(noise))
-		cumulative_delta = clamp(cumulative_delta, -0.22, 0.22)
+		cumulative_delta = clamp(
+			cumulative_delta,
+			-RUN_BALANCE_CONFIG.DAILY_CHANGE_CAP,
+			RUN_BALANCE_CONFIG.DAILY_CHANGE_CAP
+		)
 		company.apply_price_change(cumulative_delta, reasons)
 		if absf(cumulative_delta) > 0.0001:
 			print("[DEBUG][MarketManager] precio modificado | %s %s -> %s (%s)" % [

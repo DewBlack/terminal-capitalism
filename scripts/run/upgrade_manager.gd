@@ -107,20 +107,20 @@ func _build_default_upgrades() -> Array[RunUpgrade]:
 		{
 			"id": "bulk_buying_bot",
 			"name": "Bot de Compra Mayorista",
-			"description": "Un script ilegal te consigue compras con descuento del 5%.",
+			"description": "Un script ilegal te consigue compras con descuento del 3%.",
 			"duration_days": 7,
 			"weekly_expense_multiplier": 1.0,
-			"buy_price_multiplier": 0.95,
+			"buy_price_multiplier": 0.97,
 			"sell_price_multiplier": 1.0
 		},
 		{
 			"id": "auction_hype_mic",
 			"name": "Microfono de Hype",
-			"description": "Tus ventas salen en prime-time absurdo y ganan +7% en ejecucion.",
+			"description": "Tus ventas salen en prime-time absurdo y ganan +4% en ejecucion.",
 			"duration_days": 7,
 			"weekly_expense_multiplier": 1.0,
 			"buy_price_multiplier": 1.0,
-			"sell_price_multiplier": 1.07
+			"sell_price_multiplier": 1.04
 		}
 	]
 

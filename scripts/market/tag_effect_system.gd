@@ -2,6 +2,7 @@ class_name TagEffectSystem
 extends Node
 
 const REGULATORY_TAGS := ["regulation", "legal_risk", "scandal", "lawsuit", "compliance"]
+const RUN_BALANCE_CONFIG := preload("res://scripts/run/run_balance_config.gd")
 
 var _tag_ui_labels: Dictionary = {}
 
@@ -79,10 +80,12 @@ func evaluate_news_impact(company: Company, news_event: NewsEvent) -> Dictionary
 		absurdity_mult += company.absurdity * 0.16
 
 	var final_delta := base_delta * volatility_mult * hype_mult * reputation_mult * legal_mult * absurdity_mult
-	final_delta = clamp(final_delta, -0.20, 0.20)
+	final_delta *= RUN_BALANCE_CONFIG.NEWS_IMPACT_SCALE
+	final_delta = clamp(final_delta, -RUN_BALANCE_CONFIG.DAILY_CHANGE_CAP, RUN_BALANCE_CONFIG.DAILY_CHANGE_CAP)
 
 	reasons.append("Volatilidad x%.2f" % volatility_mult)
 	reasons.append("Hype x%.2f" % hype_mult)
+	reasons.append("Escala balance x%.2f" % RUN_BALANCE_CONFIG.NEWS_IMPACT_SCALE)
 	if legal_mult > 1.0:
 		reasons.append("Riesgo legal x%.2f" % legal_mult)
 
@@ -106,7 +109,7 @@ func evaluate_news_impact(company: Company, news_event: NewsEvent) -> Dictionary
 
 
 func market_noise(company: Company, rng: RandomNumberGenerator) -> float:
-	var noise_band := 0.006 + company.volatility * 0.011
+	var noise_band := (0.006 + company.volatility * 0.011) * RUN_BALANCE_CONFIG.MARKET_NOISE_SCALE
 	return rng.randf_range(-noise_band, noise_band)
 
 
