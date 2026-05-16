@@ -1,10 +1,10 @@
 # Tutorial Friction Report
 
 ## Configuracion
-- Timestamp (UTC): `2026-05-10 10:03:02`
-- Input snapshots: `res://reports/tutorial_telemetry_snapshots_2026-05-10.json`
+- Timestamp (UTC): `2026-05-16 16:25:50`
+- Input snapshots: `res://reports/tutorial_telemetry_snapshots_2026-05-16.json`
 - Output reporte: `res://reports/tutorial_friction_report.md`
-- Args: `--input=reports/tutorial_telemetry_snapshots_2026-05-10.json --output=reports/tutorial_friction_report.md`
+- Args: `--input=reports/tutorial_telemetry_snapshots_2026-05-16.json --output=reports/tutorial_friction_report.md`
 
 ## KPIs
 | KPI | Valor |
@@ -31,11 +31,11 @@
 | Accion | Total | Runs con bloqueo | Avg por run | p95 por run |
 | --- | --- | --- | --- | --- |
 | `continue` | 6 | 16.7% | 0.17 | 1.00 |
-| `select` | 24 | 50.0% | 0.67 | 2.00 |
-| `buy` | 36 | 66.7% | 1.00 | 2.00 |
+| `select` | 12 | 33.3% | 0.33 | 1.00 |
+| `buy` | 12 | 33.3% | 0.33 | 1.00 |
 | `sell` | 0 | 0.0% | 0.00 | 0.00 |
-| `end_day` | 18 | 50.0% | 0.50 | 1.00 |
-| `hotkeys` | 66 | 83.3% | 1.83 | 4.00 |
+| `end_day` | 12 | 33.3% | 0.33 | 1.00 |
+| `hotkeys` | 30 | 83.3% | 0.83 | 1.00 |
 
 ## Ranking De Friccion (Top)
 ### Pasos
@@ -46,24 +46,24 @@
 5. `sell_step` -> p95=39.0s (p50=27.0s)
 
 ### Acciones
-1. `hotkeys` -> avg/run=1.83 (p95/run=4.00)
-2. `buy` -> avg/run=1.00 (p95/run=2.00)
-3. `select` -> avg/run=0.67 (p95/run=2.00)
-4. `end_day` -> avg/run=0.50 (p95/run=1.00)
+1. `hotkeys` -> avg/run=0.83 (p95/run=1.00)
+2. `select` -> avg/run=0.33 (p95/run=1.00)
+3. `buy` -> avg/run=0.33 (p95/run=1.00)
+4. `end_day` -> avg/run=0.33 (p95/run=1.00)
 5. `continue` -> avg/run=0.17 (p95/run=1.00)
 6. `sell` -> avg/run=0.00 (p95/run=0.00)
 
 ## Friction Budget
-- Estado: **FAIL**
+- Estado: **OK**
 | Check | Actual | Limite | Estado |
 | --- | --- | --- | --- |
 | `abandonment_rate:abandonment_rate` | 16.7% | 18.0% | OK |
 | `blocked_per_run:continue` | 0.17 | 0.45 | OK |
-| `blocked_per_run:select` | 0.67 | 0.55 | FAIL |
-| `blocked_per_run:buy` | 1.00 | 0.45 | FAIL |
+| `blocked_per_run:select` | 0.33 | 0.55 | OK |
+| `blocked_per_run:buy` | 0.33 | 0.45 | OK |
 | `blocked_per_run:sell` | 0.00 | 0.40 | OK |
-| `blocked_per_run:end_day` | 0.50 | 0.40 | FAIL |
-| `blocked_per_run:hotkeys` | 1.83 | 0.85 | FAIL |
+| `blocked_per_run:end_day` | 0.33 | 0.40 | OK |
+| `blocked_per_run:hotkeys` | 0.83 | 0.85 | OK |
 | `step_p95_msec:select_company` | 45.0s | 60.0s | OK |
 | `step_p95_msec:buy_step` | 70.0s | 85.0s | OK |
 | `step_p95_msec:end_day_1` | 54.0s | 70.0s | OK |
@@ -71,10 +71,4 @@
 | `step_p95_msec:sell_step` | 39.0s | 70.0s | OK |
 | `step_p95_msec:end_day_2` | 37.0s | 60.0s | OK |
 | `step_p95_msec:finish` | 15.0s | 45.0s | OK |
-
-### Incumplimientos
-- blocked_per_run[select] excedido actual=0.667 limite=0.550
-- blocked_per_run[buy] excedido actual=1.000 limite=0.450
-- blocked_per_run[end_day] excedido actual=0.500 limite=0.400
-- blocked_per_run[hotkeys] excedido actual=1.833 limite=0.850
 

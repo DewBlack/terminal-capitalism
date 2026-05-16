@@ -8,6 +8,8 @@ const OUTCOME_ABANDONED := "abandoned"
 
 const EVENT_STEP_ENTER := "step_enter"
 const EVENT_STEP_EXIT := "step_exit"
+const BLOCKED_ACTION_DEBOUNCE_MSEC := 1200
+const BLOCKED_ACTION_SIGNATURE_TTL_MSEC := 10000
 
 var _session_active: bool = false
 var _started_at_msec: int = 0
@@ -27,6 +29,7 @@ var _step_events: Array[Dictionary] = []
 var _step_summary_by_id: Dictionary = {}
 var _blocked_actions: Array[Dictionary] = []
 var _blocked_counts: Dictionary = {}
+var _blocked_signature_last_seen_msec: Dictionary = {}
 
 
 func start_session(
@@ -77,6 +80,17 @@ func record_blocked_action(
 	var clean_reason := reason.strip_edges()
 	if clean_reason.is_empty():
 		clean_reason = "Accion bloqueada sin detalle."
+	var clean_attempted := attempted_action.strip_edges()
+	var now_msec := _now_msec()
+	var signature := _build_blocked_signature(
+		action_id,
+		source,
+		clean_reason,
+		clean_attempted,
+		keycode
+	)
+	if _is_blocked_action_debounced(signature, now_msec):
+		return
 	var event := {
 		"action": action_id,
 		"reason": clean_reason,
@@ -84,9 +98,8 @@ func record_blocked_action(
 		"source": source,
 		"step_id": _active_step_id,
 		"step_index": _active_step_index,
-		"at_msec": _now_msec()
+		"at_msec": now_msec
 	}
-	var clean_attempted := attempted_action.strip_edges()
 	if not clean_attempted.is_empty():
 		event["attempted_action"] = clean_attempted
 	if keycode >= 0:
@@ -280,6 +293,36 @@ func _reset_state() -> void:
 	_step_summary_by_id.clear()
 	_blocked_actions.clear()
 	_blocked_counts.clear()
+	_blocked_signature_last_seen_msec.clear()
+
+
+func _build_blocked_signature(
+	action_id: String,
+	source: String,
+	reason: String,
+	attempted_action: String,
+	keycode: int
+) -> String:
+	return "%s|%s|%s|%s|%s|%d" % [
+		action_id,
+		source,
+		_active_step_id,
+		reason,
+		attempted_action,
+		keycode
+	]
+
+
+func _is_blocked_action_debounced(signature: String, now_msec: int) -> bool:
+	var keys := _blocked_signature_last_seen_msec.keys()
+	for key_variant in keys:
+		var key := str(key_variant)
+		var seen_msec := int(_blocked_signature_last_seen_msec.get(key, 0))
+		if now_msec - seen_msec > BLOCKED_ACTION_SIGNATURE_TTL_MSEC:
+			_blocked_signature_last_seen_msec.erase(key)
+	var last_seen := int(_blocked_signature_last_seen_msec.get(signature, -BLOCKED_ACTION_DEBOUNCE_MSEC - 1))
+	_blocked_signature_last_seen_msec[signature] = now_msec
+	return now_msec - last_seen < BLOCKED_ACTION_DEBOUNCE_MSEC
 
 
 func _now_msec() -> int:

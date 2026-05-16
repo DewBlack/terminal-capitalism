@@ -2,7 +2,7 @@ extends SceneTree
 
 const ANALYSIS_SERVICE := preload("res://scripts/run/tutorial_friction_analysis_service.gd")
 
-const DEFAULT_INPUT_PATH := "res://reports/tutorial_telemetry_snapshots_2026-05-10.json"
+const DEFAULT_INPUT_PATH := "res://reports/tutorial_telemetry_snapshots_2026-05-16.json"
 const DEFAULT_OUTPUT_PATH := "res://reports/tutorial_friction_report.md"
 const DEFAULT_FIXTURE_RUNS := 36
 
@@ -540,24 +540,20 @@ func _blocked_count_template_for_profile(profile_kind: String) -> Dictionary:
 			counts["hotkeys"] = 1
 			return counts
 		"hotkey_heavy_completed":
-			counts["hotkeys"] = 4
-			counts["buy"] = 1
-			counts["end_day"] = 1
+			counts["hotkeys"] = 1
 			return counts
 		"review_slow_completed":
 			counts["continue"] = 1
 			counts["hotkeys"] = 1
 			return counts
 		"select_buy_confusion_completed":
-			counts["select"] = 2
-			counts["buy"] = 2
+			counts["select"] = 1
+			counts["buy"] = 1
 			counts["end_day"] = 1
-			counts["hotkeys"] = 2
+			counts["hotkeys"] = 1
 			return counts
 		"abandoned_after_buy":
-			counts["select"] = 1
-			counts["buy"] = 2
-			counts["hotkeys"] = 3
+			counts["hotkeys"] = 1
 			return counts
 		_:
 			return counts
