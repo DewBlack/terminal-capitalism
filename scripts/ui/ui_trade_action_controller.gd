@@ -2,6 +2,7 @@ class_name UiTradeActionController
 extends RefCounted
 
 const TRADE_PREVIEW_PRESENTER := preload("res://scripts/ui/trade_preview_presenter.gd")
+const BUY_LIMIT_PROBE_AMOUNT := 1000000
 
 var _run_manager: RunManager = null
 var _player_portfolio: PlayerPortfolio = null
@@ -13,7 +14,16 @@ var _quantity_input: SpinBox = null
 var _buy_button: Button = null
 var _sell_button: Button = null
 var _end_day_button: Button = null
+var _quantity_plus_ten_button: Button = null
+var _quantity_plus_twenty_five_button: Button = null
+var _quantity_max_button: Button = null
 var _trade_preview_label: Label = null
+var _last_quantity_limits: Dictionary = {
+	"has_company": false,
+	"buy_max": 0,
+	"sell_max": 0,
+	"input_max": 1
+}
 
 
 func setup(
@@ -21,13 +31,19 @@ func setup(
 	quantity_input: SpinBox,
 	buy_button: Button,
 	sell_button: Button,
-	end_day_button: Button
+	end_day_button: Button,
+	quantity_plus_ten_button: Button,
+	quantity_plus_twenty_five_button: Button,
+	quantity_max_button: Button
 ) -> void:
 	_details_vbox = details_vbox
 	_quantity_input = quantity_input
 	_buy_button = buy_button
 	_sell_button = sell_button
 	_end_day_button = end_day_button
+	_quantity_plus_ten_button = quantity_plus_ten_button
+	_quantity_plus_twenty_five_button = quantity_plus_twenty_five_button
+	_quantity_max_button = quantity_max_button
 	_setup_trade_preview_label()
 
 
@@ -102,6 +118,7 @@ func apply_tutorial_action_state(tutorial_state: Dictionary, actions_locked: boo
 				tutorial_state,
 				"Ajusta este campo cuando llegue el paso de compra o venta."
 			)
+	_apply_quantity_shortcuts_state(_last_quantity_limits, tutorial_state, actions_locked)
 	if actions_locked:
 		return
 	if not _tutorial_allows_action(tutorial_state, "allow_buy") and _buy_button != null:
@@ -119,10 +136,13 @@ func apply_tutorial_action_state(tutorial_state: Dictionary, actions_locked: boo
 func update_trade_preview(selected_ticker: String, tutorial_state: Dictionary, actions_locked: bool) -> void:
 	if _trade_preview_label == null or _quantity_input == null:
 		return
-	var quantity := maxi(1, int(_quantity_input.value))
+	var quantity_limits := _build_quantity_limits(selected_ticker)
+	_last_quantity_limits = quantity_limits.duplicate(true)
+	var quantity := _apply_quantity_bounds(quantity_limits)
+	_apply_quantity_shortcuts_state(quantity_limits, tutorial_state, actions_locked)
 	if _run_manager == null or _player_portfolio == null or _market_manager == null or _upgrade_manager == null:
 		_apply_trade_preview_model(
-			TRADE_PREVIEW_PRESENTER.build_unavailable_model(quantity, ""),
+			TRADE_PREVIEW_PRESENTER.build_unavailable_model(quantity, "", quantity_limits),
 			null,
 			tutorial_state,
 			actions_locked
@@ -131,7 +151,11 @@ func update_trade_preview(selected_ticker: String, tutorial_state: Dictionary, a
 	var company := _market_manager.get_company_by_ticker(selected_ticker)
 	if company == null:
 		_apply_trade_preview_model(
-			TRADE_PREVIEW_PRESENTER.build_unavailable_model(quantity, "Selecciona una empresa para ver coste estimado de compra/venta."),
+			TRADE_PREVIEW_PRESENTER.build_unavailable_model(
+				quantity,
+				"Selecciona una empresa para ver coste estimado de compra/venta.",
+				quantity_limits
+			),
 			null,
 			tutorial_state,
 			actions_locked
@@ -149,8 +173,123 @@ func update_trade_preview(selected_ticker: String, tutorial_state: Dictionary, a
 		_upgrade_manager.get_sell_price_multiplier(),
 		_run_manager.current_day
 	)
-	var preview_model := TRADE_PREVIEW_PRESENTER.build_model(company, quantity, buy_preview, sell_preview)
+	var preview_model := TRADE_PREVIEW_PRESENTER.build_model(
+		company,
+		quantity,
+		buy_preview,
+		sell_preview,
+		quantity_limits,
+		{
+			"cash": _player_portfolio.cash,
+			"debt": _player_portfolio.debt,
+			"debt_limit": float(PlayerPortfolio.MAX_TRADING_DEBT)
+		}
+	)
 	_apply_trade_preview_model(preview_model, company, tutorial_state, actions_locked)
+
+
+func adjust_quantity_quick_action(
+	delta: int,
+	use_max_value: bool,
+	selected_ticker: String,
+	tutorial_state: Dictionary,
+	actions_locked: bool
+) -> void:
+	if _quantity_input == null:
+		return
+	if actions_locked:
+		return
+	if not _tutorial_allows_action(tutorial_state, "allow_buy") and not _tutorial_allows_action(tutorial_state, "allow_sell"):
+		return
+	var quantity_limits := _build_quantity_limits(selected_ticker)
+	_last_quantity_limits = quantity_limits.duplicate(true)
+	if not bool(quantity_limits.get("has_company", false)):
+		return
+	var max_quantity := maxi(1, int(quantity_limits.get("input_max", 1)))
+	var current_quantity := maxi(1, int(_quantity_input.value))
+	var target_quantity := max_quantity if use_max_value else current_quantity + delta
+	target_quantity = clampi(target_quantity, 1, max_quantity)
+	_quantity_input.set_value_no_signal(float(target_quantity))
+
+
+func _build_quantity_limits(selected_ticker: String) -> Dictionary:
+	if _market_manager == null or _player_portfolio == null or _upgrade_manager == null:
+		return {
+			"has_company": false,
+			"buy_max": 0,
+			"sell_max": 0,
+			"input_max": 1
+		}
+	var company := _market_manager.get_company_by_ticker(selected_ticker)
+	if company == null:
+		return {
+			"has_company": false,
+			"buy_max": 0,
+			"sell_max": 0,
+			"input_max": 1
+		}
+	var buy_max := _compute_max_buy_amount(company)
+	var sell_max := maxi(0, _player_portfolio.get_holding_amount(company.ticker))
+	return {
+		"has_company": true,
+		"buy_max": buy_max,
+		"sell_max": sell_max,
+		"input_max": maxi(1, maxi(buy_max, sell_max))
+	}
+
+
+func _compute_max_buy_amount(company: Company) -> int:
+	if _player_portfolio == null or _upgrade_manager == null:
+		return 0
+	var preview := _player_portfolio.estimate_buy_order(
+		company,
+		BUY_LIMIT_PROBE_AMOUNT,
+		_upgrade_manager.get_buy_price_multiplier()
+	)
+	if not bool(preview.get("success", false)):
+		return 0
+	return maxi(0, int(preview.get("max_affordable_amount", preview.get("amount", 0))))
+
+
+func _apply_quantity_bounds(quantity_limits: Dictionary) -> int:
+	var max_quantity := maxi(1, int(quantity_limits.get("input_max", 1)))
+	_quantity_input.max_value = float(max_quantity)
+	var clamped_quantity := clampi(maxi(1, int(_quantity_input.value)), 1, max_quantity)
+	if int(_quantity_input.value) != clamped_quantity:
+		_quantity_input.set_value_no_signal(float(clamped_quantity))
+	return clamped_quantity
+
+
+func _apply_quantity_shortcuts_state(
+	quantity_limits: Dictionary,
+	tutorial_state: Dictionary,
+	actions_locked: bool
+) -> void:
+	var has_company := bool(quantity_limits.get("has_company", false))
+	var max_buy := maxi(0, int(quantity_limits.get("buy_max", 0)))
+	var max_sell := maxi(0, int(quantity_limits.get("sell_max", 0)))
+	var max_quantity := maxi(1, int(quantity_limits.get("input_max", 1)))
+	var tutorial_blocks_quantity := _is_tutorial_active(tutorial_state) and not (
+		_tutorial_allows_action(tutorial_state, "allow_buy")
+		or _tutorial_allows_action(tutorial_state, "allow_sell")
+	)
+	var can_adjust := has_company and not actions_locked and not tutorial_blocks_quantity
+	var hint := "Atajos cantidad: +10, +25, Max (%d). Limites C:%d | V:%d" % [max_quantity, max_buy, max_sell]
+	if tutorial_blocks_quantity:
+		hint = _tutorial_blocked_message(tutorial_state, "Ajusta cantidad cuando el tutorial habilite compra/venta.")
+	elif actions_locked:
+		hint = "Hay un panel modal abierto; cierra ese panel para ajustar cantidad."
+	elif not has_company:
+		hint = "Selecciona una empresa para activar atajos de cantidad."
+	if _quantity_plus_ten_button != null:
+		_quantity_plus_ten_button.disabled = not can_adjust
+		_quantity_plus_ten_button.tooltip_text = hint
+	if _quantity_plus_twenty_five_button != null:
+		_quantity_plus_twenty_five_button.disabled = not can_adjust
+		_quantity_plus_twenty_five_button.tooltip_text = hint
+	if _quantity_max_button != null:
+		_quantity_max_button.disabled = not can_adjust
+		_quantity_max_button.tooltip_text = hint
 
 
 func _setup_trade_preview_label() -> void:
