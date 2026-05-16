@@ -25,29 +25,48 @@ Fuente de verdad de trabajo:
 - Repo issues: `https://github.com/DewBlack/terminal-capitalism/issues`
 - Backlog maestro: issue `#19`
 
+### Regla de bloques y revision de bloque (obligatorio)
+
+- Toda issue de ejecucion debe pertenecer a un bloque mediante un label `block-*` (ejemplo: `block-mvp-loop`).
+- Cada bloque debe tener una issue de cierre llamada `[BLOCK REVIEW] <nombre-del-bloque>`.
+- La issue de cierre de bloque debe incluir:
+  - estado final del bloque
+  - regresiones detectadas
+  - ajustes/correcciones necesarias (y sus nuevas issues si aplica)
+  - decision explicita de `GO`/`NO GO` para pasar al siguiente bloque
+- No se puede empezar trabajo de otro bloque si la `[BLOCK REVIEW]` del bloque actual sigue abierta.
+- Si al cerrar la ultima issue de ejecucion de un bloque no existe `[BLOCK REVIEW]`, hay que crearla inmediatamente con `status-ready`.
+
 ### Regla para "siguiente tarea"
 
 Cuando en chat se pida "siguiente tarea" (o equivalente), el agente debe:
 
-1. Buscar tareas abiertas en GitHub del repo con prioridad y estado.
-2. Priorizar por este orden:
+1. Detectar el bloque activo (por `status-in-progress`; si no hay, por el bloque con mayor prioridad listo).
+2. Buscar tareas abiertas de ese bloque en GitHub.
+3. Aplicar compuerta de bloque:
+   - si no quedan tareas de ejecucion abiertas en el bloque, tomar primero la issue `[BLOCK REVIEW]` de ese bloque.
+   - si no existe issue `[BLOCK REVIEW]`, crearla y tomarla como siguiente tarea.
+4. Si aun hay tareas de ejecucion, priorizar por este orden:
    - `status-ready` + `priority-p0`
    - `status-ready` + `priority-p1`
    - `status-ready` + `priority-p2`
    - si no hay `status-ready`, tomar `status-backlog` por el mismo orden de prioridad.
-3. Marcar la tarea elegida como en curso:
+5. Marcar la tarea elegida como en curso:
    - agregar `status-in-progress`
    - quitar `status-ready` o `status-backlog` si estaban.
-4. Crear/switch a rama de trabajo vinculada a la issue seleccionada:
+6. Crear/switch a rama de trabajo vinculada a la issue seleccionada:
    - formato: `chat/YYYY-MM-DD-issue-<numero>-<slug-corto>`
    - ejemplo: `chat/2026-05-14-issue-21-run-variability-leaks`
-5. Empezar ejecucion directamente sobre esa issue, sin pedir mas contexto, salvo bloqueo real.
+7. Empezar ejecucion directamente sobre esa issue, sin pedir mas contexto, salvo bloqueo real.
 
 ### Regla de cierre de tarea
 
 Al terminar una tarea:
 - Validar criterios de aceptacion definidos en la issue.
 - Cerrar la issue como `completed`.
+- Si era una tarea de ejecucion, revisar si quedan tareas abiertas del mismo `block-*`:
+  - si no quedan, mover la issue `[BLOCK REVIEW]` del bloque a `status-ready`.
+  - si no existe, crearla inmediatamente y dejarla en `status-ready`.
 - Reflejar en la issue maestra `#19` (si aplica) el avance del bloque.
 - Abrir PR inmediatamente despues del cierre exitoso:
   - desde la rama `chat/...` hacia `dev`
