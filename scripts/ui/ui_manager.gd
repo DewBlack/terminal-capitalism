@@ -831,18 +831,22 @@ func _apply_action_hints() -> void:
 
 
 func _apply_diegetic_shell_styles() -> void:
-	var monitor_style := StyleBoxFlat.new()
-	monitor_style.bg_color = Color(0.10, 0.11, 0.13, 0.94)
-	monitor_style.border_color = Color(0.64, 0.57, 0.45, 0.95)
-	monitor_style.border_width_left = 5
-	monitor_style.border_width_top = 5
-	monitor_style.border_width_right = 5
-	monitor_style.border_width_bottom = 10
-	monitor_style.corner_radius_top_left = 16
-	monitor_style.corner_radius_top_right = 16
-	monitor_style.corner_radius_bottom_left = 24
-	monitor_style.corner_radius_bottom_right = 24
-	_monitor_frame.add_theme_stylebox_override("panel", monitor_style)
+	var monitor_panel := _monitor_frame as PanelContainer
+	if monitor_panel != null:
+		var monitor_style := StyleBoxFlat.new()
+		monitor_style.bg_color = Color(0.10, 0.11, 0.13, 0.94)
+		monitor_style.border_color = Color(0.64, 0.57, 0.45, 0.95)
+		monitor_style.border_width_left = 5
+		monitor_style.border_width_top = 5
+		monitor_style.border_width_right = 5
+		monitor_style.border_width_bottom = 10
+		monitor_style.corner_radius_top_left = 16
+		monitor_style.corner_radius_top_right = 16
+		monitor_style.corner_radius_bottom_left = 24
+		monitor_style.corner_radius_bottom_right = 24
+		monitor_style.shadow_color = Color(0, 0, 0, 0.55)
+		monitor_style.shadow_size = 22
+		monitor_panel.add_theme_stylebox_override("panel", monitor_style)
 
 	var paper_style := StyleBoxFlat.new()
 	paper_style.bg_color = Color(0.91, 0.87, 0.74, 0.55)
