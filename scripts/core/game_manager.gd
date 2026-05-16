@@ -14,6 +14,7 @@ const RUN_LIFECYCLE_SERVICE := preload("res://scripts/run/run_lifecycle_service.
 const WEEKLY_OBJECTIVE_SERVICE := preload("res://scripts/run/weekly_objective_service.gd")
 const MARKET_REPORT_EVENT_SERVICE := preload("res://scripts/run/market_report_event_service.gd")
 const RUN_BALANCE_CONFIG := preload("res://scripts/run/run_balance_config.gd")
+const LOGGER := preload("res://scripts/utils/logger.gd")
 const TUTORIAL_ACTION_CONTINUE := "continue"
 const TUTORIAL_ACTION_SELECT_TICKER := "select_ticker"
 const TUTORIAL_ACTION_BUY := "buy"
@@ -192,13 +193,19 @@ func _on_buy_requested(ticker: String, amount: int) -> void:
 	var multiplier := _upgrade_manager.get_buy_price_multiplier()
 	var result := _player_portfolio.buy_shares(company, amount, multiplier, _run_manager.current_day)
 	_last_status_message = str(result.get("message", "Operacion ejecutada."))
-	print("[DEBUG][GameManager] compra completada | ticker=%s cantidad=%d mensaje=%s" % [ticker, amount, _last_status_message])
+	LOGGER.debug_scoped(
+		"GameManager",
+		"compra completada | ticker=%s cantidad=%d mensaje=%s" % [ticker, amount, _last_status_message]
+	)
 	if _is_tutorial_run and bool(result.get("success", false)):
 		var tutorial_step: Dictionary = _tutorial_manager.handle_buy_completed(ticker, amount)
 		if bool(tutorial_step.get("advanced", false)):
 			_record_tutorial_step_advance(TUTORIAL_ACTION_BUY, previous_step, previous_step_index)
 			_last_status_message = str(tutorial_step.get("message", _last_status_message))
-			print("[DEBUG][GameManager][Tutorial] paso completado por compra | ticker=%s cantidad=%d" % [ticker, amount])
+			LOGGER.debug_scoped(
+				"GameManager][Tutorial",
+				"paso completado por compra | ticker=%s cantidad=%d" % [ticker, amount]
+			)
 	_update_weekly_objective_display()
 	_refresh_all_ui()
 
@@ -219,13 +226,19 @@ func _on_sell_requested(ticker: String, amount: int) -> void:
 	var multiplier := _upgrade_manager.get_sell_price_multiplier()
 	var result := _player_portfolio.sell_shares(company, amount, multiplier, _run_manager.current_day)
 	_last_status_message = str(result.get("message", "Operacion ejecutada."))
-	print("[DEBUG][GameManager] venta completada | ticker=%s cantidad=%d mensaje=%s" % [ticker, amount, _last_status_message])
+	LOGGER.debug_scoped(
+		"GameManager",
+		"venta completada | ticker=%s cantidad=%d mensaje=%s" % [ticker, amount, _last_status_message]
+	)
 	if _is_tutorial_run and bool(result.get("success", false)):
 		var tutorial_step: Dictionary = _tutorial_manager.handle_sell_completed(ticker, amount)
 		if bool(tutorial_step.get("advanced", false)):
 			_record_tutorial_step_advance(TUTORIAL_ACTION_SELL, previous_step, previous_step_index)
 			_last_status_message = str(tutorial_step.get("message", _last_status_message))
-			print("[DEBUG][GameManager][Tutorial] paso completado por venta | ticker=%s cantidad=%d" % [ticker, amount])
+			LOGGER.debug_scoped(
+				"GameManager][Tutorial",
+				"paso completado por venta | ticker=%s cantidad=%d" % [ticker, amount]
+			)
 	_update_weekly_objective_display()
 	_refresh_all_ui()
 
@@ -363,13 +376,7 @@ func _apply_end_day_ui_signals(finalize_result: Dictionary) -> void:
 
 
 func _print_debug_logs(log_lines_variant: Variant) -> void:
-	if not (log_lines_variant is Array):
-		return
-	var log_lines: Array = log_lines_variant
-	for log_line in log_lines:
-		var clean_log := str(log_line).strip_edges()
-		if not clean_log.is_empty():
-			print(clean_log)
+	LOGGER.debug_lines(log_lines_variant)
 
 
 func _finish_run(victory: bool, reason: String) -> void:
@@ -398,7 +405,7 @@ func _finish_run(victory: bool, reason: String) -> void:
 		_game_ui.show_run_end(title, reason)
 	var debug_log := str(finish_result.get("debug_log", "")).strip_edges()
 	if not debug_log.is_empty():
-		print(debug_log)
+		LOGGER.debug(debug_log)
 	_append_event_log_entry(str(finish_result.get("event_log_entry", "")))
 	var runtime_alert_variant: Variant = finish_result.get("runtime_alert", {})
 	if runtime_alert_variant is Dictionary:
@@ -463,7 +470,10 @@ func _on_company_selected(ticker: String) -> void:
 	if bool(tutorial_result.get("advanced", false)):
 		_record_tutorial_step_advance(TUTORIAL_ACTION_SELECT_TICKER, previous_step, previous_step_index)
 		_last_status_message = str(tutorial_result.get("message", _last_status_message))
-		print("[DEBUG][GameManager][Tutorial] paso completado por seleccion | ticker=%s" % ticker)
+		LOGGER.debug_scoped(
+			"GameManager][Tutorial",
+			"paso completado por seleccion | ticker=%s" % ticker
+		)
 		_refresh_all_ui()
 
 
@@ -486,7 +496,7 @@ func _on_tutorial_continue_requested() -> void:
 		return
 	_record_tutorial_step_advance(TUTORIAL_ACTION_CONTINUE, previous_step, previous_step_index)
 	_last_status_message = str(tutorial_result.get("message", _last_status_message))
-	print("[DEBUG][GameManager][Tutorial] paso manual completado")
+	LOGGER.debug_scoped("GameManager][Tutorial", "paso manual completado")
 	if _tutorial_manager.is_tutorial_completed():
 		_mark_tutorial_completed_if_needed("Tutorial completado.")
 		_finish_run(true, "Tutorial completado.")
@@ -545,7 +555,10 @@ func _on_weekly_upgrade_selected(upgrade_id: String) -> void:
 		_last_status_message = "No se pudo aplicar la mejora semanal."
 	else:
 		_last_status_message = "Mejora semanal activa: %s." % selected_upgrade.name
-		print("[DEBUG][GameManager] mejora elegida | id=%s nombre=%s" % [selected_upgrade.id, selected_upgrade.name])
+		LOGGER.debug_scoped(
+			"GameManager",
+			"mejora elegida | id=%s nombre=%s" % [selected_upgrade.id, selected_upgrade.name]
+		)
 	_refresh_all_ui()
 
 
