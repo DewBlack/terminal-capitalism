@@ -4,6 +4,7 @@ const DEFAULT_RUN_COUNT := 240
 const DEFAULT_MAX_DAYS := 120
 const DEFAULT_SEED_BASE := 8123
 const MAX_TABLE_ROWS := 40
+const EPSILON := 0.000001
 const RUN_BALANCE_CONFIG := preload("res://scripts/run/run_balance_config.gd")
 const RUN_OUTCOME_SERVICE := preload("res://scripts/run/run_outcome_service.gd")
 
@@ -51,6 +52,182 @@ const UPGRADE_OFFER_TRIGGER_LOOKBACK_DAYS := 2
 const UPGRADE_OFFER_REQUIRE_MARKET_TRIGGER := true
 const UPGRADE_OFFER_TRIGGER_ON_BANKRUPTCY := true
 const UPGRADE_OFFER_TRIGGER_ON_MERGER := true
+const DEFAULT_COMPANY_LISTING_PRICE_FLOOR_FACTOR := COMPANY_LISTING_PRICE_FLOOR / maxf(EPSILON, PRICE_DENOMINATION_SCALE)
+const DEFAULT_NATURAL_BANKRUPTCY_HARD_FLOOR_FACTOR := NATURAL_BANKRUPTCY_HARD_FLOOR / maxf(EPSILON, PRICE_DENOMINATION_SCALE)
+const DEFAULT_NATURAL_BANKRUPTCY_RISK_FLOOR_FACTOR := NATURAL_BANKRUPTCY_RISK_FLOOR / maxf(EPSILON, PRICE_DENOMINATION_SCALE)
+const DEFAULT_NATURAL_BANKRUPTCY_PANIC_FLOOR_FACTOR := NATURAL_BANKRUPTCY_PANIC_FLOOR / maxf(EPSILON, PRICE_DENOMINATION_SCALE)
+const DEFAULT_PRICE_MIN_FLOOR_FACTOR := PRICE_MIN_FLOOR / maxf(EPSILON, PRICE_DENOMINATION_SCALE)
+
+var _active_scenario: Dictionary = {}
+
+
+class ScenarioTagEffectSystem:
+	extends TagEffectSystem
+
+	var _news_impact_ratio: float = 1.0
+	var _noise_ratio: float = 1.0
+	var _daily_cap: float = DAILY_CHANGE_CAP
+
+
+	func configure_scenario(config: Dictionary) -> void:
+		_news_impact_ratio = float(config.get("news_impact_ratio", 1.0))
+		_noise_ratio = float(config.get("noise_ratio", 1.0))
+		_daily_cap = maxf(0.01, float(config.get("daily_cap", DAILY_CHANGE_CAP)))
+
+
+	func evaluate_news_impact(company: Company, news_event: NewsEvent) -> Dictionary:
+		var impact := super.evaluate_news_impact(company, news_event)
+		var base_delta := float(impact.get("percent_change", 0.0))
+		var adjusted_delta := clampf(base_delta * _news_impact_ratio, -_daily_cap, _daily_cap)
+		impact["percent_change"] = adjusted_delta
+		return impact
+
+
+	func market_noise(company: Company, rng: RandomNumberGenerator) -> float:
+		return super.market_noise(company, rng) * _noise_ratio
+
+
+class ScenarioMarketManager:
+	extends MarketManager
+
+	var _scenario_config: Dictionary = {}
+
+
+	func configure_scenario(config: Dictionary) -> void:
+		_scenario_config = config.duplicate(true)
+
+
+	func setup(
+		content_data: Dictionary,
+		company_generator: CompanyGenerator,
+		tag_effect_system: TagEffectSystem,
+		seed_value: int,
+		initial_company_count: int = 8
+	) -> void:
+		super.setup(content_data, company_generator, tag_effect_system, seed_value, initial_company_count)
+		_scale_initial_companies()
+
+
+	func apply_day_events(news_events: Array, day_index: int) -> Dictionary:
+		if _tutorial_mode:
+			return _apply_tutorial_day_events(day_index)
+
+		var report := {
+			"spawned": [],
+			"bankruptcies": [],
+			"mergers": []
+		}
+		var daily_cap := maxf(0.01, float(_scenario_config.get("daily_cap", DAILY_CHANGE_CAP)))
+		for company in get_active_companies():
+			var cumulative_delta := 0.0
+			var reasons: Array[String] = []
+			var impactful_events := 0
+			for news_event in news_events:
+				var impact := _tag_effect_system.evaluate_news_impact(company, news_event)
+				var event_delta := float(impact.get("percent_change", 0.0))
+				if absf(event_delta) <= 0.0001:
+					continue
+				impactful_events += 1
+				var stacking_mult := _event_stacking_multiplier(impactful_events)
+				var adjusted_delta := event_delta * stacking_mult
+				cumulative_delta += adjusted_delta
+				reasons.append(_format_news_impact_reason(news_event, company, impact, stacking_mult))
+
+			var regime_delta := _market_regime_delta(company)
+			if absf(regime_delta) > 0.0001:
+				cumulative_delta += regime_delta
+				reasons.append("Ciclo de run (%s): %s" % [_run_regime_label, _percent_text(regime_delta)])
+
+			var valuation_reversion_delta := _valuation_reversion_delta(company)
+			if absf(valuation_reversion_delta) > 0.0001:
+				cumulative_delta += valuation_reversion_delta
+				reasons.append("Correccion de valor: %s" % _percent_text(valuation_reversion_delta))
+
+			var noise := _tag_effect_system.market_noise(company, _rng)
+			cumulative_delta += noise
+			reasons.append("Ruido diario: %s" % _percent_text(noise))
+			cumulative_delta = clampf(cumulative_delta, -daily_cap, daily_cap)
+			company.apply_price_change(cumulative_delta, reasons)
+
+		_process_special_events(news_events, day_index, report)
+		_process_natural_bankruptcies(report)
+		emit_signal("market_updated")
+		return report
+
+
+	func _process_special_events(news_events: Array, day_index: int, report: Dictionary) -> void:
+		for news_event in news_events:
+			var create_chance := float(news_event.special_chances.get("create_company", 0.0))
+			if _rng.randf() < create_chance:
+				var new_company := _company_generator.create_random_company(day_index)
+				_apply_price_scale_to_company(new_company)
+				_add_company(new_company)
+				report["spawned"].append(new_company.name)
+				emit_signal("company_spawned", new_company)
+
+			var bankruptcy_chance := float(news_event.special_chances.get("bankruptcy", 0.0)) * 0.65
+			if _rng.randf() < bankruptcy_chance:
+				var vulnerable := _pick_vulnerable_company()
+				if vulnerable != null:
+					_mark_bankrupt(vulnerable, "Golpe critico por: %s" % news_event.title)
+					report["bankruptcies"].append(vulnerable.name)
+
+			var merge_chance := float(news_event.special_chances.get("merge", 0.0))
+			if _rng.randf() < merge_chance:
+				var pair := _pick_merge_pair()
+				if pair.size() == 2:
+					var first_company: Company = pair[0]
+					var second_company: Company = pair[1]
+					var merged_company := _company_generator.generate_merged_company(first_company, second_company, day_index)
+					_apply_price_scale_to_company(merged_company)
+					_mark_merged(first_company, second_company, merged_company)
+					report["mergers"].append("%s + %s -> %s" % [first_company.ticker, second_company.ticker, merged_company.ticker])
+
+
+	func _process_natural_bankruptcies(report: Dictionary) -> void:
+		var active_count := get_active_companies().size()
+		var hard_floor := float(_scenario_config.get("hard_bankruptcy_floor", NATURAL_BANKRUPTCY_HARD_FLOOR))
+		var risk_floor := float(_scenario_config.get("risk_bankruptcy_floor", NATURAL_BANKRUPTCY_RISK_FLOOR))
+		var panic_floor := float(_scenario_config.get("panic_bankruptcy_floor", NATURAL_BANKRUPTCY_PANIC_FLOOR))
+		var doomed: Array[Company] = []
+		for company in get_active_companies():
+			if company.current_price <= hard_floor:
+				doomed.append(company)
+				continue
+			if company.current_price < risk_floor:
+				var bankruptcy_chance := 0.08 + company.debt * 0.16 + company.legal_risk * 0.08
+				if active_count <= 4:
+					bankruptcy_chance *= 0.45
+				if _rng.randf() < bankruptcy_chance:
+					doomed.append(company)
+					continue
+			if company.current_price < panic_floor and _rng.randf() < 0.05:
+				doomed.append(company)
+		for company in doomed:
+			_mark_bankrupt(company, "Colapso por precio bajo.")
+			report["bankruptcies"].append(company.name)
+
+
+	func _scale_initial_companies() -> void:
+		for company in companies:
+			_apply_price_scale_to_company(company)
+
+
+	func _apply_price_scale_to_company(company: Company) -> void:
+		if company == null:
+			return
+		var ratio := float(_scenario_config.get("price_scale_ratio", 1.0))
+		if absf(ratio - 1.0) <= EPSILON:
+			return
+		var min_floor := maxf(0.0001, float(_scenario_config.get("price_min_floor", PRICE_MIN_FLOOR)))
+		company.current_price = maxf(min_floor, company.current_price * ratio)
+		var scaled_history: Array[float] = []
+		var source_history: Array = company.price_history
+		for sample in source_history:
+			scaled_history.append(maxf(min_floor, float(sample) * ratio))
+		if scaled_history.is_empty():
+			scaled_history.append(company.current_price)
+		company.price_history = scaled_history
 
 
 func _initialize() -> void:
@@ -64,46 +241,42 @@ func _initialize() -> void:
 	var max_days: int = int(config["max_days"])
 	var seed_base: int = int(config["seed_base"])
 	var strategy_names: Array[String] = _as_string_array(config["strategies"])
+	var compare_mode: bool = bool(config.get("compare_mode", false))
+	var strict_guardrails: bool = bool(config.get("strict_guardrails", false))
+	var baseline_scenario := _default_scenario_config("baseline")
+	var candidate_scenario := _candidate_scenario_from_config(config, baseline_scenario)
 
 	var loader := ContentPackLoader.new()
 	var content := loader.load_all_content()
-	var report_rows: Array[Dictionary] = []
-
 	print("RUN_VARIABILITY_REPORT")
-	print("runs=%d days=%d seed_base=%d strategies=%s" % [
-		run_count,
-		max_days,
-		seed_base,
-		", ".join(strategy_names)
-	])
-	print("price_scale=%.3f listing_floor=%.3f hard_bankruptcy_floor=%.3f risk_bankruptcy_floor=%.3f panic_bankruptcy_floor=%.3f min_price_floor=%.3f" % [
-		PRICE_DENOMINATION_SCALE,
-		COMPANY_LISTING_PRICE_FLOOR,
-		NATURAL_BANKRUPTCY_HARD_FLOOR,
-		NATURAL_BANKRUPTCY_RISK_FLOOR,
-		NATURAL_BANKRUPTCY_PANIC_FLOOR,
-		PRICE_MIN_FLOOR
-	])
-	print("impact_scale=%.3f noise_scale=%.3f daily_cap=%.3f buy_fee=%.4f sell_fee=%.4f intraday_penalty=%.4f" % [
-		NEWS_IMPACT_SCALE,
-		MARKET_NOISE_SCALE,
-		DAILY_CHANGE_CAP,
-		BUY_TRANSACTION_FEE_RATE,
-		SELL_TRANSACTION_FEE_RATE,
-		INTRADAY_EXIT_PENALTY_RATE
-	])
+	print("runs=%d days=%d seed_base=%d strategies=%s" % [run_count, max_days, seed_base, ", ".join(strategy_names)])
 
-	for run_index in range(run_count):
-		var row := _simulate_run(content, run_index + 1, max_days, seed_base, strategy_names)
-		report_rows.append(row)
+	var baseline_rows := _simulate_scenario_runs(content, run_count, max_days, seed_base, strategy_names, baseline_scenario)
+	_print_scenario_report("BASELINE", baseline_scenario, baseline_rows, strategy_names, max_days)
+	var should_fail := false
 
-	_print_market_table(report_rows, strategy_names)
-	_print_market_summary(report_rows)
-	_print_strategy_summary(report_rows, strategy_names, max_days)
-	report_rows.clear()
+	if compare_mode:
+		var candidate_rows := _simulate_scenario_runs(content, run_count, max_days, seed_base, strategy_names, candidate_scenario)
+		_print_scenario_report("CANDIDATO", candidate_scenario, candidate_rows, strategy_names, max_days)
+		var guardrail_result := _print_scenario_comparison(
+			"baseline",
+			baseline_rows,
+			str(candidate_scenario.get("label", "candidato")),
+			candidate_rows,
+			strategy_names,
+			max_days
+		)
+		if strict_guardrails and not bool(guardrail_result.get("pass", true)):
+			should_fail = true
+		candidate_rows.clear()
+
+	baseline_rows.clear()
 	content.clear()
 	_free_node_if_valid(loader)
-	quit()
+	if should_fail:
+		quit(1)
+		return
+	quit(0)
 
 
 func _parse_config() -> Dictionary:
@@ -112,18 +285,53 @@ func _parse_config() -> Dictionary:
 		"max_days": DEFAULT_MAX_DAYS,
 		"seed_base": DEFAULT_SEED_BASE,
 		"strategies": DEFAULT_STRATEGIES.duplicate(),
-		"show_help": false
+		"show_help": false,
+		"compare_mode": false,
+		"strict_guardrails": false,
+		"candidate_label": "candidate",
+		"candidate_price_scale": PRICE_DENOMINATION_SCALE,
+		"candidate_news_impact_scale": NEWS_IMPACT_SCALE,
+		"candidate_noise_scale": MARKET_NOISE_SCALE,
+		"candidate_daily_cap": DAILY_CHANGE_CAP,
+		"candidate_buy_fee": BUY_TRANSACTION_FEE_RATE,
+		"candidate_sell_fee": SELL_TRANSACTION_FEE_RATE
 	}
 
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--help" or arg == "-h":
 			config["show_help"] = true
+		elif arg == "--compare-baseline":
+			config["compare_mode"] = true
+		elif arg == "--strict-guardrails":
+			config["strict_guardrails"] = true
 		elif arg.begins_with("--runs="):
 			config["run_count"] = max(1, int(arg.substr("--runs=".length())))
 		elif arg.begins_with("--days="):
 			config["max_days"] = max(7, int(arg.substr("--days=".length())))
 		elif arg.begins_with("--seed-base="):
 			config["seed_base"] = int(arg.substr("--seed-base=".length()))
+		elif arg.begins_with("--scenario-label="):
+			var label := arg.substr("--scenario-label=".length()).strip_edges()
+			if not label.is_empty():
+				config["candidate_label"] = label
+		elif arg.begins_with("--price-scale="):
+			config["compare_mode"] = true
+			config["candidate_price_scale"] = maxf(EPSILON, float(arg.substr("--price-scale=".length())))
+		elif arg.begins_with("--news-impact-scale="):
+			config["compare_mode"] = true
+			config["candidate_news_impact_scale"] = maxf(EPSILON, float(arg.substr("--news-impact-scale=".length())))
+		elif arg.begins_with("--noise-scale="):
+			config["compare_mode"] = true
+			config["candidate_noise_scale"] = maxf(EPSILON, float(arg.substr("--noise-scale=".length())))
+		elif arg.begins_with("--daily-cap="):
+			config["compare_mode"] = true
+			config["candidate_daily_cap"] = clampf(float(arg.substr("--daily-cap=".length())), 0.01, 1.0)
+		elif arg.begins_with("--buy-fee="):
+			config["compare_mode"] = true
+			config["candidate_buy_fee"] = clampf(float(arg.substr("--buy-fee=".length())), 0.0, 0.35)
+		elif arg.begins_with("--sell-fee="):
+			config["compare_mode"] = true
+			config["candidate_sell_fee"] = clampf(float(arg.substr("--sell-fee=".length())), 0.0, 0.35)
 		elif arg.begins_with("--strategies="):
 			var raw := arg.substr("--strategies=".length()).strip_edges()
 			if raw.is_empty():
@@ -152,6 +360,61 @@ func _print_usage() -> void:
 	print("  --days=N              Dias por run simulada (default %d)" % DEFAULT_MAX_DAYS)
 	print("  --seed-base=N         Base de semillas (default %d)" % DEFAULT_SEED_BASE)
 	print("  --strategies=a,b,c    passive, conservador, balanceado, arriesgado, caotico, weekly_small, active_rotator")
+	print("  --compare-baseline    Fuerza comparacion baseline vs candidato")
+	print("  --price-scale=F       Escala nominal candidata")
+	print("  --news-impact-scale=F Escala candidata de impacto por noticias")
+	print("  --noise-scale=F       Escala candidata de ruido diario")
+	print("  --daily-cap=F         Tope diario candidato (0.01 - 1.0)")
+	print("  --buy-fee=F           Comision candidata de compra")
+	print("  --sell-fee=F          Comision candidata de venta")
+	print("  --scenario-label=TXT  Etiqueta del escenario candidato")
+	print("  --strict-guardrails   Devuelve exit code 1 cuando falla un guardrail")
+
+
+func _default_scenario_config(label: String) -> Dictionary:
+	var safe_label := label.strip_edges()
+	if safe_label.is_empty():
+		safe_label = "scenario"
+	var scenario := {
+		"label": safe_label,
+		"price_scale": PRICE_DENOMINATION_SCALE,
+		"news_impact_scale": NEWS_IMPACT_SCALE,
+		"noise_scale": MARKET_NOISE_SCALE,
+		"daily_cap": DAILY_CHANGE_CAP,
+		"buy_fee": BUY_TRANSACTION_FEE_RATE,
+		"sell_fee": SELL_TRANSACTION_FEE_RATE,
+		"listing_floor": COMPANY_LISTING_PRICE_FLOOR,
+		"hard_bankruptcy_floor": NATURAL_BANKRUPTCY_HARD_FLOOR,
+		"risk_bankruptcy_floor": NATURAL_BANKRUPTCY_RISK_FLOOR,
+		"panic_bankruptcy_floor": NATURAL_BANKRUPTCY_PANIC_FLOOR,
+		"price_min_floor": PRICE_MIN_FLOOR,
+		"price_scale_ratio": 1.0,
+		"news_impact_ratio": 1.0,
+		"noise_ratio": 1.0
+	}
+	return scenario
+
+
+func _candidate_scenario_from_config(config: Dictionary, baseline: Dictionary) -> Dictionary:
+	var scenario := baseline.duplicate(true)
+	scenario["label"] = str(config.get("candidate_label", "candidate"))
+	scenario["price_scale"] = maxf(EPSILON, float(config.get("candidate_price_scale", PRICE_DENOMINATION_SCALE)))
+	scenario["news_impact_scale"] = maxf(EPSILON, float(config.get("candidate_news_impact_scale", NEWS_IMPACT_SCALE)))
+	scenario["noise_scale"] = maxf(EPSILON, float(config.get("candidate_noise_scale", MARKET_NOISE_SCALE)))
+	scenario["daily_cap"] = clampf(float(config.get("candidate_daily_cap", DAILY_CHANGE_CAP)), 0.01, 1.0)
+	scenario["buy_fee"] = clampf(float(config.get("candidate_buy_fee", BUY_TRANSACTION_FEE_RATE)), 0.0, 0.35)
+	scenario["sell_fee"] = clampf(float(config.get("candidate_sell_fee", SELL_TRANSACTION_FEE_RATE)), 0.0, 0.35)
+
+	var price_scale := float(scenario["price_scale"])
+	scenario["price_min_floor"] = DEFAULT_PRICE_MIN_FLOOR_FACTOR * price_scale
+	scenario["listing_floor"] = DEFAULT_COMPANY_LISTING_PRICE_FLOOR_FACTOR * price_scale
+	scenario["hard_bankruptcy_floor"] = DEFAULT_NATURAL_BANKRUPTCY_HARD_FLOOR_FACTOR * price_scale
+	scenario["risk_bankruptcy_floor"] = DEFAULT_NATURAL_BANKRUPTCY_RISK_FLOOR_FACTOR * price_scale
+	scenario["panic_bankruptcy_floor"] = DEFAULT_NATURAL_BANKRUPTCY_PANIC_FLOOR_FACTOR * price_scale
+	scenario["price_scale_ratio"] = price_scale / maxf(EPSILON, PRICE_DENOMINATION_SCALE)
+	scenario["news_impact_ratio"] = float(scenario["news_impact_scale"]) / maxf(EPSILON, NEWS_IMPACT_SCALE)
+	scenario["noise_ratio"] = float(scenario["noise_scale"]) / maxf(EPSILON, MARKET_NOISE_SCALE)
+	return scenario
 
 
 func _as_string_array(values: Variant) -> Array[String]:
@@ -170,23 +433,41 @@ func _as_float_array(values: Variant) -> Array[float]:
 	return result
 
 
+func _simulate_scenario_runs(
+	content: Dictionary,
+	run_count: int,
+	max_days: int,
+	seed_base: int,
+	strategy_names: Array[String],
+	scenario: Dictionary
+) -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	for run_index in range(run_count):
+		rows.append(_simulate_run(content, run_index + 1, max_days, seed_base, strategy_names, scenario))
+	return rows
+
+
 func _simulate_run(
 	content: Dictionary,
 	run_number: int,
 	max_days: int,
 	seed_base_start: int,
-	strategy_names: Array[String]
+	strategy_names: Array[String],
+	scenario: Dictionary
 ) -> Dictionary:
 	var seed_base: int = seed_base_start + run_number * 977
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_base
 
 	var company_generator := CompanyGenerator.new()
-	var tag_effect_system := TagEffectSystem.new()
-	var market_manager := MarketManager.new()
+	var tag_effect_system := ScenarioTagEffectSystem.new()
+	var market_manager := ScenarioMarketManager.new()
 	var news_manager := NewsManager.new()
 	var initial_company_count: int = rng.randi_range(7, 11)
+	_active_scenario = scenario
 
+	tag_effect_system.configure_scenario(scenario)
+	market_manager.configure_scenario(scenario)
 	company_generator.setup(content, seed_base + 41)
 	news_manager.setup(content, seed_base + 77)
 	market_manager.setup(content, company_generator, tag_effect_system, seed_base + 123, initial_company_count)
@@ -292,6 +573,7 @@ func _simulate_run(
 	_free_node_if_valid(news_manager)
 	_free_node_if_valid(company_generator)
 	_free_node_if_valid(tag_effect_system)
+	_active_scenario = {}
 	return row
 
 
@@ -422,7 +704,7 @@ func _apply_weekly_small_trades(
 		var budget := maxf(20.0, portfolio.cash * 0.08)
 		var amount := int(floor(budget / maxf(0.1, company.current_price * buy_multiplier)))
 		amount = maxi(1, amount)
-		portfolio.buy_shares(company, amount, buy_multiplier, trade_day)
+		_portfolio_buy_shares(portfolio, company, amount, buy_multiplier, trade_day)
 	elif trade_day % 7 == 2:
 		var holding_ticker := _pick_random_holding_ticker(portfolio, rng)
 		if holding_ticker.is_empty():
@@ -435,7 +717,7 @@ func _apply_weekly_small_trades(
 			return
 		var sell_amount := maxi(1, int(ceil(float(held_amount) * 0.60)))
 		sell_amount = mini(sell_amount, held_amount)
-		portfolio.sell_shares(holding_company, sell_amount, upgrade_manager.get_sell_price_multiplier(), trade_day)
+		_portfolio_sell_shares(portfolio, holding_company, sell_amount, upgrade_manager.get_sell_price_multiplier(), trade_day)
 
 
 func _apply_conservative_trades(
@@ -604,7 +886,7 @@ func _apply_active_rotator_trades(
 		var budget := portfolio.cash * 0.25
 		var amount := int(floor(budget / maxf(0.1, target.current_price * buy_multiplier)))
 		if amount >= 1:
-			portfolio.buy_shares(target, amount, buy_multiplier, trade_day)
+			_portfolio_buy_shares(portfolio, target, amount, buy_multiplier, trade_day)
 
 	var holding_tickers: Array = portfolio.holdings.keys()
 	for ticker_variant in holding_tickers:
@@ -619,7 +901,7 @@ func _apply_active_rotator_trades(
 			continue
 		var sell_amount := maxi(1, int(ceil(float(held_amount) * 0.40)))
 		sell_amount = mini(sell_amount, held_amount)
-		portfolio.sell_shares(company, sell_amount, upgrade_manager.get_sell_price_multiplier(), trade_day)
+		_portfolio_sell_shares(portfolio, company, sell_amount, upgrade_manager.get_sell_price_multiplier(), trade_day)
 
 
 func _rank_companies_by_signal(active_companies: Array[Company]) -> Array[Company]:
@@ -652,7 +934,7 @@ func _buy_by_budget(
 	var amount := int(floor(maxf(0.0, budget) / unit_price))
 	if amount <= 0:
 		return
-	portfolio.buy_shares(company, amount, buy_multiplier, trade_day)
+	_portfolio_buy_shares(portfolio, company, amount, buy_multiplier, trade_day)
 
 
 func _sell_fraction(
@@ -670,7 +952,94 @@ func _sell_fraction(
 	var safe_fraction := clampf(fraction, 0.01, 1.0)
 	var sell_amount := maxi(1, int(ceil(float(held_amount) * safe_fraction)))
 	sell_amount = mini(sell_amount, held_amount)
-	portfolio.sell_shares(company, sell_amount, sell_multiplier, trade_day)
+	_portfolio_sell_shares(portfolio, company, sell_amount, sell_multiplier, trade_day)
+
+
+func _portfolio_buy_shares(
+	portfolio: PlayerPortfolio,
+	company: Company,
+	amount: int,
+	price_multiplier: float,
+	day_index: int
+) -> void:
+	if portfolio == null or company == null or amount <= 0:
+		return
+	var buy_fee := float(_active_scenario.get("buy_fee", BUY_TRANSACTION_FEE_RATE))
+	if absf(buy_fee - BUY_TRANSACTION_FEE_RATE) <= EPSILON:
+		portfolio.buy_shares(company, amount, price_multiplier, day_index)
+		return
+	if not company.is_tradeable():
+		return
+
+	var unit_price := company.current_price * maxf(0.1, price_multiplier)
+	var effective_buy_unit_price := unit_price * (1.0 + buy_fee)
+	var available_debt_capacity := maxf(0.0, PlayerPortfolio.MAX_TRADING_DEBT - portfolio.debt)
+	var max_affordable_budget := portfolio.cash + available_debt_capacity
+	if max_affordable_budget < effective_buy_unit_price:
+		return
+
+	var max_affordable_amount := int(floor(max_affordable_budget / effective_buy_unit_price))
+	var final_amount := mini(amount, max_affordable_amount)
+	if final_amount <= 0:
+		return
+
+	var gross_total_cost: float = unit_price * float(final_amount)
+	var total_cost: float = gross_total_cost * (1.0 + buy_fee)
+	if portfolio.cash >= total_cost:
+		portfolio.cash -= total_cost
+	else:
+		var uncovered: float = total_cost - portfolio.cash
+		portfolio.cash = 0.0
+		portfolio.debt += uncovered
+
+	var previous_shares := int(portfolio.holdings.get(company.ticker, 0))
+	portfolio.holdings[company.ticker] = previous_shares + final_amount
+	portfolio._register_trade_marker(company.ticker, "buy", day_index, final_amount, company.current_price)
+
+
+func _portfolio_sell_shares(
+	portfolio: PlayerPortfolio,
+	company: Company,
+	amount: int,
+	price_multiplier: float,
+	day_index: int
+) -> void:
+	if portfolio == null or company == null or amount <= 0:
+		return
+	var sell_fee := float(_active_scenario.get("sell_fee", SELL_TRANSACTION_FEE_RATE))
+	if absf(sell_fee - SELL_TRANSACTION_FEE_RATE) <= EPSILON:
+		portfolio.sell_shares(company, amount, price_multiplier, day_index)
+		return
+
+	var owned := int(portfolio.holdings.get(company.ticker, 0))
+	if owned <= 0:
+		return
+	var final_amount := mini(amount, owned)
+	if final_amount <= 0:
+		return
+
+	var sell_unit_price := company.current_price * maxf(0.1, price_multiplier)
+	var intraday_remaining := portfolio.get_intraday_unsold_amount(company.ticker, day_index)
+	var old_shares_remaining := maxi(0, owned - intraday_remaining)
+	var sell_from_old := mini(final_amount, old_shares_remaining)
+	var intraday_amount := mini(final_amount - sell_from_old, intraday_remaining)
+	var regular_amount := final_amount - intraday_amount
+
+	var gross_value_regular := sell_unit_price * float(regular_amount)
+	var gross_value_intraday := sell_unit_price * float(intraday_amount) * (1.0 - INTRADAY_EXIT_PENALTY_RATE)
+	var gross_value_before_fees := gross_value_regular + gross_value_intraday
+	var net_value: float = gross_value_before_fees * (1.0 - sell_fee)
+	portfolio.cash += net_value
+	portfolio.holdings[company.ticker] = owned - final_amount
+	if int(portfolio.holdings[company.ticker]) <= 0:
+		portfolio.holdings.erase(company.ticker)
+
+	if portfolio.debt > 0.0 and portfolio.cash > 0.0:
+		var repayment: float = minf(portfolio.debt, portfolio.cash)
+		portfolio.debt -= repayment
+		portfolio.cash -= repayment
+
+	portfolio._register_trade_marker(company.ticker, "sell", day_index, final_amount, company.current_price)
 
 
 func _pick_worst_holding_ticker(portfolio: PlayerPortfolio, market_manager: MarketManager) -> String:
@@ -989,6 +1358,216 @@ func _std_dev(values: Array[float]) -> float:
 	return sqrt(variance)
 
 
+func _print_scenario_report(
+	section_label: String,
+	scenario: Dictionary,
+	rows: Array[Dictionary],
+	strategy_names: Array[String],
+	max_days: int
+) -> void:
+	print("")
+	print("ESCENARIO_%s" % section_label.to_upper().replace(" ", "_"))
+	print("label=%s price_scale=%.3f listing_floor=%.3f hard_bankruptcy_floor=%.3f risk_bankruptcy_floor=%.3f panic_bankruptcy_floor=%.3f min_price_floor=%.3f" % [
+		str(scenario.get("label", section_label)),
+		float(scenario.get("price_scale", PRICE_DENOMINATION_SCALE)),
+		float(scenario.get("listing_floor", COMPANY_LISTING_PRICE_FLOOR)),
+		float(scenario.get("hard_bankruptcy_floor", NATURAL_BANKRUPTCY_HARD_FLOOR)),
+		float(scenario.get("risk_bankruptcy_floor", NATURAL_BANKRUPTCY_RISK_FLOOR)),
+		float(scenario.get("panic_bankruptcy_floor", NATURAL_BANKRUPTCY_PANIC_FLOOR)),
+		float(scenario.get("price_min_floor", PRICE_MIN_FLOOR))
+	])
+	print("impact_scale=%.3f noise_scale=%.3f daily_cap=%.3f buy_fee=%.4f sell_fee=%.4f intraday_penalty=%.4f" % [
+		float(scenario.get("news_impact_scale", NEWS_IMPACT_SCALE)),
+		float(scenario.get("noise_scale", MARKET_NOISE_SCALE)),
+		float(scenario.get("daily_cap", DAILY_CHANGE_CAP)),
+		float(scenario.get("buy_fee", BUY_TRANSACTION_FEE_RATE)),
+		float(scenario.get("sell_fee", SELL_TRANSACTION_FEE_RATE)),
+		INTRADAY_EXIT_PENALTY_RATE
+	])
+	_print_market_table(rows, strategy_names)
+	_print_market_summary(rows)
+	_print_strategy_summary(rows, strategy_names, max_days)
+
+
+func _print_scenario_comparison(
+	baseline_label: String,
+	baseline_rows: Array[Dictionary],
+	candidate_label: String,
+	candidate_rows: Array[Dictionary],
+	strategy_names: Array[String],
+	max_days: int
+) -> Dictionary:
+	var baseline_market := _collect_market_metrics(baseline_rows)
+	var candidate_market := _collect_market_metrics(candidate_rows)
+	var baseline_strategies := _collect_strategy_metrics(baseline_rows, strategy_names, max_days)
+	var candidate_strategies := _collect_strategy_metrics(candidate_rows, strategy_names, max_days)
+
+	print("")
+	print("COMPARACION_BASELINE_VS_CANDIDATO")
+	print("baseline=%s candidato=%s" % [baseline_label, candidate_label])
+	print("| Estrategia | Superv_base | Superv_cand | Delta_pp | P10_base | P10_cand | Delta_P10 | Vol_base | Vol_cand | Ratio_vol |")
+	print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+	for strategy_name in strategy_names:
+		var base_row: Dictionary = baseline_strategies.get(strategy_name, {})
+		var cand_row: Dictionary = candidate_strategies.get(strategy_name, {})
+		var base_survival := float(base_row.get("survival_ratio", 0.0))
+		var cand_survival := float(cand_row.get("survival_ratio", 0.0))
+		var base_p10 := float(base_row.get("p10_net", 0.0))
+		var cand_p10 := float(cand_row.get("p10_net", 0.0))
+		var base_vol := float(base_row.get("avg_daily_vol", 0.0))
+		var cand_vol := float(cand_row.get("avg_daily_vol", 0.0))
+		var vol_ratio := cand_vol / maxf(EPSILON, base_vol)
+		print("| %s | %.1f%% | %.1f%% | %+0.1fpp | %s | %s | %s | %s | %s | %.2fx |" % [
+			strategy_name,
+			base_survival * 100.0,
+			cand_survival * 100.0,
+			(cand_survival - base_survival) * 100.0,
+			_money_text(base_p10),
+			_money_text(cand_p10),
+			_money_signed(cand_p10 - base_p10),
+			_pct_text(base_vol),
+			_pct_text(cand_vol),
+			vol_ratio
+		])
+
+	var baseline_avg_bankrupt := float(baseline_market.get("avg_bankrupt", 0.0))
+	var candidate_avg_bankrupt := float(candidate_market.get("avg_bankrupt", 0.0))
+	var baseline_avg_dispersion := float(baseline_market.get("avg_dispersion", 0.0))
+	var candidate_avg_dispersion := float(candidate_market.get("avg_dispersion", 0.0))
+	print("")
+	print("DELTA_MERCADO avg_bankrupt=%+.2f avg_dispersion=%+.3f ratio_dispersion=%.2fx" % [
+		candidate_avg_bankrupt - baseline_avg_bankrupt,
+		candidate_avg_dispersion - baseline_avg_dispersion,
+		candidate_avg_dispersion / maxf(EPSILON, baseline_avg_dispersion)
+	])
+
+	var failures: Array[String] = []
+	var max_survival_drop_pp := 12.0
+	var max_p10_drop := 180.0
+	var min_vol_ratio := 0.55
+	var max_vol_ratio := 1.70
+	var max_bankrupt_delta := 1.40
+	var max_dispersion_ratio := 1.80
+	for strategy_name in strategy_names:
+		var base_row: Dictionary = baseline_strategies.get(strategy_name, {})
+		var cand_row: Dictionary = candidate_strategies.get(strategy_name, {})
+		var survival_delta_pp := (float(cand_row.get("survival_ratio", 0.0)) - float(base_row.get("survival_ratio", 0.0))) * 100.0
+		if survival_delta_pp < -max_survival_drop_pp:
+			failures.append("%s supervivencia cae %.1fpp (limite -%.1fpp)" % [strategy_name, survival_delta_pp, max_survival_drop_pp])
+		var p10_delta := float(cand_row.get("p10_net", 0.0)) - float(base_row.get("p10_net", 0.0))
+		if p10_delta < -max_p10_drop:
+			failures.append("%s p10 cae %s (limite -%s)" % [strategy_name, _money_text(-p10_delta), _money_text(max_p10_drop)])
+		var base_vol := float(base_row.get("avg_daily_vol", 0.0))
+		var cand_vol := float(cand_row.get("avg_daily_vol", 0.0))
+		var vol_ratio := cand_vol / maxf(EPSILON, base_vol)
+		if vol_ratio < min_vol_ratio or vol_ratio > max_vol_ratio:
+			failures.append("%s ratio_vol fuera de rango %.2fx (%.2f - %.2f)" % [strategy_name, vol_ratio, min_vol_ratio, max_vol_ratio])
+
+	var bankrupt_delta := candidate_avg_bankrupt - baseline_avg_bankrupt
+	if bankrupt_delta > max_bankrupt_delta:
+		failures.append("avg_bankrupt sube %.2f (limite +%.2f)" % [bankrupt_delta, max_bankrupt_delta])
+	var dispersion_ratio := candidate_avg_dispersion / maxf(EPSILON, baseline_avg_dispersion)
+	if dispersion_ratio > max_dispersion_ratio:
+		failures.append("ratio_dispersion %.2fx supera limite %.2fx" % [dispersion_ratio, max_dispersion_ratio])
+
+	print("")
+	print("GUARDRAILS")
+	print("  - supervivencia por estrategia: delta >= -%.1fpp" % max_survival_drop_pp)
+	print("  - p10 networth por estrategia: delta >= -%s" % _money_text(max_p10_drop))
+	print("  - ratio vol diaria por estrategia: %.2fx - %.2fx" % [min_vol_ratio, max_vol_ratio])
+	print("  - avg_bankrupt mercado: delta <= +%.2f" % max_bankrupt_delta)
+	print("  - ratio_dispersion mercado: <= %.2fx" % max_dispersion_ratio)
+	if failures.is_empty():
+		print("GUARDRAILS_STATUS=PASS")
+	else:
+		print("GUARDRAILS_STATUS=FAIL")
+		for failure in failures:
+			print("  - %s" % failure)
+
+	return {
+		"pass": failures.is_empty(),
+		"failures": failures
+	}
+
+
+func _collect_market_metrics(rows: Array[Dictionary]) -> Dictionary:
+	var total_final_companies := 0.0
+	var total_active := 0.0
+	var total_bankrupt := 0.0
+	var total_merged := 0.0
+	var total_dispersion := 0.0
+	var best_run_idx := -1
+	var best_run_gain := -INF
+	var worst_run_idx := -1
+	var worst_run_drop := INF
+	for row in rows:
+		total_final_companies += float(row.get("total_companies", 0))
+		total_active += float(row.get("active", 0))
+		total_bankrupt += float(row.get("bankrupt", 0))
+		total_merged += float(row.get("merged", 0))
+		total_dispersion += float(row.get("dispersion", 0.0))
+		if float(row.get("best_return", -INF)) > best_run_gain:
+			best_run_gain = float(row.get("best_return", -INF))
+			best_run_idx = int(row.get("run", -1))
+		if float(row.get("worst_return", INF)) < worst_run_drop:
+			worst_run_drop = float(row.get("worst_return", INF))
+			worst_run_idx = int(row.get("run", -1))
+	var run_count := maxf(1.0, float(rows.size()))
+	return {
+		"run_count": rows.size(),
+		"avg_total_companies": total_final_companies / run_count,
+		"avg_active": total_active / run_count,
+		"avg_bankrupt": total_bankrupt / run_count,
+		"avg_merged": total_merged / run_count,
+		"avg_dispersion": total_dispersion / run_count,
+		"best_run_idx": best_run_idx,
+		"best_run_gain": best_run_gain,
+		"worst_run_idx": worst_run_idx,
+		"worst_run_drop": worst_run_drop
+	}
+
+
+func _collect_strategy_metrics(rows: Array[Dictionary], strategy_names: Array[String], max_days: int) -> Dictionary:
+	var result := {}
+	for strategy_name in strategy_names:
+		var survived := 0
+		var finish_days: Array[float] = []
+		var net_worths: Array[float] = []
+		var debts: Array[float] = []
+		var trades: Array[float] = []
+		var drawdowns: Array[float] = []
+		var volatilities: Array[float] = []
+		var turnovers: Array[float] = []
+
+		for row in rows:
+			var state: Dictionary = (row["strategy_states"] as Dictionary)[strategy_name]
+			if bool(state["alive"]):
+				survived += 1
+			finish_days.append(float(state["defeat_day"]))
+			net_worths.append(float(state["final_net_worth"]))
+			debts.append(float(state["final_debt"]))
+			trades.append(float(state["total_trades"]))
+			drawdowns.append(float(state["max_drawdown"]))
+			volatilities.append(float(state["daily_return_volatility"]))
+			turnovers.append(float(state["turnover_ratio"]))
+
+		var survival_ratio := float(survived) / maxf(1.0, float(rows.size()))
+		result[strategy_name] = {
+			"survival_ratio": survival_ratio,
+			"avg_finish_day": _mean(finish_days),
+			"median_net": _percentile(net_worths, 0.50),
+			"p10_net": _percentile(net_worths, 0.10),
+			"p90_net": _percentile(net_worths, 0.90),
+			"avg_drawdown": _mean(drawdowns),
+			"avg_daily_vol": _mean(volatilities),
+			"avg_turnover": _mean(turnovers),
+			"avg_debt": _mean(debts),
+			"avg_trades": _mean(trades),
+			"max_days": max_days
+		}
+	return result
+
+
 func _print_market_table(rows: Array[Dictionary], strategy_names: Array[String]) -> void:
 	print("")
 	print("MUESTRA DE RUNS (primeras %d)" % mini(MAX_TABLE_ROWS, rows.size()))
@@ -1188,6 +1767,12 @@ func _pct_text(value: float) -> String:
 
 func _money_text(value: float) -> String:
 	return "$%.2f" % value
+
+
+func _money_signed(value: float) -> String:
+	if value >= 0.0:
+		return "+$%.2f" % value
+	return "-$%.2f" % absf(value)
 
 
 func _is_valid_strategy(value: String) -> bool:
