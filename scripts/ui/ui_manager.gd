@@ -111,15 +111,15 @@ var _tutorial_state: Dictionary = {"active": false}
 @onready var _debt_risk_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel/DebtVBox/DebtRiskLabel
 @onready var _invoice_preview_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel/DebtVBox/InvoicePreviewLabel
 @onready var _event_log_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/EventLogPanel/EventLogVBox/EventLogScroll/EventLogLabel
-@onready var _desk_backdrop_texture: TextureRect = $DeskBackdrop/DeskBackdropTexture
-@onready var _monitor_frame: Control = $MonitorFrame
-@onready var _monitor_frame_texture: TextureRect = $MonitorFrame/MonitorFrameTexture
-@onready var _monitor_overlay: Control = $MonitorOverlay
-@onready var _monitor_overlay_texture: TextureRect = $MonitorOverlay/MonitorOverlayTexture
-@onready var _newspaper_zone: PanelContainer = $DeskDocs/NewspaperZone
-@onready var _newspaper_texture: TextureRect = $DeskDocs/NewspaperZone/NewspaperTexture
-@onready var _invoice_zone: PanelContainer = $DeskDocs/InvoiceZone
-@onready var _invoice_texture: TextureRect = $DeskDocs/InvoiceZone/InvoiceTexture
+@onready var _desk_backdrop_texture: TextureRect = get_node_or_null("DeskBackdrop/DeskBackdropTexture") as TextureRect
+@onready var _monitor_frame: Control = get_node_or_null("MonitorFrame") as Control
+@onready var _monitor_frame_texture: TextureRect = get_node_or_null("MonitorFrame/MonitorFrameTexture") as TextureRect
+@onready var _monitor_overlay: Control = get_node_or_null("MonitorOverlay") as Control
+@onready var _monitor_overlay_texture: TextureRect = get_node_or_null("MonitorOverlay/MonitorOverlayTexture") as TextureRect
+@onready var _newspaper_zone: PanelContainer = get_node_or_null("DeskDocs/NewspaperZone") as PanelContainer
+@onready var _newspaper_texture: TextureRect = get_node_or_null("DeskDocs/NewspaperZone/NewspaperTexture") as TextureRect
+@onready var _invoice_zone: PanelContainer = get_node_or_null("DeskDocs/InvoiceZone") as PanelContainer
+@onready var _invoice_texture: TextureRect = get_node_or_null("DeskDocs/InvoiceZone/InvoiceTexture") as TextureRect
 @onready var _toast_panel: PanelContainer = $ToastPanel
 @onready var _toast_label: Label = $ToastPanel/ToastMargin/ToastLabel
 @onready var _tutorial_overlay = $TutorialOverlay
@@ -859,6 +859,9 @@ func _apply_diegetic_shell_styles() -> void:
 		monitor_style.shadow_size = 22
 		monitor_panel.add_theme_stylebox_override("panel", monitor_style)
 
+	if _newspaper_zone == null or _invoice_zone == null:
+		return
+
 	var paper_style := StyleBoxFlat.new()
 	paper_style.bg_color = Color(0.91, 0.87, 0.74, 0.55)
 	paper_style.border_color = Color(0.46, 0.39, 0.24, 0.65)
@@ -885,8 +888,10 @@ func _apply_diegetic_artwork() -> void:
 
 	var newspaper_loaded := _assign_png_texture(_newspaper_texture, NEWSPAPER_TEXTURE_PATH)
 	var invoice_loaded := _assign_png_texture(_invoice_texture, INVOICE_TEXTURE_PATH)
-	_newspaper_zone.visible = newspaper_loaded
-	_invoice_zone.visible = invoice_loaded
+	if _newspaper_zone != null:
+		_newspaper_zone.visible = newspaper_loaded
+	if _invoice_zone != null:
+		_invoice_zone.visible = invoice_loaded
 
 
 func _assign_png_texture(target: TextureRect, png_path: String) -> bool:
@@ -934,6 +939,8 @@ func _tutorial_blocked_hint_message(fallback: String) -> String:
 
 
 func _setup_diegetic_layout() -> void:
+	if _monitor_frame == null or _monitor_overlay == null or _newspaper_zone == null or _invoice_zone == null:
+		return
 	_diegetic_desk_layout = DIEGETIC_DESK_LAYOUT.new()
 	_diegetic_desk_layout.setup(
 		self,
