@@ -29,6 +29,7 @@ const UI_TRADE_ACTION_CONTROLLER := preload("res://scripts/ui/ui_trade_action_co
 const UI_MARKET_SELECTION_CONTROLLER := preload("res://scripts/ui/ui_market_selection_controller.gd")
 const UI_HOTKEY_INPUT_CONTROLLER := preload("res://scripts/ui/ui_hotkey_input_controller.gd")
 const UI_MODAL_LOCKS_CONTROLLER := preload("res://scripts/ui/ui_modal_locks_controller.gd")
+const WEEKLY_INVOICE_PRESENTER := preload("res://scripts/ui/weekly_invoice_presenter.gd")
 const TUTORIAL_OVERLAY_CONTROLLER := preload("res://scripts/ui/tutorial_overlay_controller.gd")
 const TUTORIAL_TARGET_RECT_RESOLVER := preload("res://scripts/ui/tutorial_target_rect_resolver.gd")
 const UI_THEME_TOKENS := preload("res://scripts/ui/ui_theme_tokens.gd")
@@ -77,6 +78,13 @@ var _newspaper_runtime_content: VBoxContainer = null
 var _invoice_runtime_debt_risk_label: Label = null
 var _invoice_runtime_invoice_label: Label = null
 var _invoice_runtime_event_log_label: Label = null
+var _invoice_runtime_weekly_panel: PanelContainer = null
+var _invoice_runtime_weekly_title: Label = null
+var _invoice_runtime_weekly_summary: Label = null
+var _invoice_runtime_weekly_amounts: Label = null
+var _invoice_runtime_weekly_debt: Label = null
+var _invoice_runtime_weekly_risk: Label = null
+var _invoice_runtime_weekly_continue_button: Button = null
 var _zone_contract_enabled: bool = false
 
 @onready var _main_margin: MarginContainer = $MainMargin
@@ -164,7 +172,10 @@ func _ready() -> void:
 	if _news_history_button != null:
 		_news_history_button.pressed.connect(_on_news_history_button_pressed)
 	_back_to_menu_button.pressed.connect(_on_back_to_menu_pressed)
-	_weekly_recap_continue_button.pressed.connect(_on_weekly_recap_continue_pressed)
+	if _weekly_recap_continue_button != null:
+		_weekly_recap_continue_button.pressed.connect(_on_weekly_recap_continue_pressed)
+	if _invoice_runtime_weekly_continue_button != null:
+		_invoice_runtime_weekly_continue_button.pressed.connect(_on_weekly_recap_continue_pressed)
 	resized.connect(_on_ui_resized)
 	_history_text.visible = false
 	_tutorial_overlay.visible = false
@@ -195,6 +206,9 @@ func _ready() -> void:
 		_quantity_plus_twenty_five_button,
 		_quantity_max_button
 	)
+	var weekly_invoice_visibility_callback := Callable()
+	if _invoice_runtime_weekly_panel != null:
+		weekly_invoice_visibility_callback = Callable(self, "_set_weekly_invoice_visibility")
 	_modal_locks_controller = UI_MODAL_LOCKS_CONTROLLER.new()
 	_modal_locks_controller.setup(
 		_end_run_panel,
@@ -206,7 +220,9 @@ func _ready() -> void:
 		_weekly_recap_panel,
 		_weekly_recap_title,
 		_weekly_recap_body,
-		Callable(self, "_set_action_buttons_enabled")
+		Callable(self, "_set_action_buttons_enabled"),
+		_invoice_runtime_weekly_panel,
+		weekly_invoice_visibility_callback
 	)
 	_market_selection_controller = UI_MARKET_SELECTION_CONTROLLER.new()
 	_market_selection_controller.set_tutorial_state(_tutorial_state)
@@ -364,16 +380,71 @@ func hide_weekly_upgrade_choices() -> void:
 	_modal_locks_controller.hide_weekly_upgrade_choices()
 
 
-func show_weekly_recap(week_index: int, summary_text: String) -> void:
+func show_weekly_recap(
+	week_index: int,
+	summary_text: String,
+	weekly_recap_data: Dictionary = {},
+	debt_feedback_snapshot: Dictionary = {}
+) -> void:
 	if _modal_locks_controller == null:
 		return
-	_modal_locks_controller.show_weekly_recap(week_index, summary_text)
+	var invoice_model := WEEKLY_INVOICE_PRESENTER.build_model(
+		week_index,
+		weekly_recap_data,
+		debt_feedback_snapshot
+	)
+	_apply_weekly_invoice_model(invoice_model)
+	_modal_locks_controller.show_weekly_recap(
+		week_index,
+		summary_text,
+		weekly_recap_data,
+		debt_feedback_snapshot
+	)
 
 
 func hide_weekly_recap() -> void:
 	if _modal_locks_controller == null:
 		return
 	_modal_locks_controller.hide_weekly_recap()
+
+
+func _apply_weekly_invoice_model(invoice_model: Dictionary) -> void:
+	if _invoice_runtime_weekly_title != null:
+		_invoice_runtime_weekly_title.text = str(invoice_model.get("title", "Factura Semanal"))
+	if _invoice_runtime_weekly_summary != null:
+		_invoice_runtime_weekly_summary.text = str(invoice_model.get("summary_text", ""))
+	if _invoice_runtime_weekly_amounts != null:
+		_invoice_runtime_weekly_amounts.text = str(invoice_model.get("amounts_text", ""))
+	if _invoice_runtime_weekly_debt != null:
+		_invoice_runtime_weekly_debt.text = str(invoice_model.get("debt_text", ""))
+	if _invoice_runtime_weekly_risk != null:
+		_invoice_runtime_weekly_risk.text = str(invoice_model.get("risk_text", ""))
+		_invoice_runtime_weekly_risk.remove_theme_color_override("font_color")
+		_invoice_runtime_weekly_risk.add_theme_color_override(
+			"font_color",
+			invoice_model.get("risk_color", Color(0.73, 0.93, 0.76))
+		)
+	if _invoice_runtime_weekly_continue_button != null:
+		_invoice_runtime_weekly_continue_button.text = str(invoice_model.get("continue_text", "Confirmar factura"))
+	if _invoice_runtime_weekly_panel != null:
+		var panel_style := StyleBoxFlat.new()
+		panel_style.bg_color = invoice_model.get("state_color", Color(0.74, 0.90, 0.78, 0.92))
+		panel_style.border_color = Color(0.21, 0.32, 0.21, 0.80)
+		panel_style.border_width_left = 2
+		panel_style.border_width_top = 2
+		panel_style.border_width_right = 2
+		panel_style.border_width_bottom = 2
+		panel_style.corner_radius_top_left = 8
+		panel_style.corner_radius_top_right = 8
+		panel_style.corner_radius_bottom_left = 8
+		panel_style.corner_radius_bottom_right = 8
+		_invoice_runtime_weekly_panel.add_theme_stylebox_override("panel", panel_style)
+
+
+func _set_weekly_invoice_visibility(visible: bool) -> void:
+	if _invoice_runtime_weekly_panel == null:
+		return
+	_invoice_runtime_weekly_panel.visible = visible
 
 
 func _connect_manager_signals() -> void:
@@ -774,7 +845,10 @@ func _apply_tutorial_visual_state() -> void:
 func _are_actions_locked() -> bool:
 	if _modal_locks_controller != null:
 		return _modal_locks_controller.are_actions_locked()
-	return _upgrade_choice_panel.visible or _weekly_recap_panel.visible or _end_run_panel.visible
+	return _upgrade_choice_panel.visible \
+		or _weekly_recap_panel.visible \
+		or (_invoice_runtime_weekly_panel != null and _invoice_runtime_weekly_panel.visible) \
+		or _end_run_panel.visible
 
 
 func _on_ui_resized() -> void:
@@ -942,6 +1016,73 @@ func _build_diegetic_runtime_zones() -> void:
 			invoice_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 			invoice_vbox.add_theme_constant_override("separation", 5)
 
+			var weekly_invoice_panel := PanelContainer.new()
+			weekly_invoice_panel.name = "WeeklyInvoicePanel"
+			weekly_invoice_panel.visible = false
+			weekly_invoice_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+
+			var weekly_invoice_style := StyleBoxFlat.new()
+			weekly_invoice_style.bg_color = Color(0.74, 0.90, 0.78, 0.92)
+			weekly_invoice_style.border_color = Color(0.21, 0.32, 0.21, 0.80)
+			weekly_invoice_style.border_width_left = 2
+			weekly_invoice_style.border_width_top = 2
+			weekly_invoice_style.border_width_right = 2
+			weekly_invoice_style.border_width_bottom = 2
+			weekly_invoice_style.corner_radius_top_left = 8
+			weekly_invoice_style.corner_radius_top_right = 8
+			weekly_invoice_style.corner_radius_bottom_left = 8
+			weekly_invoice_style.corner_radius_bottom_right = 8
+			weekly_invoice_panel.add_theme_stylebox_override("panel", weekly_invoice_style)
+
+			var weekly_invoice_margin := MarginContainer.new()
+			weekly_invoice_margin.name = "WeeklyInvoiceMargin"
+			weekly_invoice_margin.add_theme_constant_override("margin_left", 9)
+			weekly_invoice_margin.add_theme_constant_override("margin_top", 8)
+			weekly_invoice_margin.add_theme_constant_override("margin_right", 9)
+			weekly_invoice_margin.add_theme_constant_override("margin_bottom", 8)
+
+			var weekly_invoice_vbox := VBoxContainer.new()
+			weekly_invoice_vbox.name = "WeeklyInvoiceVBox"
+			weekly_invoice_vbox.add_theme_constant_override("separation", 4)
+
+			var weekly_invoice_title := Label.new()
+			weekly_invoice_title.name = "WeeklyInvoiceTitle"
+			weekly_invoice_title.add_theme_font_size_override("font_size", 19)
+			weekly_invoice_title.text = "Factura Semanal"
+
+			var weekly_invoice_summary := Label.new()
+			weekly_invoice_summary.name = "WeeklyInvoiceSummary"
+			weekly_invoice_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			weekly_invoice_summary.text = "Sin cobro semanal pendiente."
+
+			var weekly_invoice_amounts := Label.new()
+			weekly_invoice_amounts.name = "WeeklyInvoiceAmounts"
+			weekly_invoice_amounts.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			weekly_invoice_amounts.text = "Base: $0.00 | Actividad: $0.00 | Total: $0.00"
+
+			var weekly_invoice_debt := Label.new()
+			weekly_invoice_debt.name = "WeeklyInvoiceDebt"
+			weekly_invoice_debt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			weekly_invoice_debt.text = "Deuda: $0.00 / $1000.00 (uso 0%)."
+
+			var weekly_invoice_risk := Label.new()
+			weekly_invoice_risk.name = "WeeklyInvoiceRisk"
+			weekly_invoice_risk.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			weekly_invoice_risk.text = "Riesgo: Bajo. Sin alertas."
+
+			var weekly_invoice_continue_button := Button.new()
+			weekly_invoice_continue_button.name = "WeeklyInvoiceContinueButton"
+			weekly_invoice_continue_button.text = "Confirmar factura"
+
+			weekly_invoice_vbox.add_child(weekly_invoice_title)
+			weekly_invoice_vbox.add_child(weekly_invoice_summary)
+			weekly_invoice_vbox.add_child(weekly_invoice_amounts)
+			weekly_invoice_vbox.add_child(weekly_invoice_debt)
+			weekly_invoice_vbox.add_child(weekly_invoice_risk)
+			weekly_invoice_vbox.add_child(weekly_invoice_continue_button)
+			weekly_invoice_margin.add_child(weekly_invoice_vbox)
+			weekly_invoice_panel.add_child(weekly_invoice_margin)
+
 			var debt_risk_label := Label.new()
 			debt_risk_label.name = "DebtRiskLabel"
 			debt_risk_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -968,6 +1109,7 @@ func _build_diegetic_runtime_zones() -> void:
 			event_log_label.text = "Sin eventos importantes todavia."
 
 			event_scroll.add_child(event_log_label)
+			invoice_vbox.add_child(weekly_invoice_panel)
 			invoice_vbox.add_child(debt_risk_label)
 			invoice_vbox.add_child(invoice_label)
 			invoice_vbox.add_child(event_title)
@@ -975,6 +1117,13 @@ func _build_diegetic_runtime_zones() -> void:
 			invoice_runtime_margin.add_child(invoice_vbox)
 			_invoice_zone.add_child(invoice_runtime_margin)
 		_invoice_runtime = invoice_runtime_margin
+		_invoice_runtime_weekly_panel = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel") as PanelContainer
+		_invoice_runtime_weekly_title = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceTitle") as Label
+		_invoice_runtime_weekly_summary = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceSummary") as Label
+		_invoice_runtime_weekly_amounts = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceAmounts") as Label
+		_invoice_runtime_weekly_debt = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceDebt") as Label
+		_invoice_runtime_weekly_risk = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceRisk") as Label
+		_invoice_runtime_weekly_continue_button = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceContinueButton") as Button
 		_invoice_runtime_debt_risk_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/DebtRiskLabel") as Label
 		_invoice_runtime_invoice_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/InvoicePreviewLabel") as Label
 		_invoice_runtime_event_log_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/EventLogScroll/EventLogLabel") as Label

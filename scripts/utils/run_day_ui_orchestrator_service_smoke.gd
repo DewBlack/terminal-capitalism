@@ -74,10 +74,13 @@ func _run_weekly_recap_outcome_case(failures: Array[String]) -> void:
 		failures.append("recap_text debe incluir Semana 2")
 	_expect_string(
 		str(outcome.get("status_message", "")),
-		"Dia 7 cerrado. Revisa el resumen semanal.",
+		"Dia 7 cerrado. Revisa la factura semanal.",
 		"recap status suffix",
 		failures
 	)
+	var recap_payload: Variant = outcome.get("weekly_recap_data", {})
+	if not (recap_payload is Dictionary) or (recap_payload as Dictionary).is_empty():
+		failures.append("recap weekly_recap_data debe incluir payload de factura semanal")
 
 	_free_context(context)
 

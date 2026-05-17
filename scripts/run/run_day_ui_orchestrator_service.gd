@@ -45,6 +45,7 @@ static func build_weekly_ui_outcome(
 		"show_weekly_recap": bool(weekly_ui_flow.get("show_weekly_recap", false)),
 		"recap_week_index": int(weekly_ui_flow.get("recap_week_index", 1)),
 		"recap_text": str(weekly_ui_flow.get("recap_text", "")),
+		"weekly_recap_data": weekly_ui_flow.get("weekly_recap_data", {}),
 		"show_weekly_upgrade_choices": bool(weekly_ui_flow.get("show_weekly_upgrade_choices", false)),
 		"should_return_early": bool(weekly_ui_flow.get("should_return_early", false))
 	}

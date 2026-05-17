@@ -58,7 +58,7 @@ func _run_preflight_recap_block_case(failures: Array[String]) -> void:
 	_expect_bool(bool(branch.get("blocked", false)), true, "preflight_recap blocked", failures)
 	_expect_string(
 		str(branch.get("status_message", "")),
-		"Revisa el resumen semanal antes de continuar.",
+		"Revisa la factura semanal antes de continuar.",
 		"preflight_recap message",
 		failures
 	)

@@ -15,6 +15,9 @@ var _weekly_recap_panel: PanelContainer = null
 var _weekly_recap_title: Label = null
 var _weekly_recap_body: RichTextLabel = null
 var _set_action_buttons_enabled: Callable = Callable()
+var _weekly_invoice_document: Control = null
+var _set_weekly_invoice_visibility: Callable = Callable()
+var _weekly_invoice_visible: bool = false
 
 
 func setup(
@@ -27,7 +30,9 @@ func setup(
 	weekly_recap_panel: PanelContainer,
 	weekly_recap_title: Label,
 	weekly_recap_body: RichTextLabel,
-	set_action_buttons_enabled: Callable
+	set_action_buttons_enabled: Callable,
+	weekly_invoice_document: Control = null,
+	set_weekly_invoice_visibility: Callable = Callable()
 ) -> void:
 	_end_run_panel = end_run_panel
 	_end_run_title = end_run_title
@@ -39,6 +44,8 @@ func setup(
 	_weekly_recap_title = weekly_recap_title
 	_weekly_recap_body = weekly_recap_body
 	_set_action_buttons_enabled = set_action_buttons_enabled
+	_weekly_invoice_document = weekly_invoice_document
+	_set_weekly_invoice_visibility = set_weekly_invoice_visibility
 	reset_modal_state()
 
 
@@ -49,6 +56,7 @@ func reset_modal_state() -> void:
 		_upgrade_choice_panel.visible = false
 	if _weekly_recap_panel != null:
 		_weekly_recap_panel.visible = false
+	_set_weekly_invoice_visible(false)
 	_clear_upgrade_options()
 	_apply_action_lock_state()
 
@@ -100,7 +108,16 @@ func hide_weekly_upgrade_choices() -> void:
 	_apply_action_lock_state()
 
 
-func show_weekly_recap(week_index: int, summary_text: String) -> void:
+func show_weekly_recap(
+	week_index: int,
+	summary_text: String,
+	_weekly_recap_data: Dictionary = {},
+	_debt_snapshot: Dictionary = {}
+) -> void:
+	if _has_weekly_invoice_surface():
+		_set_weekly_invoice_visible(true)
+		_apply_action_lock_state()
+		return
 	if _weekly_recap_panel != null:
 		_weekly_recap_panel.visible = true
 	if _weekly_recap_title != null:
@@ -111,13 +128,17 @@ func show_weekly_recap(week_index: int, summary_text: String) -> void:
 
 
 func hide_weekly_recap() -> void:
+	_set_weekly_invoice_visible(false)
 	if _weekly_recap_panel != null:
 		_weekly_recap_panel.visible = false
 	_apply_action_lock_state()
 
 
 func are_actions_locked() -> bool:
-	return _is_visible(_upgrade_choice_panel) or _is_visible(_weekly_recap_panel) or _is_visible(_end_run_panel)
+	return _is_visible(_upgrade_choice_panel) \
+		or _is_visible(_weekly_recap_panel) \
+		or _weekly_invoice_visible \
+		or _is_visible(_end_run_panel)
 
 
 func _apply_action_lock_state() -> void:
@@ -131,6 +152,21 @@ func _clear_upgrade_options() -> void:
 		return
 	for child in _upgrade_options.get_children():
 		child.queue_free()
+
+
+func _has_weekly_invoice_surface() -> bool:
+	return _set_weekly_invoice_visibility.is_valid() or _weekly_invoice_document != null
+
+
+func _set_weekly_invoice_visible(visible: bool) -> void:
+	_weekly_invoice_visible = false
+	if _set_weekly_invoice_visibility.is_valid():
+		_set_weekly_invoice_visibility.call(visible)
+		_weekly_invoice_visible = visible
+		return
+	if _weekly_invoice_document != null:
+		_weekly_invoice_document.visible = visible
+		_weekly_invoice_visible = visible and _weekly_invoice_document.visible
 
 
 func _is_visible(control: Control) -> bool:
