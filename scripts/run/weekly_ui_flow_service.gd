@@ -27,8 +27,9 @@ static func build_flow(
 				news_manager,
 				weekly_recap_news_limit
 			),
+			"weekly_recap_data": weekly_recap_data.duplicate(true),
 			"show_weekly_upgrade_choices": false,
-			"status_suffix": " Revisa el resumen semanal.",
+			"status_suffix": " Revisa la factura semanal.",
 			"should_return_early": true
 		}
 
@@ -38,6 +39,7 @@ static func build_flow(
 			"show_weekly_recap": false,
 			"recap_week_index": 1,
 			"recap_text": "",
+			"weekly_recap_data": {},
 			"show_weekly_upgrade_choices": true,
 			"status_suffix": " Elige una mejora semanal.",
 			"should_return_early": false
@@ -48,6 +50,7 @@ static func build_flow(
 		"show_weekly_recap": false,
 		"recap_week_index": 1,
 		"recap_text": "",
+		"weekly_recap_data": {},
 		"show_weekly_upgrade_choices": false,
 		"status_suffix": "",
 		"should_return_early": false

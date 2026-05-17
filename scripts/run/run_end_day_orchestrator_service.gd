@@ -11,7 +11,7 @@ const RUN_LIFECYCLE_SERVICE := preload("res://scripts/run/run_lifecycle_service.
 const LOGGER := preload("res://scripts/utils/logger.gd")
 
 const TUTORIAL_ACTION_END_DAY := "end_day"
-const BLOCKED_RECAP_MESSAGE := "Revisa el resumen semanal antes de continuar."
+const BLOCKED_RECAP_MESSAGE := "Revisa la factura semanal antes de continuar."
 const BLOCKED_UPGRADE_MESSAGE := "Antes de seguir, elige una mejora semanal."
 
 

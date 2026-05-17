@@ -376,9 +376,15 @@ func _apply_end_day_ui_signals(finalize_result: Dictionary) -> void:
 		return
 	var ui_outcome: Dictionary = ui_outcome_variant
 	if bool(ui_outcome.get("show_weekly_recap", false)) and _game_ui != null:
+		var weekly_recap_data: Dictionary = {}
+		var weekly_recap_variant: Variant = ui_outcome.get("weekly_recap_data", {})
+		if weekly_recap_variant is Dictionary:
+			weekly_recap_data = (weekly_recap_variant as Dictionary).duplicate(true)
 		_game_ui.show_weekly_recap(
 			int(ui_outcome.get("recap_week_index", 1)),
-			str(ui_outcome.get("recap_text", ""))
+			str(ui_outcome.get("recap_text", "")),
+			weekly_recap_data,
+			_build_debt_feedback_snapshot()
 		)
 	if bool(ui_outcome.get("show_weekly_upgrade_choices", false)) and _game_ui != null:
 		_game_ui.show_weekly_upgrade_choices(_pending_upgrade_choices)
