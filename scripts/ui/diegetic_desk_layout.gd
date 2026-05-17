@@ -2,20 +2,22 @@ class_name DiegeticDeskLayout
 extends RefCounted
 
 const MONITOR_ASPECT_RATIO := 1.58
-const MONITOR_WIDTH_RATIO := 0.54
-const MONITOR_HEIGHT_LIMIT_RATIO := 0.82
-const MONITOR_HEIGHT_HARD_LIMIT_RATIO := 0.96
-const MONITOR_MAX_VIEWPORT_WIDTH_RATIO := 0.97
-const MONITOR_MIN_WIDTH := 760.0
-const MONITOR_MAX_WIDTH := 1320.0
-const MONITOR_VERTICAL_OFFSET_RATIO := 0.0
+const MONITOR_WIDTH_RATIO := 0.46
+const MONITOR_HEIGHT_LIMIT_RATIO := 0.72
+const MONITOR_HEIGHT_HARD_LIMIT_RATIO := 0.84
+const MONITOR_MAX_VIEWPORT_WIDTH_RATIO := 0.75
+const MONITOR_MIN_WIDTH := 620.0
+const MONITOR_MAX_WIDTH := 1080.0
+const MONITOR_VERTICAL_OFFSET_RATIO := -0.02
 
 const SCREEN_LEFT_PADDING_RATIO := 0.11
 const SCREEN_TOP_PADDING_RATIO := 0.15
 const SCREEN_RIGHT_PADDING_RATIO := 0.11
 const SCREEN_BOTTOM_PADDING_RATIO := 0.23
-const SCREEN_MIN_WIDTH_FALLBACK := 980.0
-const SCREEN_MIN_HEIGHT_FALLBACK := 560.0
+const SCREEN_MIN_WIDTH_FALLBACK := 860.0
+const SCREEN_MIN_HEIGHT_FALLBACK := 500.0
+const CONTENT_MIN_WIDTH_CAP := 980.0
+const CONTENT_MIN_HEIGHT_CAP := 620.0
 
 const DOC_ZONE_WIDTH_RATIO := 0.23
 const DOC_ZONE_ASPECT_RATIO := 0.72
@@ -127,8 +129,8 @@ func _resolve_content_min_size() -> Vector2:
 	var min_height: float = SCREEN_MIN_HEIGHT_FALLBACK
 	if _monitor_content != null:
 		var combined_min_size: Vector2 = _monitor_content.get_combined_minimum_size()
-		min_width = maxf(min_width, combined_min_size.x)
-		min_height = maxf(min_height, combined_min_size.y)
+		min_width = minf(maxf(min_width, combined_min_size.x), CONTENT_MIN_WIDTH_CAP)
+		min_height = minf(maxf(min_height, combined_min_size.y), CONTENT_MIN_HEIGHT_CAP)
 	return Vector2(min_width, min_height)
 
 
@@ -159,7 +161,7 @@ func _layout_document_zone(zone: Control, monitor_rect: Rect2, viewport_size: Ve
 		return
 	var zone_width: float = clampf(monitor_rect.size.x * DOC_ZONE_WIDTH_RATIO, 180.0, 380.0)
 	var zone_height: float = zone_width * DOC_ZONE_ASPECT_RATIO
-	var zone_top: float = monitor_rect.position.y + monitor_rect.size.y - zone_height - DOC_ZONE_BOTTOM_OFFSET
+	var zone_top: float = monitor_rect.position.y + monitor_rect.size.y * 0.58
 	var zone_left: float = monitor_rect.position.x - zone_width - DOC_ZONE_MARGIN
 	if not align_left:
 		zone_left = monitor_rect.end.x + DOC_ZONE_MARGIN
@@ -169,13 +171,14 @@ func _layout_document_zone(zone: Control, monitor_rect: Rect2, viewport_size: Ve
 	if overflows_horizontally or overflows_vertically:
 		zone_width = clampf(viewport_size.x * 0.35, 170.0, 320.0)
 		zone_height = zone_width * DOC_ZONE_ASPECT_RATIO
-		zone_top = monitor_rect.end.y + DOC_ZONE_MARGIN
+		zone_top = monitor_rect.position.y + monitor_rect.size.y * 0.62
 		if zone_top + zone_height > viewport_size.y - DOC_ZONE_MARGIN:
 			zone_top = viewport_size.y - zone_height - DOC_ZONE_MARGIN
 		if align_left:
 			zone_left = monitor_rect.position.x + DOC_ZONE_MARGIN
 		else:
 			zone_left = monitor_rect.end.x - zone_width - DOC_ZONE_MARGIN
+	zone_top = clampf(zone_top, DOC_ZONE_MARGIN, viewport_size.y - zone_height - DOC_ZONE_MARGIN)
 
 	var zone_rect := Rect2(Vector2(zone_left, zone_top), Vector2(zone_width, zone_height))
 	_apply_rect(zone, zone_rect)

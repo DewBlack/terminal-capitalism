@@ -1757,18 +1757,18 @@ func _apply_diegetic_shell_styles() -> void:
 	var monitor_panel := _monitor_frame as PanelContainer
 	if monitor_panel != null:
 		var monitor_style := StyleBoxFlat.new()
-		monitor_style.bg_color = Color(0.10, 0.11, 0.13, 0.94)
-		monitor_style.border_color = Color(0.64, 0.57, 0.45, 0.95)
-		monitor_style.border_width_left = 5
-		monitor_style.border_width_top = 5
-		monitor_style.border_width_right = 5
-		monitor_style.border_width_bottom = 10
+		monitor_style.bg_color = Color(0.08, 0.09, 0.11, 0.78)
+		monitor_style.border_color = Color(0.60, 0.54, 0.44, 0.88)
+		monitor_style.border_width_left = 4
+		monitor_style.border_width_top = 4
+		monitor_style.border_width_right = 4
+		monitor_style.border_width_bottom = 8
 		monitor_style.corner_radius_top_left = 16
 		monitor_style.corner_radius_top_right = 16
 		monitor_style.corner_radius_bottom_left = 24
 		monitor_style.corner_radius_bottom_right = 24
-		monitor_style.shadow_color = Color(0, 0, 0, 0.55)
-		monitor_style.shadow_size = 22
+		monitor_style.shadow_color = Color(0, 0, 0, 0.38)
+		monitor_style.shadow_size = 14
 		monitor_panel.add_theme_stylebox_override("panel", monitor_style)
 
 	if _newspaper_zone == null or _invoice_zone == null:
@@ -1837,7 +1837,7 @@ func _apply_crt_monitor_skin() -> void:
 		var overlay_tint_variant: Variant = profile.get("tint", Color(0.76, 0.93, 0.84, 1.0))
 		var overlay_tint: Color = overlay_tint_variant if overlay_tint_variant is Color else Color(0.76, 0.93, 0.84, 1.0)
 		var intensity: float = float(profile.get("effect_intensity", 0.52))
-		var overlay_alpha := lerpf(0.018, 0.040, clampf(intensity, 0.0, 1.0))
+		var overlay_alpha := lerpf(0.008, 0.020, clampf(intensity, 0.0, 1.0))
 		var overlay_rect := _monitor_overlay as ColorRect
 		overlay_rect.color = Color(overlay_tint.r, overlay_tint.g, overlay_tint.b, overlay_alpha)
 
