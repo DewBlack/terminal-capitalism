@@ -3,12 +3,11 @@ extends RefCounted
 
 
 func apply_visual_contract(targets: Dictionary) -> void:
-	if not bool(targets.get("enabled", false)):
-		return
-	_set_visible(targets.get("news_panel", null), false)
-	_set_visible(targets.get("feedback_panel", null), false)
-	_set_visible(targets.get("newspaper_runtime", null), true)
-	_set_visible(targets.get("invoice_runtime", null), true)
+	var contract_enabled := bool(targets.get("enabled", false))
+	_set_visible(targets.get("news_panel", null), not contract_enabled)
+	_set_visible(targets.get("feedback_panel", null), not contract_enabled)
+	_set_visible(targets.get("newspaper_runtime", null), contract_enabled)
+	_set_visible(targets.get("invoice_runtime", null), contract_enabled)
 
 
 func collect_contract_violations(targets: Dictionary) -> Array[String]:

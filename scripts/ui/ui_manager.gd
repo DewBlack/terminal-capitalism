@@ -998,8 +998,11 @@ func _resolve_content_targets() -> void:
 func _apply_zone_contract() -> void:
 	if _zone_policy == null:
 		return
+	var contract_active := _zone_contract_enabled \
+		and _is_document_zone_ready(_newspaper_zone, _newspaper_runtime) \
+		and _is_document_zone_ready(_invoice_zone, _invoice_runtime)
 	var targets := {
-		"enabled": _zone_contract_enabled,
+		"enabled": contract_active,
 		"news_panel": _news_panel,
 		"feedback_panel": _feedback_panel,
 		"newspaper_runtime": _newspaper_runtime,
@@ -1009,6 +1012,12 @@ func _apply_zone_contract() -> void:
 	var violations: Array[String] = _zone_policy.collect_contract_violations(targets)
 	for violation in violations:
 		push_warning("Zone contract violation: %s" % violation)
+
+
+func _is_document_zone_ready(zone: Control, runtime_zone: Control) -> bool:
+	if zone == null or runtime_zone == null:
+		return false
+	return zone.is_visible_in_tree() and runtime_zone.is_visible_in_tree()
 
 
 func _apply_diegetic_shell_styles() -> void:

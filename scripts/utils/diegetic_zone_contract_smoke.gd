@@ -67,6 +67,17 @@ func _run_smoke() -> void:
 		var docs_has_content := newspaper_runtime.visible or invoice_runtime.visible
 		if monitor_has_non_operational and docs_has_content:
 			failures.append("Se detecto duplicacion entre monitor y documentos diegeticos.")
+		# Si una zona diegetica desaparece (p. ej. fallo de textura en export), debe volver el fallback monitor.
+		var newspaper_zone := newspaper_runtime.get_parent() as Control
+		if newspaper_zone == null:
+			failures.append("No se pudo resolver el parent de NewsRuntime para simular fallback.")
+		else:
+			newspaper_zone.visible = false
+			ui.call("_apply_zone_contract")
+			if news_panel != null and not news_panel.visible:
+				failures.append("Fallback roto: NewsPanel no vuelve cuando falta zona diegetica.")
+			if feedback_panel != null and not feedback_panel.visible:
+				failures.append("Fallback roto: FeedbackPanel no vuelve cuando falta zona diegetica.")
 
 	ui.queue_free()
 	if failures.is_empty():
