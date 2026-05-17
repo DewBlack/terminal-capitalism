@@ -35,6 +35,7 @@ const TUTORIAL_TARGET_RECT_RESOLVER := preload("res://scripts/ui/tutorial_target
 const UI_THEME_TOKENS := preload("res://scripts/ui/ui_theme_tokens.gd")
 const DIEGETIC_DESK_LAYOUT := preload("res://scripts/ui/diegetic_desk_layout.gd")
 const DIEGETIC_ZONE_POLICY := preload("res://scripts/ui/diegetic_zone_policy.gd")
+const CRT_MONITOR_SHADER := preload("res://shaders/crt_monitor.gdshader")
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
 const MOVEMENT_REASON_MAX_CHARS := 88
@@ -86,6 +87,9 @@ var _invoice_runtime_weekly_debt: Label = null
 var _invoice_runtime_weekly_risk: Label = null
 var _invoice_runtime_weekly_continue_button: Button = null
 var _zone_contract_enabled: bool = false
+var _crt_shader_material: ShaderMaterial = null
+
+@export_enum("low", "medium", "high") var crt_profile: String = UI_THEME_TOKENS.CRT_PROFILE_FALLBACK
 
 @onready var _main_margin: MarginContainer = $MainMargin
 @onready var _day_label: Label = $MainMargin/MainVBox/HeaderBar/DayLabel
@@ -184,6 +188,7 @@ func _ready() -> void:
 	_apply_ui_tone()
 	_apply_diegetic_shell_styles()
 	_apply_diegetic_artwork()
+	_apply_crt_monitor_skin()
 	_setup_diegetic_layout()
 	_ui_feedback_controller = UI_FEEDBACK_CONTROLLER.new()
 	add_child(_ui_feedback_controller)
@@ -1211,6 +1216,36 @@ func _apply_diegetic_shell_styles() -> void:
 	invoice_style.bg_color = Color(0.86, 0.93, 0.98, 0.68)
 	invoice_style.border_color = Color(0.30, 0.46, 0.58, 0.72)
 	_invoice_zone.add_theme_stylebox_override("panel", invoice_style)
+
+
+func _apply_crt_monitor_skin() -> void:
+	_apply_crt_profile_to_chart()
+	if _monitor_overlay == null:
+		return
+	var overlay_item := _monitor_overlay as CanvasItem
+	if overlay_item == null:
+		return
+	if _crt_shader_material == null:
+		_crt_shader_material = ShaderMaterial.new()
+	_crt_shader_material.shader = CRT_MONITOR_SHADER
+
+	var profile := UI_THEME_TOKENS.get_crt_profile(crt_profile)
+	for parameter_name in profile.keys():
+		_crt_shader_material.set_shader_parameter(str(parameter_name), profile[parameter_name])
+	overlay_item.material = _crt_shader_material
+
+	if _monitor_overlay is ColorRect:
+		var overlay_tint_variant: Variant = profile.get("tint", Color(0.76, 0.93, 0.84, 1.0))
+		var overlay_tint: Color = overlay_tint_variant if overlay_tint_variant is Color else Color(0.76, 0.93, 0.84, 1.0)
+		var intensity: float = float(profile.get("effect_intensity", 0.52))
+		var overlay_alpha := lerpf(0.018, 0.040, clampf(intensity, 0.0, 1.0))
+		var overlay_rect := _monitor_overlay as ColorRect
+		overlay_rect.color = Color(overlay_tint.r, overlay_tint.g, overlay_tint.b, overlay_alpha)
+
+
+func _apply_crt_profile_to_chart() -> void:
+	if _price_chart != null and _price_chart.has_method("apply_crt_profile"):
+		_price_chart.call("apply_crt_profile", crt_profile)
 
 
 func _apply_diegetic_artwork() -> void:
