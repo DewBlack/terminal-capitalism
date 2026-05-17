@@ -53,18 +53,18 @@ func _run_smoke() -> void:
 	if event_log_label == null:
 		failures.append("No se encontro EventLogLabel en documento diegetico.")
 
-	if news_panel != null and news_panel.visible:
+	if _is_visible_in_tree(news_panel):
 		failures.append("NewsPanel sigue visible en monitor (debe estar oculto).")
-	if feedback_panel != null and feedback_panel.visible:
+	if _is_visible_in_tree(feedback_panel):
 		failures.append("FeedbackPanel sigue visible en monitor (debe estar oculto).")
-	if newspaper_runtime != null and not newspaper_runtime.visible:
+	if newspaper_runtime != null and not _is_visible_in_tree(newspaper_runtime):
 		failures.append("NewsRuntime no esta visible en periodico.")
-	if invoice_runtime != null and not invoice_runtime.visible:
+	if invoice_runtime != null and not _is_visible_in_tree(invoice_runtime):
 		failures.append("InvoiceRuntime no esta visible en factura/documentos.")
 
 	if news_panel != null and feedback_panel != null and newspaper_runtime != null and invoice_runtime != null:
-		var monitor_has_non_operational := news_panel.visible or feedback_panel.visible
-		var docs_has_content := newspaper_runtime.visible or invoice_runtime.visible
+		var monitor_has_non_operational := _is_visible_in_tree(news_panel) or _is_visible_in_tree(feedback_panel)
+		var docs_has_content := _is_visible_in_tree(newspaper_runtime) or _is_visible_in_tree(invoice_runtime)
 		if monitor_has_non_operational and docs_has_content:
 			failures.append("Se detecto duplicacion entre monitor y documentos diegeticos.")
 		# Si una zona diegetica desaparece (p. ej. fallo de textura en export), debe volver el fallback monitor.
@@ -74,10 +74,12 @@ func _run_smoke() -> void:
 		else:
 			newspaper_zone.visible = false
 			ui.call("_apply_zone_contract")
-			if news_panel != null and not news_panel.visible:
+			if not _is_visible_in_tree(news_panel):
 				failures.append("Fallback roto: NewsPanel no vuelve cuando falta zona diegetica.")
-			if feedback_panel != null and not feedback_panel.visible:
+			if not _is_visible_in_tree(feedback_panel):
 				failures.append("Fallback roto: FeedbackPanel no vuelve cuando falta zona diegetica.")
+			if _is_visible_in_tree(newspaper_runtime):
+				failures.append("Fallback roto: NewsRuntime sigue visible en arbol con zona padre oculta.")
 
 	ui.queue_free()
 	if failures.is_empty():
@@ -89,3 +91,7 @@ func _run_smoke() -> void:
 	for line in failures:
 		print("  - %s" % line)
 	quit(1)
+
+
+func _is_visible_in_tree(control: Control) -> bool:
+	return control != null and control.is_visible_in_tree()
