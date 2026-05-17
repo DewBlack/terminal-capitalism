@@ -83,3 +83,18 @@ Smokes activos:
 - HUD de deuda/factura con legibilidad reforzada:
   - Snapshot incluye progreso de actividad (`notional actual`, `objetivo`, `umbral medio`, `% avance`).
   - La previsualizacion de factura semanal expone estos datos en texto explicable.
+
+## Contrato de zonas visuales (2026-05-17)
+
+Regla operativa para `game_screen_visual_wip`:
+- No duplicar el mismo contenido entre monitor y escritorio diegetico al mismo tiempo.
+- El monitor queda reservado a trading operativo.
+
+| Zona | Permitido | Prohibido |
+| --- | --- | --- |
+| Monitor operativo | Seleccion de empresa, buy/sell, cantidad, end-day, estado operativo breve, detalle de mercado para decidir trades | Titulares/noticias, factura semanal, bitacora narrativa completa, documentos de evento |
+| Periodico diegetico (`DeskDocs/NewspaperZone`) | Noticias del dia + historico | Duplicar noticias en monitor |
+| Factura/documentos (`DeskDocs/InvoiceZone`) | Riesgo de deuda, factura semanal estimada y bitacora de eventos/documentos | Duplicar factura o bitacora completa en monitor |
+
+Validacion automatica:
+- Smoke `scripts/utils/diegetic_zone_contract_smoke.gd` en CI para bloquear regresiones de duplicacion de zonas.

@@ -33,6 +33,7 @@ const TUTORIAL_OVERLAY_CONTROLLER := preload("res://scripts/ui/tutorial_overlay_
 const TUTORIAL_TARGET_RECT_RESOLVER := preload("res://scripts/ui/tutorial_target_rect_resolver.gd")
 const UI_THEME_TOKENS := preload("res://scripts/ui/ui_theme_tokens.gd")
 const DIEGETIC_DESK_LAYOUT := preload("res://scripts/ui/diegetic_desk_layout.gd")
+const DIEGETIC_ZONE_POLICY := preload("res://scripts/ui/diegetic_zone_policy.gd")
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
 const MOVEMENT_REASON_MAX_CHARS := 88
@@ -66,7 +67,17 @@ var _modal_locks_controller = null
 var _tutorial_overlay_controller = null
 var _tutorial_target_rect_resolver = null
 var _diegetic_desk_layout = null
+var _zone_policy = null
 var _tutorial_state: Dictionary = {"active": false}
+var _newspaper_runtime: Control = null
+var _invoice_runtime: Control = null
+var _newspaper_runtime_title: Label = null
+var _newspaper_runtime_history_button: Button = null
+var _newspaper_runtime_content: VBoxContainer = null
+var _invoice_runtime_debt_risk_label: Label = null
+var _invoice_runtime_invoice_label: Label = null
+var _invoice_runtime_event_log_label: Label = null
+var _zone_contract_enabled: bool = false
 
 @onready var _main_margin: MarginContainer = $MainMargin
 @onready var _day_label: Label = $MainMargin/MainVBox/HeaderBar/DayLabel
@@ -138,6 +149,9 @@ var _tutorial_state: Dictionary = {"active": false}
 
 
 func _ready() -> void:
+	_build_diegetic_runtime_zones()
+	_resolve_content_targets()
+	_zone_policy = DIEGETIC_ZONE_POLICY.new()
 	_buy_button.pressed.connect(_on_buy_button_pressed)
 	_sell_button.pressed.connect(_on_sell_button_pressed)
 	_end_day_button.pressed.connect(_on_end_day_button_pressed)
@@ -147,7 +161,8 @@ func _ready() -> void:
 	_quantity_max_button.pressed.connect(_on_quantity_max_pressed)
 	_market_panel.gui_input.connect(_on_market_panel_gui_input)
 	_history_button.pressed.connect(_on_history_button_pressed)
-	_news_history_button.pressed.connect(_on_news_history_button_pressed)
+	if _news_history_button != null:
+		_news_history_button.pressed.connect(_on_news_history_button_pressed)
 	_back_to_menu_button.pressed.connect(_on_back_to_menu_pressed)
 	_weekly_recap_continue_button.pressed.connect(_on_weekly_recap_continue_pressed)
 	resized.connect(_on_ui_resized)
@@ -214,8 +229,11 @@ func _ready() -> void:
 			_upgrade_manager
 		)
 	_apply_action_hints()
-	_news_title.text = "Periodico del Dia"
-	_news_history_button.text = "Ver historico"
+	_apply_zone_contract()
+	if _news_title != null:
+		_news_title.text = "Periodico del Dia"
+	if _news_history_button != null:
+		_news_history_button.text = "Ver historico"
 
 
 func bind_managers(
@@ -253,6 +271,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 		return
 	if not status_message.is_empty():
 		_last_status_message = status_message
+	_apply_zone_contract()
 	_ensure_selected_company_is_valid()
 	_update_header()
 	_update_news_panel()
@@ -304,6 +323,9 @@ func set_tutorial_state(state: Dictionary) -> void:
 func get_tutorial_target_rect(target_id: String, ticker_hint: String = "") -> Rect2:
 	if _tutorial_target_rect_resolver == null:
 		return _header_bar.get_global_rect()
+	var news_target: Control = _news_panel
+	if _zone_contract_enabled and _newspaper_runtime != null:
+		news_target = _newspaper_runtime
 	return _tutorial_target_rect_resolver.resolve_target_rect(
 		target_id,
 		ticker_hint,
@@ -311,7 +333,7 @@ func get_tutorial_target_rect(target_id: String, ticker_hint: String = "") -> Re
 		_market_selection_controller,
 		{
 			"header": _header_bar,
-			"news_panel": _news_panel,
+			"news_panel": news_target,
 			"market_panel": _market_panel,
 			"details_panel": _details_panel,
 			"bottom_panel": _bottom_panel,
@@ -404,6 +426,8 @@ func _update_header() -> void:
 
 
 func _update_news_panel() -> void:
+	if _news_title == null or _news_history_button == null or _news_content == null:
+		return
 	NEWS_PANEL_RENDERER.clear_container(_news_content)
 	var history_entries: Array = []
 	if _news_manager != null and _news_history_visible:
@@ -754,6 +778,7 @@ func _are_actions_locked() -> bool:
 
 
 func _on_ui_resized() -> void:
+	_apply_zone_contract()
 	_apply_diegetic_layout()
 	if _tutorial_overlay_controller == null:
 		return
@@ -839,6 +864,151 @@ func _apply_action_hints() -> void:
 		_market_header,
 		HOTKEYS_HINT
 	)
+
+
+func _build_diegetic_runtime_zones() -> void:
+	if _newspaper_zone != null:
+		var runtime_margin := _newspaper_zone.get_node_or_null("NewsRuntime") as MarginContainer
+		if runtime_margin == null:
+			runtime_margin = MarginContainer.new()
+			runtime_margin.name = "NewsRuntime"
+			runtime_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			runtime_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			runtime_margin.mouse_filter = Control.MOUSE_FILTER_STOP
+			runtime_margin.add_theme_constant_override("margin_left", 14)
+			runtime_margin.add_theme_constant_override("margin_top", 12)
+			runtime_margin.add_theme_constant_override("margin_right", 14)
+			runtime_margin.add_theme_constant_override("margin_bottom", 12)
+
+			var news_vbox := VBoxContainer.new()
+			news_vbox.name = "NewsVBox"
+			news_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			news_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			news_vbox.add_theme_constant_override("separation", 6)
+
+			var top_row := HBoxContainer.new()
+			top_row.name = "NewsTopRow"
+			top_row.add_theme_constant_override("separation", 6)
+
+			var title := Label.new()
+			title.name = "NewsTitle"
+			title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			title.add_theme_font_size_override("font_size", 20)
+			title.text = "Periodico del Dia"
+
+			var history_button := Button.new()
+			history_button.name = "NewsHistoryButton"
+			history_button.text = "Ver historico"
+
+			var scroll := ScrollContainer.new()
+			scroll.name = "NewsScroll"
+			scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+
+			var content := VBoxContainer.new()
+			content.name = "NewsContent"
+			content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			content.add_theme_constant_override("separation", 8)
+
+			scroll.add_child(content)
+			top_row.add_child(title)
+			top_row.add_child(history_button)
+			news_vbox.add_child(top_row)
+			news_vbox.add_child(scroll)
+			runtime_margin.add_child(news_vbox)
+			_newspaper_zone.add_child(runtime_margin)
+		_newspaper_runtime = runtime_margin
+		_newspaper_runtime_title = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsTitle") as Label
+		_newspaper_runtime_history_button = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsHistoryButton") as Button
+		_newspaper_runtime_content = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsScroll/NewsContent") as VBoxContainer
+
+	if _invoice_zone != null:
+		var invoice_runtime_margin := _invoice_zone.get_node_or_null("InvoiceRuntime") as MarginContainer
+		if invoice_runtime_margin == null:
+			invoice_runtime_margin = MarginContainer.new()
+			invoice_runtime_margin.name = "InvoiceRuntime"
+			invoice_runtime_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			invoice_runtime_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			invoice_runtime_margin.mouse_filter = Control.MOUSE_FILTER_STOP
+			invoice_runtime_margin.add_theme_constant_override("margin_left", 14)
+			invoice_runtime_margin.add_theme_constant_override("margin_top", 12)
+			invoice_runtime_margin.add_theme_constant_override("margin_right", 14)
+			invoice_runtime_margin.add_theme_constant_override("margin_bottom", 12)
+
+			var invoice_vbox := VBoxContainer.new()
+			invoice_vbox.name = "InvoiceVBox"
+			invoice_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			invoice_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			invoice_vbox.add_theme_constant_override("separation", 5)
+
+			var debt_risk_label := Label.new()
+			debt_risk_label.name = "DebtRiskLabel"
+			debt_risk_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			debt_risk_label.text = "Deuda actual, limite y margen."
+
+			var invoice_label := Label.new()
+			invoice_label.name = "InvoicePreviewLabel"
+			invoice_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			invoice_label.text = "Factura semanal estimada."
+
+			var event_title := Label.new()
+			event_title.name = "EventDocTitle"
+			event_title.text = "Documento de Eventos"
+
+			var event_scroll := ScrollContainer.new()
+			event_scroll.name = "EventLogScroll"
+			event_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			event_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+
+			var event_log_label := Label.new()
+			event_log_label.name = "EventLogLabel"
+			event_log_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			event_log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			event_log_label.text = "Sin eventos importantes todavia."
+
+			event_scroll.add_child(event_log_label)
+			invoice_vbox.add_child(debt_risk_label)
+			invoice_vbox.add_child(invoice_label)
+			invoice_vbox.add_child(event_title)
+			invoice_vbox.add_child(event_scroll)
+			invoice_runtime_margin.add_child(invoice_vbox)
+			_invoice_zone.add_child(invoice_runtime_margin)
+		_invoice_runtime = invoice_runtime_margin
+		_invoice_runtime_debt_risk_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/DebtRiskLabel") as Label
+		_invoice_runtime_invoice_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/InvoicePreviewLabel") as Label
+		_invoice_runtime_event_log_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/EventLogScroll/EventLogLabel") as Label
+
+
+func _resolve_content_targets() -> void:
+	if _newspaper_runtime_title != null and _newspaper_runtime_history_button != null and _newspaper_runtime_content != null:
+		_news_title = _newspaper_runtime_title
+		_news_history_button = _newspaper_runtime_history_button
+		_news_content = _newspaper_runtime_content
+
+	if _invoice_runtime_debt_risk_label != null:
+		_debt_risk_label = _invoice_runtime_debt_risk_label
+	if _invoice_runtime_invoice_label != null:
+		_invoice_preview_label = _invoice_runtime_invoice_label
+	if _invoice_runtime_event_log_label != null:
+		_event_log_label = _invoice_runtime_event_log_label
+
+	_zone_contract_enabled = _newspaper_runtime != null and _invoice_runtime != null
+
+
+func _apply_zone_contract() -> void:
+	if _zone_policy == null:
+		return
+	var targets := {
+		"enabled": _zone_contract_enabled,
+		"news_panel": _news_panel,
+		"feedback_panel": _feedback_panel,
+		"newspaper_runtime": _newspaper_runtime,
+		"invoice_runtime": _invoice_runtime
+	}
+	_zone_policy.apply_visual_contract(targets)
+	var violations: Array[String] = _zone_policy.collect_contract_violations(targets)
+	for violation in violations:
+		push_warning("Zone contract violation: %s" % violation)
 
 
 func _apply_diegetic_shell_styles() -> void:

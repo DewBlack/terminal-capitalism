@@ -53,7 +53,7 @@ static func build_model(
 	if days_until_charge > 0:
 		charge_timing = "en %d dia(s)" % days_until_charge
 
-	var invoice_text := "Factura semanal estimada: %s (%s base + %s actividad, x%.2f). Proximo cobro %s. Actividad: %s%s. Notional semanal: %s / %s (umbral medio %s, avance %.0f%%)." % [
+	var invoice_text := "Documento de factura semanal: %s (%s base + %s actividad, x%.2f). Proximo cobro %s. Actividad: %s%s. Notional semanal: %s / %s (umbral medio %s, avance %.0f%%)." % [
 		UI_FORMAT_HELPER.money(estimated_charge),
 		UI_FORMAT_HELPER.money(base_expense),
 		UI_FORMAT_HELPER.money(estimated_surcharge),
