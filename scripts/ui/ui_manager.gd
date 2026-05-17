@@ -134,6 +134,7 @@ var _crt_shader_material: ShaderMaterial = null
 @onready var _debt_risk_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel/DebtVBox/DebtRiskLabel
 @onready var _invoice_preview_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel/DebtVBox/InvoicePreviewLabel
 @onready var _event_log_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/EventLogPanel/EventLogVBox/EventLogScroll/EventLogLabel
+@onready var _desk_props_layer: Control = get_node_or_null("DeskPropsLayer") as Control
 @onready var _desk_backdrop_texture: TextureRect = get_node_or_null("DeskBackdrop/DeskBackdropTexture") as TextureRect
 @onready var _monitor_frame: Control = get_node_or_null("MonitorFrame") as Control
 @onready var _monitor_frame_texture: TextureRect = get_node_or_null("MonitorFrame/MonitorFrameTexture") as TextureRect
@@ -305,6 +306,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 		_ui_feedback_controller.apply_status_text(_last_status_message)
 	_apply_tutorial_visual_state()
 	_apply_diegetic_layout()
+	_update_desk_props_alert_state()
 
 
 func show_run_end(title: String, description: String) -> void:
@@ -444,6 +446,7 @@ func _apply_weekly_invoice_model(invoice_model: Dictionary) -> void:
 		panel_style.corner_radius_bottom_left = 8
 		panel_style.corner_radius_bottom_right = 8
 		_invoice_runtime_weekly_panel.add_theme_stylebox_override("panel", panel_style)
+	_update_desk_props_alert_state()
 
 
 func _set_weekly_invoice_visibility(visible: bool) -> void:
@@ -1287,6 +1290,17 @@ func _assign_png_texture(target: TextureRect, png_path: String) -> bool:
 func _apply_diegetic_layout() -> void:
 	if _diegetic_desk_layout != null:
 		_diegetic_desk_layout.apply_layout()
+
+
+func _update_desk_props_alert_state() -> void:
+	if _desk_props_layer == null or not _desk_props_layer.has_method("set_alert_mode"):
+		return
+	var risk_text := ""
+	if _debt_risk_label != null:
+		risk_text = _debt_risk_label.text.to_lower()
+	var high_or_critical := risk_text.contains("riesgo: alto") or risk_text.contains("riesgo: critico")
+	var warning_or_critical_state := risk_text.contains("warning") or risk_text.contains("critical")
+	_desk_props_layer.call("set_alert_mode", high_or_critical or warning_or_critical_state)
 
 
 func _emit_tutorial_action_blocked(
