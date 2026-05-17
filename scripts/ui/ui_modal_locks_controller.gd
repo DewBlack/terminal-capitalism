@@ -104,7 +104,7 @@ func show_weekly_recap(week_index: int, summary_text: String) -> void:
 	if _weekly_recap_panel != null:
 		_weekly_recap_panel.visible = true
 	if _weekly_recap_title != null:
-		_weekly_recap_title.text = "Resumen Semana %d" % week_index
+		_weekly_recap_title.text = "Documento Semanal %d" % week_index
 	if _weekly_recap_body != null:
 		_weekly_recap_body.text = summary_text
 	_apply_action_lock_state()

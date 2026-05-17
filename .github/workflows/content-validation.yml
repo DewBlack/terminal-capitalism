@@ -24,6 +24,8 @@ jobs:
             script: scripts/utils/news_generation_quality_smoke.gd
           - name: UI Tutorial Overlay Regression Smoke
             script: scripts/utils/ui_tutorial_overlay_regression_smoke.gd
+          - name: Diegetic Zone Contract Smoke
+            script: scripts/utils/diegetic_zone_contract_smoke.gd
           - name: UI Hotkey Input Regression Smoke
             script: scripts/utils/ui_hotkey_input_regression_smoke.gd
           - name: UI Trade Action Locks Smoke

@@ -5,7 +5,7 @@ extends RefCounted
 static func build_model(entries: Array[String], visible_max: int) -> Dictionary:
 	if entries.is_empty():
 		return {
-			"text": "Sin eventos importantes todavia.",
+			"text": "Sin eventos documentados todavia.",
 			"tooltip": ""
 		}
 
