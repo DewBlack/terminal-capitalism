@@ -2,7 +2,8 @@ class_name GameManager
 extends Node
 
 const MENU_SCENE := preload("res://scenes/ui/main_menu.tscn")
-const GAME_SCENE := preload("res://scenes/game/game_screen.tscn")
+const GAME_SCENE_LEGACY := preload("res://scenes/game/game_screen_legacy.tscn")
+const GAME_SCENE_VISUAL_WIP := preload("res://scenes/game/game_screen_visual_wip.tscn")
 const TUTORIAL_MANAGER_SCRIPT := preload("res://scripts/run/tutorial_manager.gd")
 const TUTORIAL_TELEMETRY_SERVICE_SCRIPT := preload("res://scripts/run/tutorial_telemetry_service.gd")
 const RUN_END_DAY_ORCHESTRATOR_SERVICE := preload("res://scripts/run/run_end_day_orchestrator_service.gd")
@@ -106,12 +107,13 @@ func _show_main_menu() -> void:
 	if _current_screen is MainMenuUI:
 		var menu: MainMenuUI = _current_screen
 		menu.start_run_requested.connect(_on_start_run_requested)
+		menu.start_run_visual_wip_requested.connect(_on_start_run_visual_wip_requested)
 		menu.start_tutorial_requested.connect(_on_start_tutorial_requested)
 		menu.quit_requested.connect(_on_quit_requested)
 
 
-func _show_game_screen() -> void:
-	_swap_screen(GAME_SCENE)
+func _show_game_screen(scene_to_load: PackedScene) -> void:
+	_swap_screen(scene_to_load)
 	if _current_screen is UIManager:
 		_game_ui = _current_screen
 		_game_ui.bind_managers(_run_manager, _player_portfolio, _market_manager, _news_manager, _upgrade_manager)
@@ -128,6 +130,14 @@ func _show_game_screen() -> void:
 
 
 func _on_start_run_requested() -> void:
+	_start_standard_run_with_scene(GAME_SCENE_LEGACY)
+
+
+func _on_start_run_visual_wip_requested() -> void:
+	_start_standard_run_with_scene(GAME_SCENE_VISUAL_WIP)
+
+
+func _start_standard_run_with_scene(scene_to_load: PackedScene) -> void:
 	var lifecycle_state := RUN_LIFECYCLE_SERVICE.start_standard_run(
 		_content_pack_loader,
 		_run_manager,
@@ -152,8 +162,7 @@ func _on_start_run_requested() -> void:
 		Callable(self, "_money")
 	)
 	_apply_run_lifecycle_start_state(lifecycle_state)
-
-	_show_game_screen()
+	_show_game_screen(scene_to_load)
 	_refresh_all_ui()
 
 
@@ -171,7 +180,7 @@ func _on_start_tutorial_requested() -> void:
 	)
 	_apply_run_lifecycle_start_state(lifecycle_state)
 	_start_tutorial_telemetry_session()
-	_show_game_screen()
+	_show_game_screen(GAME_SCENE_LEGACY)
 	if bool(lifecycle_state.get("roll_daily_news_on_start", false)):
 		_news_manager.roll_daily_news(_run_manager.current_day, _market_manager.get_active_companies())
 	_refresh_all_ui()

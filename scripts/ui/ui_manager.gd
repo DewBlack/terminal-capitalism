@@ -32,6 +32,7 @@ const UI_MODAL_LOCKS_CONTROLLER := preload("res://scripts/ui/ui_modal_locks_cont
 const TUTORIAL_OVERLAY_CONTROLLER := preload("res://scripts/ui/tutorial_overlay_controller.gd")
 const TUTORIAL_TARGET_RECT_RESOLVER := preload("res://scripts/ui/tutorial_target_rect_resolver.gd")
 const UI_THEME_TOKENS := preload("res://scripts/ui/ui_theme_tokens.gd")
+const DIEGETIC_DESK_LAYOUT := preload("res://scripts/ui/diegetic_desk_layout.gd")
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
 const MOVEMENT_REASON_MAX_CHARS := 88
@@ -42,6 +43,11 @@ const ROW_NAME_MIN_WIDTH := 176.0
 const ROW_PRICE_MIN_WIDTH := 84.0
 const ROW_CHANGE_MIN_WIDTH := 74.0
 const HOTKEYS_HINT := "Atajos: Up/Down empresa | B comprar | V vender | Enter pasar dia"
+const DESK_BACKDROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_bg_v1.png"
+const MONITOR_FRAME_TEXTURE_PATH := "res://art/placeholder/desk/crt_monitor_frame_v1.png"
+const MONITOR_OVERLAY_TEXTURE_PATH := "res://art/placeholder/desk/crt_screen_overlay_v1.png"
+const NEWSPAPER_TEXTURE_PATH := "res://art/placeholder/news/newspaper_front_v1.png"
+const INVOICE_TEXTURE_PATH := "res://art/placeholder/weekly/invoice_sheet_v1.png"
 
 var _run_manager: RunManager
 var _player_portfolio: PlayerPortfolio
@@ -59,8 +65,10 @@ var _hotkey_input_controller = null
 var _modal_locks_controller = null
 var _tutorial_overlay_controller = null
 var _tutorial_target_rect_resolver = null
+var _diegetic_desk_layout = null
 var _tutorial_state: Dictionary = {"active": false}
 
+@onready var _main_margin: MarginContainer = $MainMargin
 @onready var _day_label: Label = $MainMargin/MainVBox/HeaderBar/DayLabel
 @onready var _week_label: Label = $MainMargin/MainVBox/HeaderBar/WeekLabel
 @onready var _cash_label: Label = $MainMargin/MainVBox/HeaderBar/CashLabel
@@ -103,6 +111,15 @@ var _tutorial_state: Dictionary = {"active": false}
 @onready var _debt_risk_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel/DebtVBox/DebtRiskLabel
 @onready var _invoice_preview_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel/DebtVBox/InvoicePreviewLabel
 @onready var _event_log_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/EventLogPanel/EventLogVBox/EventLogScroll/EventLogLabel
+@onready var _desk_backdrop_texture: TextureRect = get_node_or_null("DeskBackdrop/DeskBackdropTexture") as TextureRect
+@onready var _monitor_frame: Control = get_node_or_null("MonitorFrame") as Control
+@onready var _monitor_frame_texture: TextureRect = get_node_or_null("MonitorFrame/MonitorFrameTexture") as TextureRect
+@onready var _monitor_overlay: Control = get_node_or_null("MonitorOverlay") as Control
+@onready var _monitor_overlay_texture: TextureRect = get_node_or_null("MonitorOverlay/MonitorOverlayTexture") as TextureRect
+@onready var _newspaper_zone: PanelContainer = get_node_or_null("DeskDocs/NewspaperZone") as PanelContainer
+@onready var _newspaper_texture: TextureRect = get_node_or_null("DeskDocs/NewspaperZone/NewspaperTexture") as TextureRect
+@onready var _invoice_zone: PanelContainer = get_node_or_null("DeskDocs/InvoiceZone") as PanelContainer
+@onready var _invoice_texture: TextureRect = get_node_or_null("DeskDocs/InvoiceZone/InvoiceTexture") as TextureRect
 @onready var _toast_panel: PanelContainer = $ToastPanel
 @onready var _toast_label: Label = $ToastPanel/ToastMargin/ToastLabel
 @onready var _tutorial_overlay = $TutorialOverlay
@@ -139,6 +156,9 @@ func _ready() -> void:
 	_tutorial_overlay.continue_requested.connect(_on_tutorial_continue_pressed)
 	set_process_unhandled_key_input(true)
 	_apply_ui_tone()
+	_apply_diegetic_shell_styles()
+	_apply_diegetic_artwork()
+	_setup_diegetic_layout()
 	_ui_feedback_controller = UI_FEEDBACK_CONTROLLER.new()
 	add_child(_ui_feedback_controller)
 	_ui_feedback_controller.setup(
@@ -244,6 +264,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 		_ui_feedback_controller.update_feedback_panel(_player_portfolio)
 		_ui_feedback_controller.apply_status_text(_last_status_message)
 	_apply_tutorial_visual_state()
+	_apply_diegetic_layout()
 
 
 func show_run_end(title: String, description: String) -> void:
@@ -733,6 +754,7 @@ func _are_actions_locked() -> bool:
 
 
 func _on_ui_resized() -> void:
+	_apply_diegetic_layout()
 	if _tutorial_overlay_controller == null:
 		return
 	if not _tutorial_overlay_controller.is_tutorial_active(_tutorial_state):
@@ -819,6 +841,87 @@ func _apply_action_hints() -> void:
 	)
 
 
+func _apply_diegetic_shell_styles() -> void:
+	var monitor_panel := _monitor_frame as PanelContainer
+	if monitor_panel != null:
+		var monitor_style := StyleBoxFlat.new()
+		monitor_style.bg_color = Color(0.10, 0.11, 0.13, 0.94)
+		monitor_style.border_color = Color(0.64, 0.57, 0.45, 0.95)
+		monitor_style.border_width_left = 5
+		monitor_style.border_width_top = 5
+		monitor_style.border_width_right = 5
+		monitor_style.border_width_bottom = 10
+		monitor_style.corner_radius_top_left = 16
+		monitor_style.corner_radius_top_right = 16
+		monitor_style.corner_radius_bottom_left = 24
+		monitor_style.corner_radius_bottom_right = 24
+		monitor_style.shadow_color = Color(0, 0, 0, 0.55)
+		monitor_style.shadow_size = 22
+		monitor_panel.add_theme_stylebox_override("panel", monitor_style)
+
+	if _newspaper_zone == null or _invoice_zone == null:
+		return
+
+	var paper_style := StyleBoxFlat.new()
+	paper_style.bg_color = Color(0.91, 0.87, 0.74, 0.55)
+	paper_style.border_color = Color(0.46, 0.39, 0.24, 0.65)
+	paper_style.border_width_left = 2
+	paper_style.border_width_top = 2
+	paper_style.border_width_right = 2
+	paper_style.border_width_bottom = 2
+	paper_style.corner_radius_top_left = 6
+	paper_style.corner_radius_top_right = 6
+	paper_style.corner_radius_bottom_left = 6
+	paper_style.corner_radius_bottom_right = 6
+	_newspaper_zone.add_theme_stylebox_override("panel", paper_style)
+
+	var invoice_style := paper_style.duplicate(true) as StyleBoxFlat
+	invoice_style.bg_color = Color(0.84, 0.93, 0.98, 0.46)
+	invoice_style.border_color = Color(0.33, 0.48, 0.60, 0.65)
+	_invoice_zone.add_theme_stylebox_override("panel", invoice_style)
+
+
+func _apply_diegetic_artwork() -> void:
+	_assign_png_texture(_desk_backdrop_texture, DESK_BACKDROP_TEXTURE_PATH)
+	# El frame actual viene con chroma verde sólido; lo ocultamos hasta tener asset usable.
+	_assign_png_texture(_monitor_frame_texture, MONITOR_FRAME_TEXTURE_PATH)
+	if _monitor_frame_texture != null:
+		_monitor_frame_texture.visible = false
+
+	# El overlay actual oscurece demasiado la UI dentro de pantalla.
+	_assign_png_texture(_monitor_overlay_texture, MONITOR_OVERLAY_TEXTURE_PATH)
+	if _monitor_overlay_texture != null:
+		_monitor_overlay_texture.visible = false
+
+	var newspaper_loaded := _assign_png_texture(_newspaper_texture, NEWSPAPER_TEXTURE_PATH)
+	var invoice_loaded := _assign_png_texture(_invoice_texture, INVOICE_TEXTURE_PATH)
+	if _newspaper_zone != null:
+		_newspaper_zone.visible = newspaper_loaded
+	if _invoice_zone != null:
+		_invoice_zone.visible = invoice_loaded
+
+
+func _assign_png_texture(target: TextureRect, png_path: String) -> bool:
+	if target == null:
+		return false
+	var image := Image.new()
+	var image_error := image.load(png_path)
+	if image_error != OK:
+		target.texture = null
+		return false
+	var texture := ImageTexture.create_from_image(image)
+	if texture == null:
+		target.texture = null
+		return false
+	target.texture = texture
+	return true
+
+
+func _apply_diegetic_layout() -> void:
+	if _diegetic_desk_layout != null:
+		_diegetic_desk_layout.apply_layout()
+
+
 func _emit_tutorial_action_blocked(
 	action_id: String,
 	reason: String,
@@ -840,3 +943,18 @@ func _tutorial_blocked_hint_message(fallback: String) -> String:
 	if hint.is_empty():
 		return fallback
 	return "Tutorial: %s" % hint
+
+
+func _setup_diegetic_layout() -> void:
+	if _monitor_frame == null or _monitor_overlay == null or _newspaper_zone == null or _invoice_zone == null:
+		return
+	_diegetic_desk_layout = DIEGETIC_DESK_LAYOUT.new()
+	_diegetic_desk_layout.setup(
+		self,
+		_monitor_frame,
+		_monitor_overlay,
+		_main_margin,
+		_newspaper_zone,
+		_invoice_zone
+	)
+	_apply_diegetic_layout()

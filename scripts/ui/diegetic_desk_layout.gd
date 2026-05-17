@@ -1,0 +1,174 @@
+class_name DiegeticDeskLayout
+extends RefCounted
+
+const MONITOR_ASPECT_RATIO := 1.58
+const MONITOR_WIDTH_RATIO := 0.54
+const MONITOR_HEIGHT_LIMIT_RATIO := 0.82
+const MONITOR_HEIGHT_HARD_LIMIT_RATIO := 0.96
+const MONITOR_MAX_VIEWPORT_WIDTH_RATIO := 0.97
+const MONITOR_MIN_WIDTH := 760.0
+const MONITOR_MAX_WIDTH := 1320.0
+const MONITOR_VERTICAL_OFFSET_RATIO := 0.0
+
+const SCREEN_LEFT_PADDING_RATIO := 0.08
+const SCREEN_TOP_PADDING_RATIO := 0.11
+const SCREEN_RIGHT_PADDING_RATIO := 0.08
+const SCREEN_BOTTOM_PADDING_RATIO := 0.18
+const SCREEN_MIN_WIDTH_FALLBACK := 980.0
+const SCREEN_MIN_HEIGHT_FALLBACK := 560.0
+
+const DOC_ZONE_WIDTH_RATIO := 0.23
+const DOC_ZONE_ASPECT_RATIO := 0.72
+const DOC_ZONE_MARGIN := 18.0
+const DOC_ZONE_BOTTOM_OFFSET := 10.0
+
+var _root: Control
+var _monitor_frame: Control
+var _monitor_overlay: Control
+var _monitor_content: Control
+var _news_zone: Control
+var _invoice_zone: Control
+
+
+func setup(
+	root: Control,
+	monitor_frame: Control,
+	monitor_overlay: Control,
+	monitor_content: Control,
+	news_zone: Control,
+	invoice_zone: Control
+) -> void:
+	_root = root
+	_monitor_frame = monitor_frame
+	_monitor_overlay = monitor_overlay
+	_monitor_content = monitor_content
+	_news_zone = news_zone
+	_invoice_zone = invoice_zone
+
+
+func apply_layout() -> void:
+	if _root == null:
+		return
+	if _monitor_frame == null or _monitor_overlay == null or _monitor_content == null:
+		return
+	var viewport_size := _root.get_size()
+	if viewport_size.x < 8.0 or viewport_size.y < 8.0:
+		return
+
+	var required_screen_size: Vector2 = _resolve_required_screen_size(viewport_size)
+	var monitor_size := _build_monitor_size(viewport_size, required_screen_size)
+	var monitor_position := Vector2(
+		(viewport_size.x - monitor_size.x) * 0.5,
+		(viewport_size.y - monitor_size.y) * 0.5 + viewport_size.y * MONITOR_VERTICAL_OFFSET_RATIO
+	)
+	var max_top: float = maxf(0.0, viewport_size.y - monitor_size.y - DOC_ZONE_MARGIN)
+	monitor_position.y = clampf(monitor_position.y, DOC_ZONE_MARGIN, max_top)
+	var monitor_rect := Rect2(monitor_position, monitor_size)
+	_apply_rect(_monitor_frame, monitor_rect)
+
+	var screen_rect := _build_screen_rect(monitor_rect)
+	var content_min_size: Vector2 = _resolve_content_min_size()
+	var content_scale: float = _resolve_content_scale(screen_rect.size, content_min_size)
+	var content_size: Vector2 = screen_rect.size / content_scale
+	_apply_rect(_monitor_content, Rect2(screen_rect.position, content_size))
+	_monitor_content.scale = Vector2(content_scale, content_scale)
+	_monitor_content.pivot_offset = Vector2.ZERO
+	_apply_rect(_monitor_overlay, screen_rect)
+
+	_layout_document_zone(_news_zone, monitor_rect, viewport_size, true)
+	_layout_document_zone(_invoice_zone, monitor_rect, viewport_size, false)
+
+
+func _build_monitor_size(viewport_size: Vector2, required_screen_size: Vector2) -> Vector2:
+	var max_width: float = minf(MONITOR_MAX_WIDTH, viewport_size.x * MONITOR_MAX_VIEWPORT_WIDTH_RATIO)
+	var base_monitor_width: float = viewport_size.x * MONITOR_WIDTH_RATIO
+	var monitor_width_for_content: float = required_screen_size.x / _screen_inner_width_ratio()
+	var monitor_width_for_content_height: float = (required_screen_size.y / _screen_inner_height_ratio()) * MONITOR_ASPECT_RATIO
+	var preferred_monitor_width: float = maxf(maxf(base_monitor_width, monitor_width_for_content), monitor_width_for_content_height)
+	var monitor_width: float = clampf(preferred_monitor_width, MONITOR_MIN_WIDTH, max_width)
+	var monitor_height: float = monitor_width / MONITOR_ASPECT_RATIO
+	var max_height: float = viewport_size.y * MONITOR_HEIGHT_LIMIT_RATIO
+	if preferred_monitor_width > base_monitor_width:
+		max_height = viewport_size.y * MONITOR_HEIGHT_HARD_LIMIT_RATIO
+	if monitor_height > max_height:
+		monitor_height = max_height
+		monitor_width = monitor_height * MONITOR_ASPECT_RATIO
+	if monitor_width > viewport_size.x * MONITOR_MAX_VIEWPORT_WIDTH_RATIO:
+		monitor_width = viewport_size.x * MONITOR_MAX_VIEWPORT_WIDTH_RATIO
+		monitor_height = monitor_width / MONITOR_ASPECT_RATIO
+	return Vector2(monitor_width, monitor_height)
+
+
+func _resolve_required_screen_size(viewport_size: Vector2) -> Vector2:
+	var required_screen_width: float = SCREEN_MIN_WIDTH_FALLBACK
+	var required_screen_height: float = SCREEN_MIN_HEIGHT_FALLBACK
+	var max_screen_width: float = viewport_size.x * MONITOR_MAX_VIEWPORT_WIDTH_RATIO * _screen_inner_width_ratio()
+	var max_screen_height: float = viewport_size.y * MONITOR_HEIGHT_HARD_LIMIT_RATIO * _screen_inner_height_ratio()
+	return Vector2(minf(required_screen_width, max_screen_width), minf(required_screen_height, max_screen_height))
+
+
+func _resolve_content_min_size() -> Vector2:
+	var min_width: float = SCREEN_MIN_WIDTH_FALLBACK
+	var min_height: float = SCREEN_MIN_HEIGHT_FALLBACK
+	if _monitor_content != null:
+		var combined_min_size: Vector2 = _monitor_content.get_combined_minimum_size()
+		min_width = maxf(min_width, combined_min_size.x)
+		min_height = maxf(min_height, combined_min_size.y)
+	return Vector2(min_width, min_height)
+
+
+func _resolve_content_scale(screen_size: Vector2, content_min_size: Vector2) -> float:
+	var scale_x: float = screen_size.x / maxf(1.0, content_min_size.x)
+	var scale_y: float = screen_size.y / maxf(1.0, content_min_size.y)
+	return maxf(0.55, minf(1.0, minf(scale_x, scale_y)))
+
+
+func _screen_inner_width_ratio() -> float:
+	return maxf(0.01, 1.0 - SCREEN_LEFT_PADDING_RATIO - SCREEN_RIGHT_PADDING_RATIO)
+
+
+func _screen_inner_height_ratio() -> float:
+	return maxf(0.01, 1.0 - SCREEN_TOP_PADDING_RATIO - SCREEN_BOTTOM_PADDING_RATIO)
+
+
+func _build_screen_rect(monitor_rect: Rect2) -> Rect2:
+	var screen_left := monitor_rect.position.x + monitor_rect.size.x * SCREEN_LEFT_PADDING_RATIO
+	var screen_top := monitor_rect.position.y + monitor_rect.size.y * SCREEN_TOP_PADDING_RATIO
+	var screen_width := monitor_rect.size.x * (1.0 - SCREEN_LEFT_PADDING_RATIO - SCREEN_RIGHT_PADDING_RATIO)
+	var screen_height := monitor_rect.size.y * (1.0 - SCREEN_TOP_PADDING_RATIO - SCREEN_BOTTOM_PADDING_RATIO)
+	return Rect2(Vector2(screen_left, screen_top), Vector2(screen_width, screen_height))
+
+
+func _layout_document_zone(zone: Control, monitor_rect: Rect2, viewport_size: Vector2, align_left: bool) -> void:
+	if zone == null:
+		return
+	var zone_width: float = clampf(monitor_rect.size.x * DOC_ZONE_WIDTH_RATIO, 180.0, 380.0)
+	var zone_height: float = zone_width * DOC_ZONE_ASPECT_RATIO
+	var zone_top: float = monitor_rect.position.y + monitor_rect.size.y - zone_height - DOC_ZONE_BOTTOM_OFFSET
+	var zone_left: float = monitor_rect.position.x - zone_width - DOC_ZONE_MARGIN
+	if not align_left:
+		zone_left = monitor_rect.end.x + DOC_ZONE_MARGIN
+
+	var overflows_horizontally: bool = zone_left < DOC_ZONE_MARGIN or zone_left + zone_width > viewport_size.x - DOC_ZONE_MARGIN
+	var overflows_vertically: bool = zone_top + zone_height > viewport_size.y - DOC_ZONE_MARGIN
+	if overflows_horizontally or overflows_vertically:
+		zone_width = clampf(viewport_size.x * 0.35, 170.0, 320.0)
+		zone_height = zone_width * DOC_ZONE_ASPECT_RATIO
+		zone_top = monitor_rect.end.y + DOC_ZONE_MARGIN
+		if zone_top + zone_height > viewport_size.y - DOC_ZONE_MARGIN:
+			zone_top = viewport_size.y - zone_height - DOC_ZONE_MARGIN
+		if align_left:
+			zone_left = monitor_rect.position.x + DOC_ZONE_MARGIN
+		else:
+			zone_left = monitor_rect.end.x - zone_width - DOC_ZONE_MARGIN
+
+	var zone_rect := Rect2(Vector2(zone_left, zone_top), Vector2(zone_width, zone_height))
+	_apply_rect(zone, zone_rect)
+
+
+func _apply_rect(control: Control, rect: Rect2) -> void:
+	if control == null:
+		return
+	control.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	control.position = rect.position.round()
+	control.size = rect.size.round()
