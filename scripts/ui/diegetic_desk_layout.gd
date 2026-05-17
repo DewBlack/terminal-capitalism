@@ -10,10 +10,10 @@ const MONITOR_MIN_WIDTH := 760.0
 const MONITOR_MAX_WIDTH := 1320.0
 const MONITOR_VERTICAL_OFFSET_RATIO := 0.0
 
-const SCREEN_LEFT_PADDING_RATIO := 0.08
-const SCREEN_TOP_PADDING_RATIO := 0.11
-const SCREEN_RIGHT_PADDING_RATIO := 0.08
-const SCREEN_BOTTOM_PADDING_RATIO := 0.18
+const SCREEN_LEFT_PADDING_RATIO := 0.11
+const SCREEN_TOP_PADDING_RATIO := 0.15
+const SCREEN_RIGHT_PADDING_RATIO := 0.11
+const SCREEN_BOTTOM_PADDING_RATIO := 0.23
 const SCREEN_MIN_WIDTH_FALLBACK := 980.0
 const SCREEN_MIN_HEIGHT_FALLBACK := 560.0
 
@@ -21,6 +21,13 @@ const DOC_ZONE_WIDTH_RATIO := 0.23
 const DOC_ZONE_ASPECT_RATIO := 0.72
 const DOC_ZONE_MARGIN := 18.0
 const DOC_ZONE_BOTTOM_OFFSET := 10.0
+const CALENDAR_WIDTH_RATIO := 0.20
+const CALENDAR_ASPECT_RATIO := 0.62
+const END_DAY_WIDTH_RATIO := 0.24
+const END_DAY_MIN_WIDTH := 220.0
+const END_DAY_MAX_WIDTH := 340.0
+const END_DAY_HEIGHT := 46.0
+const END_DAY_MARGIN := 16.0
 
 var _root: Control
 var _monitor_frame: Control
@@ -28,6 +35,8 @@ var _monitor_overlay: Control
 var _monitor_content: Control
 var _news_zone: Control
 var _invoice_zone: Control
+var _calendar_zone: Control
+var _desk_end_day_button: Control
 
 
 func setup(
@@ -36,7 +45,9 @@ func setup(
 	monitor_overlay: Control,
 	monitor_content: Control,
 	news_zone: Control,
-	invoice_zone: Control
+	invoice_zone: Control,
+	calendar_zone: Control,
+	desk_end_day_button: Control
 ) -> void:
 	_root = root
 	_monitor_frame = monitor_frame
@@ -44,6 +55,8 @@ func setup(
 	_monitor_content = monitor_content
 	_news_zone = news_zone
 	_invoice_zone = invoice_zone
+	_calendar_zone = calendar_zone
+	_desk_end_day_button = desk_end_day_button
 
 
 func apply_layout() -> void:
@@ -77,6 +90,8 @@ func apply_layout() -> void:
 
 	_layout_document_zone(_news_zone, monitor_rect, viewport_size, true)
 	_layout_document_zone(_invoice_zone, monitor_rect, viewport_size, false)
+	_layout_calendar_zone(_calendar_zone, monitor_rect, viewport_size)
+	_layout_end_day_surface(_desk_end_day_button, monitor_rect, viewport_size)
 
 
 func _build_monitor_size(viewport_size: Vector2, required_screen_size: Vector2) -> Vector2:
@@ -164,6 +179,31 @@ func _layout_document_zone(zone: Control, monitor_rect: Rect2, viewport_size: Ve
 
 	var zone_rect := Rect2(Vector2(zone_left, zone_top), Vector2(zone_width, zone_height))
 	_apply_rect(zone, zone_rect)
+
+
+func _layout_calendar_zone(zone: Control, monitor_rect: Rect2, viewport_size: Vector2) -> void:
+	if zone == null:
+		return
+	var zone_width: float = clampf(monitor_rect.size.x * CALENDAR_WIDTH_RATIO, 180.0, 290.0)
+	var zone_height: float = zone_width * CALENDAR_ASPECT_RATIO
+	var zone_left: float = monitor_rect.end.x - zone_width
+	var zone_top: float = monitor_rect.position.y - zone_height - DOC_ZONE_MARGIN * 0.45
+	zone_left = clampf(zone_left, DOC_ZONE_MARGIN, viewport_size.x - zone_width - DOC_ZONE_MARGIN)
+	zone_top = clampf(zone_top, DOC_ZONE_MARGIN, monitor_rect.position.y - 8.0)
+	_apply_rect(zone, Rect2(Vector2(zone_left, zone_top), Vector2(zone_width, zone_height)))
+
+
+func _layout_end_day_surface(surface: Control, monitor_rect: Rect2, viewport_size: Vector2) -> void:
+	if surface == null:
+		return
+	var width: float = clampf(monitor_rect.size.x * END_DAY_WIDTH_RATIO, END_DAY_MIN_WIDTH, END_DAY_MAX_WIDTH)
+	var height: float = END_DAY_HEIGHT
+	var left: float = (monitor_rect.position.x + monitor_rect.end.x - width) * 0.5
+	var top: float = monitor_rect.end.y + END_DAY_MARGIN
+	if top + height > viewport_size.y - DOC_ZONE_MARGIN:
+		top = viewport_size.y - height - DOC_ZONE_MARGIN
+	left = clampf(left, DOC_ZONE_MARGIN, viewport_size.x - width - DOC_ZONE_MARGIN)
+	_apply_rect(surface, Rect2(Vector2(left, top), Vector2(width, height)))
 
 
 func _apply_rect(control: Control, rect: Rect2) -> void:
