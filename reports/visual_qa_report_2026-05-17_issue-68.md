@@ -4,6 +4,7 @@
 - Issue: `#68`
 - Bloque: `block-visual`
 - Rama: `chat/2026-05-17-issue-68-qa-visual-checklist`
+- PR draft: `#80`
 - Build/commit evaluado: `PENDING`
 - Fecha: `2026-05-17`
 - Responsable QA: `PENDING`
