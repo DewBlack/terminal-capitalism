@@ -1,6 +1,8 @@
 class_name EventLogPresenter
 extends RefCounted
 
+const DIEGETIC_DOCUMENT_PRESENTER := preload("res://scripts/ui/diegetic_document_presenter.gd")
+
 
 static func build_model(entries: Array[String], visible_max: int) -> Dictionary:
 	if entries.is_empty():
@@ -13,8 +15,8 @@ static func build_model(entries: Array[String], visible_max: int) -> Dictionary:
 	var safe_visible_max := maxi(1, visible_max)
 	var start_index := maxi(0, entries.size() - safe_visible_max)
 	for index in range(entries.size() - 1, start_index - 1, -1):
-		visible_entries.append("- %s" % entries[index])
+		visible_entries.append("- %s" % DIEGETIC_DOCUMENT_PRESENTER.build_log_preview(entries[index]))
 	return {
 		"text": "\n".join(visible_entries),
-		"tooltip": "\n".join(entries)
+		"tooltip": "\n".join(visible_entries)
 	}

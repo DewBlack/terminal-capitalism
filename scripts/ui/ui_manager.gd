@@ -30,6 +30,7 @@ const UI_MARKET_SELECTION_CONTROLLER := preload("res://scripts/ui/ui_market_sele
 const UI_HOTKEY_INPUT_CONTROLLER := preload("res://scripts/ui/ui_hotkey_input_controller.gd")
 const UI_MODAL_LOCKS_CONTROLLER := preload("res://scripts/ui/ui_modal_locks_controller.gd")
 const WEEKLY_INVOICE_PRESENTER := preload("res://scripts/ui/weekly_invoice_presenter.gd")
+const DIEGETIC_DOCUMENT_PRESENTER := preload("res://scripts/ui/diegetic_document_presenter.gd")
 const TUTORIAL_OVERLAY_CONTROLLER := preload("res://scripts/ui/tutorial_overlay_controller.gd")
 const TUTORIAL_TARGET_RECT_RESOLVER := preload("res://scripts/ui/tutorial_target_rect_resolver.gd")
 const UI_THEME_TOKENS := preload("res://scripts/ui/ui_theme_tokens.gd")
@@ -86,6 +87,14 @@ var _invoice_runtime_weekly_amounts: Label = null
 var _invoice_runtime_weekly_debt: Label = null
 var _invoice_runtime_weekly_risk: Label = null
 var _invoice_runtime_weekly_continue_button: Button = null
+var _invoice_runtime_critical_document_panel: PanelContainer = null
+var _invoice_runtime_critical_stamp: Label = null
+var _invoice_runtime_critical_title: Label = null
+var _invoice_runtime_critical_subtitle: Label = null
+var _invoice_runtime_critical_body: Label = null
+var _invoice_runtime_critical_footer: Label = null
+var _invoice_runtime_critical_continue_button: Button = null
+var _last_critical_document_id: String = ""
 var _zone_contract_enabled: bool = false
 var _crt_shader_material: ShaderMaterial = null
 
@@ -181,6 +190,8 @@ func _ready() -> void:
 		_weekly_recap_continue_button.pressed.connect(_on_weekly_recap_continue_pressed)
 	if _invoice_runtime_weekly_continue_button != null:
 		_invoice_runtime_weekly_continue_button.pressed.connect(_on_weekly_recap_continue_pressed)
+	if _invoice_runtime_critical_continue_button != null:
+		_invoice_runtime_critical_continue_button.pressed.connect(_on_critical_document_continue_pressed)
 	resized.connect(_on_ui_resized)
 	_history_text.visible = false
 	_tutorial_overlay.visible = false
@@ -215,6 +226,9 @@ func _ready() -> void:
 	var weekly_invoice_visibility_callback := Callable()
 	if _invoice_runtime_weekly_panel != null:
 		weekly_invoice_visibility_callback = Callable(self, "_set_weekly_invoice_visibility")
+	var critical_document_visibility_callback := Callable()
+	if _invoice_runtime_critical_document_panel != null:
+		critical_document_visibility_callback = Callable(self, "_set_critical_document_visibility")
 	_modal_locks_controller = UI_MODAL_LOCKS_CONTROLLER.new()
 	_modal_locks_controller.setup(
 		_end_run_panel,
@@ -228,7 +242,10 @@ func _ready() -> void:
 		_weekly_recap_body,
 		Callable(self, "_set_action_buttons_enabled"),
 		_invoice_runtime_weekly_panel,
-		weekly_invoice_visibility_callback
+		weekly_invoice_visibility_callback,
+		_invoice_runtime_critical_document_panel,
+		critical_document_visibility_callback,
+		Callable(self, "_apply_critical_document_model")
 	)
 	_market_selection_controller = UI_MARKET_SELECTION_CONTROLLER.new()
 	_market_selection_controller.set_tutorial_state(_tutorial_state)
@@ -312,13 +329,25 @@ func refresh_all_ui(status_message: String = "") -> void:
 func show_run_end(title: String, description: String) -> void:
 	if _modal_locks_controller == null:
 		return
-	_modal_locks_controller.show_run_end(title, description)
+	var day_index := 1
+	if _run_manager != null:
+		day_index = _run_manager.current_day
+	var run_document := DIEGETIC_DOCUMENT_PRESENTER.build_run_outcome_document(
+		day_index,
+		title,
+		description
+	)
+	var document_id := str(run_document.get("id", ""))
+	if not document_id.is_empty():
+		_last_critical_document_id = document_id
+	_modal_locks_controller.show_run_end(title, description, run_document)
 
 
 func set_event_log_entries(entries: Array[String]) -> void:
 	if _ui_feedback_controller == null:
 		return
 	_ui_feedback_controller.set_event_log_entries(entries)
+	_sync_critical_document_from_event_log(entries)
 
 
 func set_debt_feedback_snapshot(snapshot: Dictionary) -> void:
@@ -453,6 +482,77 @@ func _set_weekly_invoice_visibility(visible: bool) -> void:
 	if _invoice_runtime_weekly_panel == null:
 		return
 	_invoice_runtime_weekly_panel.visible = visible
+
+
+func _set_critical_document_visibility(visible: bool) -> void:
+	if _invoice_runtime_critical_document_panel == null:
+		return
+	_invoice_runtime_critical_document_panel.visible = visible
+
+
+func _apply_critical_document_model(document_model: Dictionary) -> void:
+	if _invoice_runtime_critical_document_panel == null:
+		return
+	var title_text := str(document_model.get("title", "Documento Critico"))
+	var subtitle_text := str(document_model.get("subtitle", "Registro operativo"))
+	var body_text := str(document_model.get("body", "Sin detalle disponible."))
+	var footer_text := str(document_model.get("footer", "Documento archivado en bitacora."))
+	var stamp_text := str(document_model.get("stamp_text", "ARCHIVO"))
+	var action_text := str(document_model.get("action_text", "Archivar documento"))
+	var stamp_color_variant: Variant = document_model.get("stamp_color", Color(0.80, 0.58, 0.30))
+	var accent_color_variant: Variant = document_model.get("accent_color", Color(0.80, 0.58, 0.30))
+	var paper_color_variant: Variant = document_model.get("paper_color", Color(0.97, 0.93, 0.84, 0.95))
+	var stamp_color: Color = stamp_color_variant if stamp_color_variant is Color else Color(0.80, 0.58, 0.30)
+	var accent_color: Color = accent_color_variant if accent_color_variant is Color else Color(0.80, 0.58, 0.30)
+	var paper_color: Color = paper_color_variant if paper_color_variant is Color else Color(0.97, 0.93, 0.84, 0.95)
+	if _invoice_runtime_critical_stamp != null:
+		_invoice_runtime_critical_stamp.text = stamp_text
+		_invoice_runtime_critical_stamp.remove_theme_color_override("font_color")
+		_invoice_runtime_critical_stamp.add_theme_color_override("font_color", stamp_color)
+	if _invoice_runtime_critical_title != null:
+		_invoice_runtime_critical_title.text = title_text
+	if _invoice_runtime_critical_subtitle != null:
+		_invoice_runtime_critical_subtitle.text = subtitle_text
+	if _invoice_runtime_critical_body != null:
+		_invoice_runtime_critical_body.text = body_text
+	if _invoice_runtime_critical_footer != null:
+		_invoice_runtime_critical_footer.text = footer_text
+	if _invoice_runtime_critical_continue_button != null:
+		_invoice_runtime_critical_continue_button.text = action_text
+
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = paper_color
+	panel_style.border_color = accent_color
+	panel_style.border_width_left = 2
+	panel_style.border_width_top = 2
+	panel_style.border_width_right = 2
+	panel_style.border_width_bottom = 2
+	panel_style.corner_radius_top_left = 8
+	panel_style.corner_radius_top_right = 8
+	panel_style.corner_radius_bottom_left = 8
+	panel_style.corner_radius_bottom_right = 8
+	panel_style.shadow_color = Color(0, 0, 0, 0.22)
+	panel_style.shadow_size = 8
+	panel_style.shadow_offset = Vector2(1, 2)
+	_invoice_runtime_critical_document_panel.add_theme_stylebox_override("panel", panel_style)
+	_update_desk_props_alert_state()
+
+
+func _sync_critical_document_from_event_log(entries: Array[String]) -> void:
+	if _modal_locks_controller == null:
+		return
+	if _invoice_runtime_critical_document_panel == null:
+		return
+	if entries.is_empty():
+		return
+	var document_model := DIEGETIC_DOCUMENT_PRESENTER.find_latest_critical_document(entries)
+	if document_model.is_empty():
+		return
+	var document_id := str(document_model.get("id", ""))
+	if document_id.is_empty() or document_id == _last_critical_document_id:
+		return
+	_last_critical_document_id = document_id
+	_modal_locks_controller.show_critical_document(document_model)
 
 
 func _connect_manager_signals() -> void:
@@ -680,6 +780,12 @@ func _on_weekly_recap_continue_pressed() -> void:
 	emit_signal("weekly_recap_closed")
 
 
+func _on_critical_document_continue_pressed() -> void:
+	if _modal_locks_controller == null:
+		return
+	_modal_locks_controller.hide_critical_document()
+
+
 func _on_history_button_pressed() -> void:
 	if _is_tutorial_active():
 		_last_status_message = "Este paso del tutorial usa la vista principal."
@@ -856,6 +962,7 @@ func _are_actions_locked() -> bool:
 	return _upgrade_choice_panel.visible \
 		or _weekly_recap_panel.visible \
 		or (_invoice_runtime_weekly_panel != null and _invoice_runtime_weekly_panel.visible) \
+		or (_invoice_runtime_critical_document_panel != null and _invoice_runtime_critical_document_panel.visible) \
 		or _end_run_panel.visible
 
 
@@ -1091,6 +1198,74 @@ func _build_diegetic_runtime_zones() -> void:
 			weekly_invoice_margin.add_child(weekly_invoice_vbox)
 			weekly_invoice_panel.add_child(weekly_invoice_margin)
 
+			var critical_document_panel := PanelContainer.new()
+			critical_document_panel.name = "CriticalDocumentPanel"
+			critical_document_panel.visible = false
+			critical_document_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+
+			var critical_document_style := StyleBoxFlat.new()
+			critical_document_style.bg_color = Color(0.97, 0.93, 0.84, 0.95)
+			critical_document_style.border_color = Color(0.80, 0.58, 0.30, 0.92)
+			critical_document_style.border_width_left = 2
+			critical_document_style.border_width_top = 2
+			critical_document_style.border_width_right = 2
+			critical_document_style.border_width_bottom = 2
+			critical_document_style.corner_radius_top_left = 8
+			critical_document_style.corner_radius_top_right = 8
+			critical_document_style.corner_radius_bottom_left = 8
+			critical_document_style.corner_radius_bottom_right = 8
+			critical_document_panel.add_theme_stylebox_override("panel", critical_document_style)
+
+			var critical_document_margin := MarginContainer.new()
+			critical_document_margin.name = "CriticalDocumentMargin"
+			critical_document_margin.add_theme_constant_override("margin_left", 9)
+			critical_document_margin.add_theme_constant_override("margin_top", 8)
+			critical_document_margin.add_theme_constant_override("margin_right", 9)
+			critical_document_margin.add_theme_constant_override("margin_bottom", 8)
+
+			var critical_document_vbox := VBoxContainer.new()
+			critical_document_vbox.name = "CriticalDocumentVBox"
+			critical_document_vbox.add_theme_constant_override("separation", 4)
+
+			var critical_stamp := Label.new()
+			critical_stamp.name = "CriticalStampLabel"
+			critical_stamp.add_theme_font_size_override("font_size", 11)
+			critical_stamp.add_theme_color_override("font_color", Color(0.80, 0.58, 0.30))
+			critical_stamp.text = "ARCHIVO"
+
+			var critical_title := Label.new()
+			critical_title.name = "CriticalTitleLabel"
+			critical_title.add_theme_font_size_override("font_size", 18)
+			critical_title.text = "Documento Critico"
+
+			var critical_subtitle := Label.new()
+			critical_subtitle.name = "CriticalSubtitleLabel"
+			critical_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			critical_subtitle.text = "Registro operativo"
+
+			var critical_body := Label.new()
+			critical_body.name = "CriticalBodyLabel"
+			critical_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			critical_body.text = "Sin detalle disponible."
+
+			var critical_footer := Label.new()
+			critical_footer.name = "CriticalFooterLabel"
+			critical_footer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			critical_footer.text = "Documento archivado."
+
+			var critical_continue_button := Button.new()
+			critical_continue_button.name = "CriticalContinueButton"
+			critical_continue_button.text = "Archivar documento"
+
+			critical_document_vbox.add_child(critical_stamp)
+			critical_document_vbox.add_child(critical_title)
+			critical_document_vbox.add_child(critical_subtitle)
+			critical_document_vbox.add_child(critical_body)
+			critical_document_vbox.add_child(critical_footer)
+			critical_document_vbox.add_child(critical_continue_button)
+			critical_document_margin.add_child(critical_document_vbox)
+			critical_document_panel.add_child(critical_document_margin)
+
 			var debt_risk_label := Label.new()
 			debt_risk_label.name = "DebtRiskLabel"
 			debt_risk_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1118,6 +1293,7 @@ func _build_diegetic_runtime_zones() -> void:
 
 			event_scroll.add_child(event_log_label)
 			invoice_vbox.add_child(weekly_invoice_panel)
+			invoice_vbox.add_child(critical_document_panel)
 			invoice_vbox.add_child(debt_risk_label)
 			invoice_vbox.add_child(invoice_label)
 			invoice_vbox.add_child(event_title)
@@ -1132,6 +1308,13 @@ func _build_diegetic_runtime_zones() -> void:
 		_invoice_runtime_weekly_debt = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceDebt") as Label
 		_invoice_runtime_weekly_risk = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceRisk") as Label
 		_invoice_runtime_weekly_continue_button = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceContinueButton") as Button
+		_invoice_runtime_critical_document_panel = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel") as PanelContainer
+		_invoice_runtime_critical_stamp = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalStampLabel") as Label
+		_invoice_runtime_critical_title = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalTitleLabel") as Label
+		_invoice_runtime_critical_subtitle = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalSubtitleLabel") as Label
+		_invoice_runtime_critical_body = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalBodyLabel") as Label
+		_invoice_runtime_critical_footer = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalFooterLabel") as Label
+		_invoice_runtime_critical_continue_button = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalContinueButton") as Button
 		_invoice_runtime_debt_risk_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/DebtRiskLabel") as Label
 		_invoice_runtime_invoice_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/InvoicePreviewLabel") as Label
 		_invoice_runtime_event_log_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/EventLogScroll/EventLogLabel") as Label
