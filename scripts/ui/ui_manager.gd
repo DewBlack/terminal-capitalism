@@ -231,7 +231,7 @@ func _ready() -> void:
 	_apply_action_hints()
 	_apply_zone_contract()
 	if _news_title != null:
-		_news_title.text = "Periodico del Dia"
+		_news_title.text = "Capital Gazette"
 	if _news_history_button != null:
 		_news_history_button.text = "Ver historico"
 
@@ -875,26 +875,27 @@ func _build_diegetic_runtime_zones() -> void:
 			runtime_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			runtime_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 			runtime_margin.mouse_filter = Control.MOUSE_FILTER_STOP
-			runtime_margin.add_theme_constant_override("margin_left", 14)
-			runtime_margin.add_theme_constant_override("margin_top", 12)
-			runtime_margin.add_theme_constant_override("margin_right", 14)
-			runtime_margin.add_theme_constant_override("margin_bottom", 12)
+			runtime_margin.add_theme_constant_override("margin_left", 18)
+			runtime_margin.add_theme_constant_override("margin_top", 14)
+			runtime_margin.add_theme_constant_override("margin_right", 18)
+			runtime_margin.add_theme_constant_override("margin_bottom", 14)
 
 			var news_vbox := VBoxContainer.new()
 			news_vbox.name = "NewsVBox"
 			news_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			news_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-			news_vbox.add_theme_constant_override("separation", 6)
+			news_vbox.add_theme_constant_override("separation", 10)
 
 			var top_row := HBoxContainer.new()
 			top_row.name = "NewsTopRow"
-			top_row.add_theme_constant_override("separation", 6)
+			top_row.add_theme_constant_override("separation", 10)
 
 			var title := Label.new()
 			title.name = "NewsTitle"
 			title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			title.add_theme_font_size_override("font_size", 20)
-			title.text = "Periodico del Dia"
+			title.add_theme_font_size_override("font_size", 28)
+			title.add_theme_color_override("font_color", Color(0.17, 0.12, 0.08, 0.98))
+			title.text = "Capital Gazette"
 
 			var history_button := Button.new()
 			history_button.name = "NewsHistoryButton"
@@ -908,7 +909,7 @@ func _build_diegetic_runtime_zones() -> void:
 			var content := VBoxContainer.new()
 			content.name = "NewsContent"
 			content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			content.add_theme_constant_override("separation", 8)
+			content.add_theme_constant_override("separation", 10)
 
 			scroll.add_child(content)
 			top_row.add_child(title)
@@ -1042,8 +1043,8 @@ func _apply_diegetic_shell_styles() -> void:
 		return
 
 	var paper_style := StyleBoxFlat.new()
-	paper_style.bg_color = Color(0.91, 0.87, 0.74, 0.55)
-	paper_style.border_color = Color(0.46, 0.39, 0.24, 0.65)
+	paper_style.bg_color = Color(0.95, 0.90, 0.79, 0.88)
+	paper_style.border_color = Color(0.44, 0.33, 0.20, 0.72)
 	paper_style.border_width_left = 2
 	paper_style.border_width_top = 2
 	paper_style.border_width_right = 2
@@ -1052,11 +1053,14 @@ func _apply_diegetic_shell_styles() -> void:
 	paper_style.corner_radius_top_right = 6
 	paper_style.corner_radius_bottom_left = 6
 	paper_style.corner_radius_bottom_right = 6
+	paper_style.shadow_color = Color(0.0, 0.0, 0.0, 0.22)
+	paper_style.shadow_size = 10
+	paper_style.shadow_offset = Vector2(2, 3)
 	_newspaper_zone.add_theme_stylebox_override("panel", paper_style)
 
 	var invoice_style := paper_style.duplicate(true) as StyleBoxFlat
-	invoice_style.bg_color = Color(0.84, 0.93, 0.98, 0.46)
-	invoice_style.border_color = Color(0.33, 0.48, 0.60, 0.65)
+	invoice_style.bg_color = Color(0.86, 0.93, 0.98, 0.68)
+	invoice_style.border_color = Color(0.30, 0.46, 0.58, 0.72)
 	_invoice_zone.add_theme_stylebox_override("panel", invoice_style)
 
 
