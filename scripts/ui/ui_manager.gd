@@ -43,6 +43,11 @@ const ROW_NAME_MIN_WIDTH := 176.0
 const ROW_PRICE_MIN_WIDTH := 84.0
 const ROW_CHANGE_MIN_WIDTH := 74.0
 const HOTKEYS_HINT := "Atajos: Up/Down empresa | B comprar | V vender | Enter pasar dia"
+const DESK_BACKDROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_bg_v1.png"
+const MONITOR_FRAME_TEXTURE_PATH := "res://art/placeholder/desk/crt_monitor_frame_v1.png"
+const MONITOR_OVERLAY_TEXTURE_PATH := "res://art/placeholder/desk/crt_screen_overlay_v1.png"
+const NEWSPAPER_TEXTURE_PATH := "res://art/placeholder/news/newspaper_front_v1.png"
+const INVOICE_TEXTURE_PATH := "res://art/placeholder/weekly/invoice_sheet_v1.png"
 
 var _run_manager: RunManager
 var _player_portfolio: PlayerPortfolio
@@ -106,10 +111,15 @@ var _tutorial_state: Dictionary = {"active": false}
 @onready var _debt_risk_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel/DebtVBox/DebtRiskLabel
 @onready var _invoice_preview_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel/DebtVBox/InvoicePreviewLabel
 @onready var _event_log_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/EventLogPanel/EventLogVBox/EventLogScroll/EventLogLabel
+@onready var _desk_backdrop_texture: TextureRect = $DeskBackdrop/DeskBackdropTexture
 @onready var _monitor_frame: Control = $MonitorFrame
+@onready var _monitor_frame_texture: TextureRect = $MonitorFrame/MonitorFrameTexture
 @onready var _monitor_overlay: Control = $MonitorOverlay
+@onready var _monitor_overlay_texture: TextureRect = $MonitorOverlay/MonitorOverlayTexture
 @onready var _newspaper_zone: PanelContainer = $DeskDocs/NewspaperZone
+@onready var _newspaper_texture: TextureRect = $DeskDocs/NewspaperZone/NewspaperTexture
 @onready var _invoice_zone: PanelContainer = $DeskDocs/InvoiceZone
+@onready var _invoice_texture: TextureRect = $DeskDocs/InvoiceZone/InvoiceTexture
 @onready var _toast_panel: PanelContainer = $ToastPanel
 @onready var _toast_label: Label = $ToastPanel/ToastMargin/ToastLabel
 @onready var _tutorial_overlay = $TutorialOverlay
@@ -147,6 +157,7 @@ func _ready() -> void:
 	set_process_unhandled_key_input(true)
 	_apply_ui_tone()
 	_apply_diegetic_shell_styles()
+	_apply_diegetic_artwork()
 	_setup_diegetic_layout()
 	_ui_feedback_controller = UI_FEEDBACK_CONTROLLER.new()
 	add_child(_ui_feedback_controller)
@@ -253,6 +264,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 		_ui_feedback_controller.update_feedback_panel(_player_portfolio)
 		_ui_feedback_controller.apply_status_text(_last_status_message)
 	_apply_tutorial_visual_state()
+	_apply_diegetic_layout()
 
 
 func show_run_end(title: String, description: String) -> void:
@@ -742,8 +754,7 @@ func _are_actions_locked() -> bool:
 
 
 func _on_ui_resized() -> void:
-	if _diegetic_desk_layout != null:
-		_diegetic_desk_layout.apply_layout()
+	_apply_diegetic_layout()
 	if _tutorial_overlay_controller == null:
 		return
 	if not _tutorial_overlay_controller.is_tutorial_active(_tutorial_state):
@@ -867,6 +878,38 @@ func _apply_diegetic_shell_styles() -> void:
 	_invoice_zone.add_theme_stylebox_override("panel", invoice_style)
 
 
+func _apply_diegetic_artwork() -> void:
+	_assign_png_texture(_desk_backdrop_texture, DESK_BACKDROP_TEXTURE_PATH)
+	_assign_png_texture(_monitor_frame_texture, MONITOR_FRAME_TEXTURE_PATH)
+	_assign_png_texture(_monitor_overlay_texture, MONITOR_OVERLAY_TEXTURE_PATH)
+
+	var newspaper_loaded := _assign_png_texture(_newspaper_texture, NEWSPAPER_TEXTURE_PATH)
+	var invoice_loaded := _assign_png_texture(_invoice_texture, INVOICE_TEXTURE_PATH)
+	_newspaper_zone.visible = newspaper_loaded
+	_invoice_zone.visible = invoice_loaded
+
+
+func _assign_png_texture(target: TextureRect, png_path: String) -> bool:
+	if target == null:
+		return false
+	var image := Image.new()
+	var image_error := image.load(png_path)
+	if image_error != OK:
+		target.texture = null
+		return false
+	var texture := ImageTexture.create_from_image(image)
+	if texture == null:
+		target.texture = null
+		return false
+	target.texture = texture
+	return true
+
+
+func _apply_diegetic_layout() -> void:
+	if _diegetic_desk_layout != null:
+		_diegetic_desk_layout.apply_layout()
+
+
 func _emit_tutorial_action_blocked(
 	action_id: String,
 	reason: String,
@@ -900,4 +943,4 @@ func _setup_diegetic_layout() -> void:
 		_newspaper_zone,
 		_invoice_zone
 	)
-	_diegetic_desk_layout.apply_layout()
+	_apply_diegetic_layout()
