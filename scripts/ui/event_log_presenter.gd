@@ -18,5 +18,5 @@ static func build_model(entries: Array[String], visible_max: int) -> Dictionary:
 		visible_entries.append("- %s" % DIEGETIC_DOCUMENT_PRESENTER.build_log_preview(entries[index]))
 	return {
 		"text": "\n".join(visible_entries),
-		"tooltip": "\n".join(visible_entries)
+		"tooltip": "\n".join(entries)
 	}
