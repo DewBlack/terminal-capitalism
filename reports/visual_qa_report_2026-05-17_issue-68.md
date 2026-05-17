@@ -5,7 +5,7 @@
 - Bloque: `block-visual`
 - Rama: `chat/2026-05-17-issue-68-qa-visual-checklist`
 - PR draft: `#80`
-- Build/commit evaluado: `cf128aa`
+- Build/commit evaluado: `4e2f970`
 - Fecha: `2026-05-17`
 - Responsable QA: `Usuario (manual) + Codex (registro)`
 
