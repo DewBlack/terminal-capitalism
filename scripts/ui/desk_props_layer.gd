@@ -138,12 +138,7 @@ func _assign_texture(node: TextureRect, texture_path: String) -> void:
 func _load_texture(texture_path: String) -> Texture2D:
 	if _texture_cache.has(texture_path):
 		return _texture_cache[texture_path] as Texture2D
-	var image := Image.new()
-	var image_error := image.load(texture_path)
-	if image_error != OK:
-		_texture_cache[texture_path] = null
-		return null
-	var loaded := ImageTexture.create_from_image(image)
+	var loaded := ResourceLoader.load(texture_path, "Texture2D") as Texture2D
 	_texture_cache[texture_path] = loaded
 	return loaded
 
