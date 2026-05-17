@@ -883,8 +883,15 @@ func _apply_diegetic_shell_styles() -> void:
 
 func _apply_diegetic_artwork() -> void:
 	_assign_png_texture(_desk_backdrop_texture, DESK_BACKDROP_TEXTURE_PATH)
+	# El frame actual viene con chroma verde sólido; lo ocultamos hasta tener asset usable.
 	_assign_png_texture(_monitor_frame_texture, MONITOR_FRAME_TEXTURE_PATH)
+	if _monitor_frame_texture != null:
+		_monitor_frame_texture.visible = false
+
+	# El overlay actual oscurece demasiado la UI dentro de pantalla.
 	_assign_png_texture(_monitor_overlay_texture, MONITOR_OVERLAY_TEXTURE_PATH)
+	if _monitor_overlay_texture != null:
+		_monitor_overlay_texture.visible = false
 
 	var newspaper_loaded := _assign_png_texture(_newspaper_texture, NEWSPAPER_TEXTURE_PATH)
 	var invoice_loaded := _assign_png_texture(_invoice_texture, INVOICE_TEXTURE_PATH)

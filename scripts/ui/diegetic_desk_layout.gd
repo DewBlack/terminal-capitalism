@@ -2,20 +2,20 @@ class_name DiegeticDeskLayout
 extends RefCounted
 
 const MONITOR_ASPECT_RATIO := 1.58
-const MONITOR_WIDTH_RATIO := 0.68
-const MONITOR_HEIGHT_LIMIT_RATIO := 0.90
+const MONITOR_WIDTH_RATIO := 0.54
+const MONITOR_HEIGHT_LIMIT_RATIO := 0.82
 const MONITOR_HEIGHT_HARD_LIMIT_RATIO := 0.96
 const MONITOR_MAX_VIEWPORT_WIDTH_RATIO := 0.97
 const MONITOR_MIN_WIDTH := 760.0
-const MONITOR_MAX_WIDTH := 1700.0
+const MONITOR_MAX_WIDTH := 1320.0
 const MONITOR_VERTICAL_OFFSET_RATIO := 0.0
 
-const SCREEN_LEFT_PADDING_RATIO := 0.06
-const SCREEN_TOP_PADDING_RATIO := 0.08
-const SCREEN_RIGHT_PADDING_RATIO := 0.06
-const SCREEN_BOTTOM_PADDING_RATIO := 0.12
-const SCREEN_MIN_WIDTH_FALLBACK := 1120.0
-const SCREEN_MIN_HEIGHT_FALLBACK := 760.0
+const SCREEN_LEFT_PADDING_RATIO := 0.08
+const SCREEN_TOP_PADDING_RATIO := 0.11
+const SCREEN_RIGHT_PADDING_RATIO := 0.08
+const SCREEN_BOTTOM_PADDING_RATIO := 0.18
+const SCREEN_MIN_WIDTH_FALLBACK := 980.0
+const SCREEN_MIN_HEIGHT_FALLBACK := 560.0
 
 const DOC_ZONE_WIDTH_RATIO := 0.23
 const DOC_ZONE_ASPECT_RATIO := 0.72
@@ -102,9 +102,6 @@ func _build_monitor_size(viewport_size: Vector2, required_screen_size: Vector2) 
 func _resolve_required_screen_size(viewport_size: Vector2) -> Vector2:
 	var required_screen_width: float = SCREEN_MIN_WIDTH_FALLBACK
 	var required_screen_height: float = SCREEN_MIN_HEIGHT_FALLBACK
-	var content_min_size: Vector2 = _resolve_content_min_size()
-	required_screen_width = maxf(required_screen_width, content_min_size.x)
-	required_screen_height = maxf(required_screen_height, content_min_size.y)
 	var max_screen_width: float = viewport_size.x * MONITOR_MAX_VIEWPORT_WIDTH_RATIO * _screen_inner_width_ratio()
 	var max_screen_height: float = viewport_size.y * MONITOR_HEIGHT_HARD_LIMIT_RATIO * _screen_inner_height_ratio()
 	return Vector2(minf(required_screen_width, max_screen_width), minf(required_screen_height, max_screen_height))
