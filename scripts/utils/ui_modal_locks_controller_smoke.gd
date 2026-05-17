@@ -25,6 +25,21 @@ class UpgradeSelectionRecorder:
 		selected_ids.append(upgrade_id)
 
 
+class DocumentSurfaceRecorder:
+	extends RefCounted
+
+	var visible: bool = false
+	var latest_model: Dictionary = {}
+
+
+	func on_set_visible(next_visible: bool) -> void:
+		visible = next_visible
+
+
+	func on_set_model(model: Dictionary) -> void:
+		latest_model = model.duplicate(true)
+
+
 func _initialize() -> void:
 	call_deferred("_run_smoke")
 
@@ -40,8 +55,10 @@ func _run_smoke() -> void:
 	var weekly_recap_panel := PanelContainer.new()
 	var weekly_recap_title := Label.new()
 	var weekly_recap_body := RichTextLabel.new()
+	var critical_document_panel := PanelContainer.new()
 	var action_recorder := ActionLockRecorder.new()
 	var upgrade_recorder := UpgradeSelectionRecorder.new()
+	var document_recorder := DocumentSurfaceRecorder.new()
 	var modal_controller = UI_MODAL_LOCKS_CONTROLLER.new()
 	var created_controls: Array[Control] = [
 		end_run_panel,
@@ -52,7 +69,8 @@ func _run_smoke() -> void:
 		upgrade_options,
 		weekly_recap_panel,
 		weekly_recap_title,
-		weekly_recap_body
+		weekly_recap_body,
+		critical_document_panel
 	]
 
 	modal_controller.setup(
@@ -65,7 +83,12 @@ func _run_smoke() -> void:
 		weekly_recap_panel,
 		weekly_recap_title,
 		weekly_recap_body,
-		Callable(action_recorder, "on_set_action_buttons_enabled")
+		Callable(action_recorder, "on_set_action_buttons_enabled"),
+		null,
+		Callable(),
+		critical_document_panel,
+		Callable(document_recorder, "on_set_visible"),
+		Callable(document_recorder, "on_set_model")
 	)
 
 	_expect_bool(modal_controller.are_actions_locked(), false, "setup actions_locked", failures)
@@ -76,6 +99,7 @@ func _run_smoke() -> void:
 
 	_run_upgrade_modal_case(modal_controller, upgrade_choice_panel, upgrade_subtitle, upgrade_options, action_recorder, upgrade_recorder, failures)
 	_run_stacked_modal_case(modal_controller, upgrade_choice_panel, weekly_recap_panel, action_recorder, failures)
+	_run_critical_document_queue_case(modal_controller, weekly_recap_panel, action_recorder, document_recorder, failures)
 	_run_end_run_modal_case(
 		modal_controller,
 		end_run_panel,
@@ -187,6 +211,41 @@ func _run_end_run_modal_case(
 	_expect_bool(action_recorder.last_enabled, false, "end_run action_buttons_enabled", failures)
 	_expect_string(end_run_title.text, "Run Terminada", "end_run title", failures)
 	_expect_string(end_run_description.text, "Victoria de smoke", "end_run description", failures)
+
+
+func _run_critical_document_queue_case(
+	modal_controller: Object,
+	weekly_recap_panel: PanelContainer,
+	action_recorder: ActionLockRecorder,
+	document_recorder: DocumentSurfaceRecorder,
+	failures: Array[String]
+) -> void:
+	var document_model := {
+		"id": "doc_smoke_01",
+		"title": "Aviso de Quiebras",
+		"body": "Detalle smoke."
+	}
+	modal_controller.show_critical_document(document_model)
+	_expect_bool(modal_controller.are_actions_locked(), true, "critical_doc lock_active", failures)
+	_expect_bool(document_recorder.visible, true, "critical_doc visible", failures)
+	_expect_string(
+		str(document_recorder.latest_model.get("id", "")),
+		"doc_smoke_01",
+		"critical_doc model_id",
+		failures
+	)
+
+	modal_controller.show_weekly_recap(5, "Resumen temporal")
+	_expect_bool(weekly_recap_panel.visible, true, "critical_doc recap_priority", failures)
+	_expect_bool(document_recorder.visible, false, "critical_doc queued_hidden", failures)
+	_expect_bool(action_recorder.last_enabled, false, "critical_doc queued_buttons_locked", failures)
+
+	modal_controller.hide_weekly_recap()
+	_expect_bool(document_recorder.visible, true, "critical_doc restored_after_recap", failures)
+
+	modal_controller.hide_critical_document()
+	_expect_bool(modal_controller.are_actions_locked(), false, "critical_doc unlock_after_hide", failures)
+	_expect_bool(document_recorder.visible, false, "critical_doc hidden_after_ack", failures)
 
 
 func _expect_bool(actual: bool, expected: bool, label: String, failures: Array[String]) -> void:

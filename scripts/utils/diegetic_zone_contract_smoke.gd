@@ -6,6 +6,7 @@ const FEEDBACK_PANEL_PATH := NodePath("MainMargin/MainVBox/FeedbackPanel")
 const NEWSPAPER_RUNTIME_PATH := NodePath("DeskDocs/NewspaperZone/NewsRuntime")
 const NEWSPAPER_CONTENT_PATH := NodePath("DeskDocs/NewspaperZone/NewsRuntime/NewsVBox/NewsScroll/NewsContent")
 const INVOICE_RUNTIME_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime")
+const INVOICE_CRITICAL_DOC_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel")
 const INVOICE_DEBT_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/DebtRiskLabel")
 const INVOICE_PREVIEW_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/InvoicePreviewLabel")
 const INVOICE_EVENT_LOG_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/EventLogScroll/EventLogLabel")
@@ -32,6 +33,7 @@ func _run_smoke() -> void:
 	var newspaper_runtime := ui.get_node_or_null(NEWSPAPER_RUNTIME_PATH) as Control
 	var newspaper_content := ui.get_node_or_null(NEWSPAPER_CONTENT_PATH) as VBoxContainer
 	var invoice_runtime := ui.get_node_or_null(INVOICE_RUNTIME_PATH) as Control
+	var critical_document_panel := ui.get_node_or_null(INVOICE_CRITICAL_DOC_PATH) as PanelContainer
 	var debt_label := ui.get_node_or_null(INVOICE_DEBT_PATH) as Label
 	var invoice_label := ui.get_node_or_null(INVOICE_PREVIEW_PATH) as Label
 	var event_log_label := ui.get_node_or_null(INVOICE_EVENT_LOG_PATH) as Label
@@ -46,6 +48,8 @@ func _run_smoke() -> void:
 		failures.append("No se encontro NewsContent en zona de periodico.")
 	if invoice_runtime == null:
 		failures.append("No se encontro InvoiceRuntime en zona de factura/documentos.")
+	if critical_document_panel == null:
+		failures.append("No se encontro CriticalDocumentPanel en zona de factura/documentos.")
 	if debt_label == null:
 		failures.append("No se encontro DebtRiskLabel en zona de factura.")
 	if invoice_label == null:
@@ -61,6 +65,8 @@ func _run_smoke() -> void:
 		failures.append("NewsRuntime no esta visible en periodico.")
 	if invoice_runtime != null and not _is_visible_in_tree(invoice_runtime):
 		failures.append("InvoiceRuntime no esta visible en factura/documentos.")
+	if critical_document_panel != null and _is_visible_in_tree(critical_document_panel):
+		failures.append("CriticalDocumentPanel inicia visible sin evento critico.")
 
 	if news_panel != null and feedback_panel != null and newspaper_runtime != null and invoice_runtime != null:
 		var monitor_has_non_operational := _is_visible_in_tree(news_panel) or _is_visible_in_tree(feedback_panel)

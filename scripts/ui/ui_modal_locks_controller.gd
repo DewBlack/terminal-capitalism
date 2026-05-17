@@ -18,6 +18,12 @@ var _set_action_buttons_enabled: Callable = Callable()
 var _weekly_invoice_document: Control = null
 var _set_weekly_invoice_visibility: Callable = Callable()
 var _weekly_invoice_visible: bool = false
+var _critical_document: Control = null
+var _set_critical_document_visibility: Callable = Callable()
+var _set_critical_document_model: Callable = Callable()
+var _critical_document_visible: bool = false
+var _queued_critical_document_model: Dictionary = {}
+var _active_critical_document_model: Dictionary = {}
 
 
 func setup(
@@ -32,7 +38,10 @@ func setup(
 	weekly_recap_body: RichTextLabel,
 	set_action_buttons_enabled: Callable,
 	weekly_invoice_document: Control = null,
-	set_weekly_invoice_visibility: Callable = Callable()
+	set_weekly_invoice_visibility: Callable = Callable(),
+	critical_document: Control = null,
+	set_critical_document_visibility: Callable = Callable(),
+	set_critical_document_model: Callable = Callable()
 ) -> void:
 	_end_run_panel = end_run_panel
 	_end_run_title = end_run_title
@@ -46,6 +55,9 @@ func setup(
 	_set_action_buttons_enabled = set_action_buttons_enabled
 	_weekly_invoice_document = weekly_invoice_document
 	_set_weekly_invoice_visibility = set_weekly_invoice_visibility
+	_critical_document = critical_document
+	_set_critical_document_visibility = set_critical_document_visibility
+	_set_critical_document_model = set_critical_document_model
 	reset_modal_state()
 
 
@@ -57,23 +69,33 @@ func reset_modal_state() -> void:
 	if _weekly_recap_panel != null:
 		_weekly_recap_panel.visible = false
 	_set_weekly_invoice_visible(false)
+	_set_critical_document_visible(false)
+	_queued_critical_document_model.clear()
+	_active_critical_document_model.clear()
 	_clear_upgrade_options()
 	_apply_action_lock_state()
 
 
-func show_run_end(title: String, description: String) -> void:
-	hide_weekly_upgrade_choices()
-	hide_weekly_recap()
+func show_run_end(title: String, description: String, run_summary_document: Dictionary = {}) -> void:
+	hide_weekly_upgrade_choices(false)
+	hide_weekly_recap(false)
+	_queued_critical_document_model.clear()
 	if _end_run_panel != null:
 		_end_run_panel.visible = true
 	if _end_run_title != null:
 		_end_run_title.text = title
 	if _end_run_description != null:
 		_end_run_description.text = description
+	if not run_summary_document.is_empty():
+		_show_critical_document_now(run_summary_document)
+	else:
+		_set_critical_document_visible(false)
 	_apply_action_lock_state()
 
 
 func show_weekly_upgrade_choices(choices: Array[RunUpgrade], on_upgrade_choice_pressed: Callable) -> void:
+	_stash_active_critical_document_for_later()
+	_set_critical_document_visible(false)
 	if _upgrade_choice_panel != null:
 		_upgrade_choice_panel.visible = true
 	if _upgrade_subtitle != null:
@@ -101,10 +123,12 @@ func show_weekly_upgrade_choices(choices: Array[RunUpgrade], on_upgrade_choice_p
 		_upgrade_options.add_child(card)
 
 
-func hide_weekly_upgrade_choices() -> void:
+func hide_weekly_upgrade_choices(try_show_queued_document: bool = true) -> void:
 	if _upgrade_choice_panel != null:
 		_upgrade_choice_panel.visible = false
 	_clear_upgrade_options()
+	if try_show_queued_document:
+		_try_show_queued_critical_document()
 	_apply_action_lock_state()
 
 
@@ -114,6 +138,8 @@ func show_weekly_recap(
 	_weekly_recap_data: Dictionary = {},
 	_debt_snapshot: Dictionary = {}
 ) -> void:
+	_stash_active_critical_document_for_later()
+	_set_critical_document_visible(false)
 	if _has_weekly_invoice_surface():
 		_set_weekly_invoice_visible(true)
 		_apply_action_lock_state()
@@ -127,10 +153,27 @@ func show_weekly_recap(
 	_apply_action_lock_state()
 
 
-func hide_weekly_recap() -> void:
+func hide_weekly_recap(try_show_queued_document: bool = true) -> void:
 	_set_weekly_invoice_visible(false)
 	if _weekly_recap_panel != null:
 		_weekly_recap_panel.visible = false
+	if try_show_queued_document:
+		_try_show_queued_critical_document()
+	_apply_action_lock_state()
+
+
+func show_critical_document(document_model: Dictionary) -> void:
+	if document_model.is_empty():
+		return
+	if _has_priority_modal_visible():
+		_queued_critical_document_model = document_model.duplicate(true)
+		return
+	_show_critical_document_now(document_model)
+
+
+func hide_critical_document() -> void:
+	_set_critical_document_visible(false)
+	_try_show_queued_critical_document()
 	_apply_action_lock_state()
 
 
@@ -138,6 +181,7 @@ func are_actions_locked() -> bool:
 	return _is_visible(_upgrade_choice_panel) \
 		or _is_visible(_weekly_recap_panel) \
 		or _weekly_invoice_visible \
+		or _critical_document_visible \
 		or _is_visible(_end_run_panel)
 
 
@@ -167,6 +211,49 @@ func _set_weekly_invoice_visible(visible: bool) -> void:
 	if _weekly_invoice_document != null:
 		_weekly_invoice_document.visible = visible
 		_weekly_invoice_visible = visible and _weekly_invoice_document.visible
+
+
+func _set_critical_document_visible(visible: bool) -> void:
+	_critical_document_visible = false
+	if _set_critical_document_visibility.is_valid():
+		_set_critical_document_visibility.call(visible)
+		_critical_document_visible = visible
+	elif _critical_document != null:
+		_critical_document.visible = visible
+		_critical_document_visible = visible and _critical_document.visible
+	if not visible:
+		_active_critical_document_model.clear()
+
+
+func _show_critical_document_now(document_model: Dictionary) -> void:
+	_active_critical_document_model = document_model.duplicate(true)
+	if _set_critical_document_model.is_valid():
+		_set_critical_document_model.call(document_model.duplicate(true))
+	_set_critical_document_visible(true)
+	_apply_action_lock_state()
+
+
+func _stash_active_critical_document_for_later() -> void:
+	if _active_critical_document_model.is_empty():
+		return
+	_queued_critical_document_model = _active_critical_document_model.duplicate(true)
+
+
+func _try_show_queued_critical_document() -> void:
+	if _queued_critical_document_model.is_empty():
+		return
+	if _has_priority_modal_visible():
+		return
+	var queued_model := _queued_critical_document_model.duplicate(true)
+	_queued_critical_document_model.clear()
+	_show_critical_document_now(queued_model)
+
+
+func _has_priority_modal_visible() -> bool:
+	return _is_visible(_upgrade_choice_panel) \
+		or _is_visible(_weekly_recap_panel) \
+		or _weekly_invoice_visible \
+		or _is_visible(_end_run_panel)
 
 
 func _is_visible(control: Control) -> bool:
