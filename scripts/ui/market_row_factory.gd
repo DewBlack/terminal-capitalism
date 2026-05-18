@@ -43,7 +43,7 @@ static func build_company_row(
 	top_row.add_theme_constant_override("separation", 8)
 	row_vbox.add_child(top_row)
 
-	var badge := _build_company_logo_badge(company, 30)
+	var badge := _build_company_logo_badge(company, 24)
 	top_row.add_child(badge)
 
 	var select_button := Button.new()
@@ -60,8 +60,8 @@ static func build_company_row(
 	top_row.add_child(select_button)
 
 	var info_button := Button.new()
-	info_button.custom_minimum_size = Vector2(58, 0)
-	info_button.text = "Info"
+	info_button.custom_minimum_size = Vector2(38, 0)
+	info_button.text = "i"
 	info_button.tooltip_text = "Abrir ficha de %s" % company.name
 	info_button.focus_mode = Control.FOCUS_NONE
 	if on_info_pressed.is_valid():

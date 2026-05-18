@@ -43,13 +43,19 @@ const MOVEMENT_REASON_MAX_CHARS := 88
 const MARKET_TAGS_VISIBLE := 3
 const MARKET_TAGS_MAX_CHARS := 24
 const COMPANY_TAGS_VISIBLE := 6
-const ROW_NAME_MIN_WIDTH := 150.0
-const ROW_PRICE_MIN_WIDTH := 72.0
-const ROW_CHANGE_MIN_WIDTH := 66.0
+const ROW_NAME_MIN_WIDTH := 96.0
+const ROW_PRICE_MIN_WIDTH := 58.0
+const ROW_CHANGE_MIN_WIDTH := 52.0
 const HOTKEYS_HINT := "Atajos: Up/Down empresa | B comprar | V vender | Enter dia"
 const APP_SECTION_HOME := "home"
 const APP_SECTION_MARKET := "market"
 const APP_SECTION_COMPANY := "company"
+const BUY_LABEL_FULL := "Comprar"
+const SELL_LABEL_FULL := "Vender"
+const END_DAY_LABEL_FULL := "Pasar Dia"
+const BUY_LABEL_COMPACT := "C"
+const SELL_LABEL_COMPACT := "V"
+const END_DAY_LABEL_COMPACT := "Dia"
 const DESK_BACKDROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_bg_v1.png"
 const DESK_COMPUTER_PROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_bg_v1.png"
 const MONITOR_FRAME_TEXTURE_PATH := "res://art/placeholder/desk/crt_monitor_frame_v1.png"
@@ -316,6 +322,7 @@ func _ready() -> void:
 		)
 	_apply_action_hints()
 	_apply_zone_contract()
+	_apply_monitor_compaction()
 	if _news_title != null:
 		_news_title.text = "Capital Gazette"
 	if _news_history_button != null:
@@ -373,6 +380,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 		_ui_feedback_controller.apply_status_text(_last_status_message)
 	_apply_tutorial_visual_state()
 	_apply_app_section_visibility()
+	_apply_monitor_compaction()
 	_apply_diegetic_layout()
 	_update_desk_props_alert_state()
 
@@ -955,6 +963,37 @@ func _apply_app_nav_button_state(button: Button, label: String, is_active: bool)
 		return
 	button.disabled = is_active
 	button.text = "[%s]" % label if is_active else label
+
+
+func _apply_monitor_compaction() -> void:
+	var compact := _zone_contract_enabled
+	if _quantity_plus_ten_button != null:
+		_quantity_plus_ten_button.visible = not compact
+	if _quantity_plus_twenty_five_button != null:
+		_quantity_plus_twenty_five_button.visible = not compact
+	if _quantity_max_button != null:
+		_quantity_max_button.visible = not compact
+	if _status_label != null:
+		_status_label.visible = not compact
+	if _selection_label != null:
+		_selection_label.custom_minimum_size = Vector2(96, 0) if compact else Vector2(150, 0)
+	if _quantity_input != null:
+		_quantity_input.custom_minimum_size = Vector2(66, 0) if compact else Vector2.ZERO
+	if _bottom_bar != null:
+		_bottom_bar.add_theme_constant_override("separation", 4 if compact else 8)
+	if _buy_button != null:
+		_buy_button.text = BUY_LABEL_COMPACT if compact else BUY_LABEL_FULL
+		_buy_button.tooltip_text = "Comprar acciones."
+	if _sell_button != null:
+		_sell_button.text = SELL_LABEL_COMPACT if compact else SELL_LABEL_FULL
+		_sell_button.tooltip_text = "Vender acciones."
+	if _end_day_button != null:
+		_end_day_button.text = END_DAY_LABEL_COMPACT if compact else END_DAY_LABEL_FULL
+		_end_day_button.tooltip_text = "Cierra el dia y procesa precios/noticias."
+	if _market_panel != null and compact:
+		_market_panel.custom_minimum_size = Vector2(300, 0)
+	if _details_panel != null and compact:
+		_details_panel.custom_minimum_size = Vector2(300, 0)
 
 
 func _update_market_table() -> void:

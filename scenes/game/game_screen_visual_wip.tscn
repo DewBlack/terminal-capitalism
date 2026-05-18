@@ -247,17 +247,17 @@ alignment = 1
 theme_override_constants/separation = 6
 
 [node name="HomeButton" type="Button" parent="MainMargin/MainVBox/AppNavBar"]
-custom_minimum_size = Vector2(98, 0)
+custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
 text = "Home"
 
 [node name="MarketButton" type="Button" parent="MainMargin/MainVBox/AppNavBar"]
-custom_minimum_size = Vector2(110, 0)
+custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
 text = "Mercado"
 
 [node name="CompanyButton" type="Button" parent="MainMargin/MainVBox/AppNavBar"]
-custom_minimum_size = Vector2(110, 0)
+custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
 text = "Empresa"
 
@@ -301,10 +301,10 @@ text = "Resumen general de cartera."
 custom_minimum_size = Vector2(0, 164)
 layout_mode = 2
 size_flags_vertical = 1
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
 [node name="HomePiePanel" type="PanelContainer" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow"]
-custom_minimum_size = Vector2(220, 0)
+custom_minimum_size = Vector2(160, 0)
 layout_mode = 2
 size_flags_horizontal = 1
 
@@ -434,7 +434,7 @@ size_flags_vertical = 3
 theme_override_constants/separation = 10
 
 [node name="MarketPanel" type="PanelContainer" parent="MainMargin/MainVBox/BodySplit/CenterSplit"]
-custom_minimum_size = Vector2(420, 0)
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 1.2
@@ -463,7 +463,7 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 4
 
 [node name="DetailsPanel" type="PanelContainer" parent="MainMargin/MainVBox/BodySplit/CenterSplit"]
-custom_minimum_size = Vector2(360, 0)
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 1.0
@@ -598,7 +598,7 @@ theme_override_constants/separation = 8
 
 [node name="SelectionLabel" type="Label" parent="MainMargin/MainVBox/BottomPanel/BottomBar"]
 layout_mode = 2
-custom_minimum_size = Vector2(150, 0)
+custom_minimum_size = Vector2(96, 0)
 size_flags_horizontal = 1
 clip_text = true
 text = "Selecciona una empresa."
@@ -640,7 +640,7 @@ text = "Pasar Dia"
 
 [node name="StatusLabel" type="Label" parent="MainMargin/MainVBox/BottomPanel/BottomBar"]
 layout_mode = 2
-custom_minimum_size = Vector2(160, 0)
+custom_minimum_size = Vector2(0, 0)
 size_flags_horizontal = 3
 size_flags_vertical = 1
 clip_text = true
