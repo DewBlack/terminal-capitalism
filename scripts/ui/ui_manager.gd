@@ -1756,20 +1756,7 @@ func _is_document_zone_ready(zone: Control, runtime_zone: Control) -> bool:
 func _apply_diegetic_shell_styles() -> void:
 	var monitor_panel := _monitor_frame as PanelContainer
 	if monitor_panel != null:
-		var monitor_style := StyleBoxFlat.new()
-		monitor_style.bg_color = Color(0.08, 0.09, 0.11, 0.78)
-		monitor_style.border_color = Color(0.60, 0.54, 0.44, 0.88)
-		monitor_style.border_width_left = 4
-		monitor_style.border_width_top = 4
-		monitor_style.border_width_right = 4
-		monitor_style.border_width_bottom = 8
-		monitor_style.corner_radius_top_left = 16
-		monitor_style.corner_radius_top_right = 16
-		monitor_style.corner_radius_bottom_left = 24
-		monitor_style.corner_radius_bottom_right = 24
-		monitor_style.shadow_color = Color(0, 0, 0, 0.38)
-		monitor_style.shadow_size = 14
-		monitor_panel.add_theme_stylebox_override("panel", monitor_style)
+		monitor_panel.visible = false
 
 	if _newspaper_zone == null or _invoice_zone == null:
 		return
@@ -1853,6 +1840,8 @@ func _apply_diegetic_artwork() -> void:
 	_assign_png_texture(_monitor_frame_texture, MONITOR_FRAME_TEXTURE_PATH)
 	if _monitor_frame_texture != null:
 		_monitor_frame_texture.visible = false
+	if _monitor_frame != null:
+		_monitor_frame.visible = false
 
 	# El overlay actual oscurece demasiado la UI dentro de pantalla.
 	_assign_png_texture(_monitor_overlay_texture, MONITOR_OVERLAY_TEXTURE_PATH)
