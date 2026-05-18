@@ -43,15 +43,27 @@ const MOVEMENT_REASON_MAX_CHARS := 88
 const MARKET_TAGS_VISIBLE := 3
 const MARKET_TAGS_MAX_CHARS := 24
 const COMPANY_TAGS_VISIBLE := 6
-const ROW_NAME_MIN_WIDTH := 176.0
-const ROW_PRICE_MIN_WIDTH := 84.0
-const ROW_CHANGE_MIN_WIDTH := 74.0
-const HOTKEYS_HINT := "Atajos: Up/Down empresa | B comprar | V vender | Enter pasar dia"
+const ROW_NAME_MIN_WIDTH := 96.0
+const ROW_PRICE_MIN_WIDTH := 58.0
+const ROW_CHANGE_MIN_WIDTH := 52.0
+const HOTKEYS_HINT := "Atajos: Up/Down empresa | B comprar | V vender | Enter dia"
+const APP_SECTION_HOME := "home"
+const APP_SECTION_MARKET := "market"
+const APP_SECTION_COMPANY := "company"
+const BUY_LABEL_FULL := "Comprar"
+const SELL_LABEL_FULL := "Vender"
+const END_DAY_LABEL_FULL := "Pasar Dia"
+const BUY_LABEL_COMPACT := "C"
+const SELL_LABEL_COMPACT := "V"
+const END_DAY_LABEL_COMPACT := "Dia"
 const DESK_BACKDROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_bg_v1.png"
+const DESK_COMPUTER_PROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_bg_v1.png"
 const MONITOR_FRAME_TEXTURE_PATH := "res://art/placeholder/desk/crt_monitor_frame_v1.png"
 const MONITOR_OVERLAY_TEXTURE_PATH := "res://art/placeholder/desk/crt_screen_overlay_v1.png"
 const NEWSPAPER_TEXTURE_PATH := "res://art/placeholder/news/newspaper_front_v1.png"
 const INVOICE_TEXTURE_PATH := "res://art/placeholder/weekly/invoice_sheet_v1.png"
+const NEWSPAPER_PAGE_BLOCKS := 4
+const CALENDAR_DAYS := 30
 
 var _run_manager: RunManager
 var _player_portfolio: PlayerPortfolio
@@ -62,6 +74,7 @@ var _upgrade_manager: UpgradeManager
 var _history_visible: bool = false
 var _news_history_visible: bool = false
 var _last_status_message: String = ""
+var _active_app_section: String = APP_SECTION_MARKET
 var _ui_feedback_controller = null
 var _trade_action_controller = null
 var _market_selection_controller = null
@@ -77,9 +90,21 @@ var _invoice_runtime: Control = null
 var _newspaper_runtime_title: Label = null
 var _newspaper_runtime_history_button: Button = null
 var _newspaper_runtime_content: VBoxContainer = null
+var _newspaper_runtime_page_prev_button: Button = null
+var _newspaper_runtime_page_next_button: Button = null
+var _newspaper_runtime_page_label: Label = null
+var _newspaper_current_page: int = 0
+var _newspaper_total_pages: int = 1
+var _calendar_zone: PanelContainer = null
+var _calendar_runtime: Control = null
+var _calendar_title_label: Label = null
+var _calendar_day_labels: Array[Label] = []
+var _desk_end_day_button: Button = null
 var _invoice_runtime_debt_risk_label: Label = null
 var _invoice_runtime_invoice_label: Label = null
 var _invoice_runtime_event_log_label: Label = null
+var _invoice_runtime_cash_ledger_label: Label = null
+var _invoice_runtime_debt_ledger_label: Label = null
 var _invoice_runtime_weekly_panel: PanelContainer = null
 var _invoice_runtime_weekly_title: Label = null
 var _invoice_runtime_weekly_summary: Label = null
@@ -108,6 +133,19 @@ var _crt_shader_material: ShaderMaterial = null
 @onready var _net_worth_label: Label = $MainMargin/MainVBox/HeaderBar/NetWorthLabel
 @onready var _upgrade_label: Label = $MainMargin/MainVBox/HeaderBar/UpgradeLabel
 @onready var _header_bar: GridContainer = $MainMargin/MainVBox/HeaderBar
+@onready var _app_home_button: Button = get_node_or_null("MainMargin/MainVBox/AppNavBar/HomeButton") as Button
+@onready var _app_market_button: Button = get_node_or_null("MainMargin/MainVBox/AppNavBar/MarketButton") as Button
+@onready var _app_company_button: Button = get_node_or_null("MainMargin/MainVBox/AppNavBar/CompanyButton") as Button
+@onready var _body_split: HBoxContainer = $MainMargin/MainVBox/BodySplit
+@onready var _center_split: HBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit
+@onready var _home_panel: PanelContainer = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel") as PanelContainer
+@onready var _home_summary_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeSummaryLabel") as Label
+@onready var _home_pie_chart: Control = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomePiePanel/HomePieMargin/HomePieVBox/HomePieChart") as Control
+@onready var _home_pie_legend_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomePiePanel/HomePieMargin/HomePieVBox/HomePieLegendLabel") as Label
+@onready var _home_trend_chart: PriceChart = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomeTrendPanel/HomeTrendMargin/HomeTrendVBox/HomeTrendChart") as PriceChart
+@onready var _home_trend_delta_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomeTrendPanel/HomeTrendMargin/HomeTrendVBox/HomeTrendDeltaLabel") as Label
+@onready var _home_pulse_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomePulseLabel") as Label
+@onready var _home_holdings_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeHoldingsScroll/HomeHoldingsLabel") as Label
 @onready var _market_title: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketTitle
 @onready var _market_header: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketHeader
 @onready var _details_title: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/DetailsTitle
@@ -145,10 +183,13 @@ var _crt_shader_material: ShaderMaterial = null
 @onready var _event_log_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/EventLogPanel/EventLogVBox/EventLogScroll/EventLogLabel
 @onready var _desk_props_layer: Control = get_node_or_null("DeskPropsLayer") as Control
 @onready var _desk_backdrop_texture: TextureRect = get_node_or_null("DeskBackdrop/DeskBackdropTexture") as TextureRect
+@onready var _desk_computer_prop: Control = get_node_or_null("DeskComputerProp") as Control
+@onready var _desk_computer_prop_texture: TextureRect = get_node_or_null("DeskComputerProp/DeskComputerPropTexture") as TextureRect
 @onready var _monitor_frame: Control = get_node_or_null("MonitorFrame") as Control
 @onready var _monitor_frame_texture: TextureRect = get_node_or_null("MonitorFrame/MonitorFrameTexture") as TextureRect
 @onready var _monitor_overlay: Control = get_node_or_null("MonitorOverlay") as Control
 @onready var _monitor_overlay_texture: TextureRect = get_node_or_null("MonitorOverlay/MonitorOverlayTexture") as TextureRect
+@onready var _desk_docs: Control = get_node_or_null("DeskDocs") as Control
 @onready var _newspaper_zone: PanelContainer = get_node_or_null("DeskDocs/NewspaperZone") as PanelContainer
 @onready var _newspaper_texture: TextureRect = get_node_or_null("DeskDocs/NewspaperZone/NewspaperTexture") as TextureRect
 @onready var _invoice_zone: PanelContainer = get_node_or_null("DeskDocs/InvoiceZone") as PanelContainer
@@ -177,6 +218,14 @@ func _ready() -> void:
 	_buy_button.pressed.connect(_on_buy_button_pressed)
 	_sell_button.pressed.connect(_on_sell_button_pressed)
 	_end_day_button.pressed.connect(_on_end_day_button_pressed)
+	if _app_home_button != null:
+		_app_home_button.pressed.connect(_on_home_section_pressed)
+	if _app_market_button != null:
+		_app_market_button.pressed.connect(_on_market_section_pressed)
+	if _app_company_button != null:
+		_app_company_button.pressed.connect(_on_company_section_pressed)
+	if _desk_end_day_button != null:
+		_desk_end_day_button.pressed.connect(_on_end_day_button_pressed)
 	_quantity_input.value_changed.connect(_on_quantity_value_changed)
 	_quantity_plus_ten_button.pressed.connect(_on_quantity_plus_ten_pressed)
 	_quantity_plus_twenty_five_button.pressed.connect(_on_quantity_plus_twenty_five_pressed)
@@ -185,6 +234,10 @@ func _ready() -> void:
 	_history_button.pressed.connect(_on_history_button_pressed)
 	if _news_history_button != null:
 		_news_history_button.pressed.connect(_on_news_history_button_pressed)
+	if _newspaper_runtime_page_prev_button != null:
+		_newspaper_runtime_page_prev_button.pressed.connect(_on_newspaper_prev_page_pressed)
+	if _newspaper_runtime_page_next_button != null:
+		_newspaper_runtime_page_next_button.pressed.connect(_on_newspaper_next_page_pressed)
 	_back_to_menu_button.pressed.connect(_on_back_to_menu_pressed)
 	if _weekly_recap_continue_button != null:
 		_weekly_recap_continue_button.pressed.connect(_on_weekly_recap_continue_pressed)
@@ -269,10 +322,12 @@ func _ready() -> void:
 		)
 	_apply_action_hints()
 	_apply_zone_contract()
+	_apply_monitor_compaction()
 	if _news_title != null:
 		_news_title.text = "Capital Gazette"
 	if _news_history_button != null:
 		_news_history_button.text = "Ver historico"
+	_set_app_section(_active_app_section, true)
 
 
 func bind_managers(
@@ -316,12 +371,16 @@ func refresh_all_ui(status_message: String = "") -> void:
 	_update_news_panel()
 	_update_market_table()
 	_update_selected_company_details()
+	_update_home_dashboard()
 	_update_selection_context()
 	_update_trade_action_state()
+	_sync_desk_end_day_button_state()
 	if _ui_feedback_controller != null:
 		_ui_feedback_controller.update_feedback_panel(_player_portfolio)
 		_ui_feedback_controller.apply_status_text(_last_status_message)
 	_apply_tutorial_visual_state()
+	_apply_app_section_visibility()
+	_apply_monitor_compaction()
 	_apply_diegetic_layout()
 	_update_desk_props_alert_state()
 
@@ -576,18 +635,24 @@ func _update_header() -> void:
 		_market_manager,
 		debt_feedback_snapshot
 	)
+	var current_day := int(header_metrics.get("current_day", 1))
+	var max_days := int(header_metrics.get("max_days", CALENDAR_DAYS))
+	var week_index := int(header_metrics.get("week_index", 1))
+	var cash_value := float(header_metrics.get("cash", 0.0))
+	var debt_value := float(header_metrics.get("debt", 0.0))
+	var debt_limit := float(header_metrics.get("debt_limit", 1000.0))
 	var header_model := HEADER_PRESENTER.build_model(
-		int(header_metrics.get("current_day", 1)),
-		int(header_metrics.get("max_days", 1)),
-		int(header_metrics.get("week_index", 1)),
+		current_day,
+		max_days,
+		week_index,
 		str(header_metrics.get("activity_label", "Nula")),
 		str(header_metrics.get("objective_brief", "")),
 		float(header_metrics.get("weekly_notional", 0.0)),
 		float(header_metrics.get("weekly_target_notional", 0.0)),
 		float(header_metrics.get("raw_weekly_notional", 0.0)),
-		float(header_metrics.get("cash", 0.0)),
-		float(header_metrics.get("debt", 0.0)),
-		float(header_metrics.get("debt_limit", 1000.0)),
+		cash_value,
+		debt_value,
+		debt_limit,
 		float(header_metrics.get("net_worth", 0.0)),
 		float(header_metrics.get("holdings_value", 0.0)),
 		_upgrade_manager.get_active_upgrade_text(),
@@ -602,6 +667,9 @@ func _update_header() -> void:
 		_upgrade_label,
 		header_model
 	)
+	_update_calendar_view(current_day, max_days, week_index)
+	_update_finance_ledger_view(cash_value, debt_value, debt_limit)
+	_apply_header_visibility_contract()
 
 
 func _update_news_panel() -> void:
@@ -626,6 +694,9 @@ func _update_news_panel() -> void:
 		history_entries,
 		run_context
 	)
+	if _newspaper_runtime != null and _news_content == _newspaper_runtime_content:
+		_render_newspaper_template(news_model)
+		return
 	NEWS_PANEL_RENDERER.apply_model(
 		_news_title,
 		_news_history_button,
@@ -635,6 +706,296 @@ func _update_news_panel() -> void:
 		UI_THEME_TOKENS.TEXT_NEWS_TITLE
 	)
 
+
+func _render_newspaper_template(news_model: Dictionary) -> void:
+	if _newspaper_runtime_title != null:
+		_newspaper_runtime_title.text = str(news_model.get("title_text", "Capital Gazette"))
+	if _newspaper_runtime_history_button != null:
+		_newspaper_runtime_history_button.text = str(news_model.get("history_button_text", "Ver historico"))
+
+	var all_blocks := _collect_newspaper_blocks(news_model)
+	_newspaper_total_pages = maxi(1, int(ceili(float(all_blocks.size()) / float(NEWSPAPER_PAGE_BLOCKS))))
+	_newspaper_current_page = clampi(_newspaper_current_page, 0, _newspaper_total_pages - 1)
+
+	var start_index := _newspaper_current_page * NEWSPAPER_PAGE_BLOCKS
+	var end_index := mini(all_blocks.size(), start_index + NEWSPAPER_PAGE_BLOCKS)
+	var page_blocks := all_blocks.slice(start_index, end_index)
+
+	var columns := HBoxContainer.new()
+	columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_theme_constant_override("separation", 10)
+
+	var left_column := VBoxContainer.new()
+	left_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_column.add_theme_constant_override("separation", 5)
+	var right_column := VBoxContainer.new()
+	right_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_column.add_theme_constant_override("separation", 5)
+
+	for index in range(page_blocks.size()):
+		var block_variant: Variant = page_blocks[index]
+		if not (block_variant is Dictionary):
+			continue
+		var block := block_variant as Dictionary
+		var target_column := left_column if index % 2 == 0 else right_column
+		target_column.add_child(_build_newspaper_block_node(block, start_index + index))
+
+	columns.add_child(left_column)
+	columns.add_child(right_column)
+	_news_content.add_child(columns)
+
+	if _newspaper_runtime_page_label != null:
+		_newspaper_runtime_page_label.text = "%d/%d" % [_newspaper_current_page + 1, _newspaper_total_pages]
+	if _newspaper_runtime_page_prev_button != null:
+		_newspaper_runtime_page_prev_button.disabled = _newspaper_current_page <= 0
+	if _newspaper_runtime_page_next_button != null:
+		_newspaper_runtime_page_next_button.disabled = _newspaper_current_page >= (_newspaper_total_pages - 1)
+
+
+func _collect_newspaper_blocks(news_model: Dictionary) -> Array[Dictionary]:
+	var blocks: Array[Dictionary] = []
+	var lead_variant: Variant = news_model.get("lead_article", {})
+	if lead_variant is Dictionary:
+		var lead_article := (lead_variant as Dictionary).duplicate(true)
+		if not lead_article.is_empty():
+			lead_article["slot"] = "lead"
+			blocks.append(lead_article)
+
+	var secondary_variant: Variant = news_model.get("secondary_articles", [])
+	if secondary_variant is Array:
+		var secondary_articles := secondary_variant as Array
+		for item in secondary_articles:
+			if not (item is Dictionary):
+				continue
+			var article := (item as Dictionary).duplicate(true)
+			article["slot"] = "secondary"
+			blocks.append(article)
+
+	if blocks.is_empty():
+		blocks.append({
+			"kicker": "Sin titulares",
+			"title": str(news_model.get("placeholder_text", "Sin noticias.")),
+			"deck": "",
+			"body": "",
+			"trace_text": "",
+			"slot": "placeholder"
+		})
+	return blocks
+
+
+func _build_newspaper_block_node(block: Dictionary, order_index: int) -> Control:
+	var wrapper := VBoxContainer.new()
+	wrapper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	wrapper.add_theme_constant_override("separation", 2)
+
+	var kicker := str(block.get("kicker", "Titular"))
+	if kicker.is_empty():
+		kicker = "Titular"
+	var kicker_label := Label.new()
+	kicker_label.text = "%d. %s" % [order_index + 1, kicker]
+	kicker_label.add_theme_font_size_override("font_size", 10)
+	kicker_label.add_theme_color_override("font_color", Color(0.39, 0.29, 0.20, 0.95))
+	wrapper.add_child(kicker_label)
+
+	var title_label := Label.new()
+	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title_label.max_lines_visible = 3
+	title_label.clip_text = true
+	title_label.add_theme_font_size_override("font_size", 13)
+	title_label.add_theme_color_override("font_color", Color(0.14, 0.11, 0.08, 0.98))
+	title_label.text = str(block.get("title", "Sin titular"))
+	wrapper.add_child(title_label)
+
+	var deck_text := str(block.get("deck", ""))
+	if not deck_text.is_empty():
+		var deck_label := Label.new()
+		deck_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		deck_label.max_lines_visible = 2
+		deck_label.clip_text = true
+		deck_label.add_theme_font_size_override("font_size", 11)
+		deck_label.add_theme_color_override("font_color", Color(0.24, 0.19, 0.14, 0.94))
+		deck_label.text = deck_text
+		wrapper.add_child(deck_label)
+
+	var body_text := str(block.get("body", ""))
+	if not body_text.is_empty():
+		var body_label := Label.new()
+		body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body_label.max_lines_visible = 5
+		body_label.clip_text = true
+		body_label.add_theme_font_size_override("font_size", 10)
+		body_label.add_theme_color_override("font_color", Color(0.19, 0.15, 0.12, 0.94))
+		body_label.text = body_text
+		wrapper.add_child(body_label)
+
+	var trace_text := str(block.get("trace_text", ""))
+	if not trace_text.is_empty():
+		var trace_label := Label.new()
+		trace_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		trace_label.max_lines_visible = 2
+		trace_label.clip_text = true
+		trace_label.add_theme_font_size_override("font_size", 9)
+		trace_label.add_theme_color_override("font_color", Color(0.36, 0.27, 0.20, 0.92))
+		trace_label.text = trace_text
+		wrapper.add_child(trace_label)
+
+	var separator := HSeparator.new()
+	wrapper.add_child(separator)
+	return wrapper
+
+
+func _update_calendar_view(current_day: int, max_days: int, week_index: int) -> void:
+	if _calendar_title_label == null or _calendar_day_labels.is_empty():
+		return
+	var safe_max_days := clampi(max_days, 1, CALENDAR_DAYS)
+	var safe_day := clampi(current_day, 1, safe_max_days)
+	_calendar_title_label.text = "Dia %02d/%02d - S%d" % [safe_day, safe_max_days, maxi(1, week_index)]
+	for index in range(_calendar_day_labels.size()):
+		var day_label := _calendar_day_labels[index]
+		if day_label == null:
+			continue
+		var day_number := index + 1
+		day_label.remove_theme_color_override("font_color")
+		if day_number > safe_max_days:
+			day_label.text = "--"
+			day_label.add_theme_color_override("font_color", Color(0.48, 0.44, 0.39, 0.62))
+		elif day_number < safe_day:
+			day_label.text = "X%02d" % day_number
+			day_label.add_theme_color_override("font_color", Color(0.44, 0.24, 0.18, 0.96))
+		elif day_number == safe_day:
+			day_label.text = "[%02d]" % day_number
+			day_label.add_theme_color_override("font_color", Color(0.18, 0.31, 0.54, 0.98))
+		else:
+			day_label.text = "%02d" % day_number
+			day_label.add_theme_color_override("font_color", Color(0.19, 0.16, 0.13, 0.90))
+
+
+func _update_finance_ledger_view(cash_value: float, debt_value: float, debt_limit: float) -> void:
+	var debt_usage_ratio := debt_value / maxf(1.0, debt_limit)
+	var cash_text := "$%.2f" % cash_value
+	var debt_text := "$%.2f" % debt_value
+	if _invoice_runtime_cash_ledger_label != null:
+		_invoice_runtime_cash_ledger_label.text = "Caja %s" % cash_text
+	if _invoice_runtime_debt_ledger_label != null:
+		_invoice_runtime_debt_ledger_label.text = "Deuda %s (%.0f%%)" % [
+			debt_text,
+			clampf(debt_usage_ratio * 100.0, 0.0, 999.0)
+		]
+		_invoice_runtime_debt_ledger_label.remove_theme_color_override("font_color")
+		if debt_usage_ratio >= 0.95:
+			_invoice_runtime_debt_ledger_label.add_theme_color_override("font_color", Color(0.85, 0.23, 0.20))
+		elif debt_usage_ratio >= 0.75:
+			_invoice_runtime_debt_ledger_label.add_theme_color_override("font_color", Color(0.78, 0.50, 0.14))
+		else:
+			_invoice_runtime_debt_ledger_label.add_theme_color_override("font_color", Color(0.18, 0.29, 0.15))
+
+
+func _apply_header_visibility_contract() -> void:
+	var use_diegetic_day_and_finance := _zone_contract_enabled and _calendar_runtime != null
+	if _day_label != null:
+		_day_label.visible = not use_diegetic_day_and_finance
+	if _cash_label != null:
+		_cash_label.visible = not use_diegetic_day_and_finance
+	if _debt_label != null:
+		_debt_label.visible = not use_diegetic_day_and_finance
+
+
+func _sync_desk_end_day_button_state() -> void:
+	if _desk_end_day_button == null or _end_day_button == null:
+		return
+	_desk_end_day_button.visible = _zone_contract_enabled
+	_desk_end_day_button.disabled = _end_day_button.disabled
+	_desk_end_day_button.text = "Sellar cierre del dia"
+	if _is_tutorial_active():
+		_desk_end_day_button.tooltip_text = "Tutorial activo: sigue el paso actual."
+	else:
+		_desk_end_day_button.tooltip_text = "Cierra el dia cuando termines de operar."
+
+
+func _set_app_section(section_id: String, force_apply: bool = false) -> void:
+	var normalized := _normalize_app_section(section_id)
+	if not force_apply and normalized == _active_app_section:
+		return
+	_active_app_section = normalized
+	_apply_app_section_visibility()
+
+
+func _normalize_app_section(section_id: String) -> String:
+	if section_id == APP_SECTION_HOME:
+		return APP_SECTION_HOME
+	if section_id == APP_SECTION_COMPANY:
+		return APP_SECTION_COMPANY
+	return APP_SECTION_MARKET
+
+
+func _apply_app_section_visibility() -> void:
+	var show_home := _active_app_section == APP_SECTION_HOME
+	var show_market := _active_app_section == APP_SECTION_MARKET
+	var show_company := _active_app_section == APP_SECTION_COMPANY
+
+	if _home_panel != null:
+		_home_panel.visible = show_home
+
+	# La experiencia app usa una sola seccion principal; noticias/factura viven fuera del monitor.
+	if _news_panel != null:
+		_news_panel.visible = false
+	if _feedback_panel != null:
+		_feedback_panel.visible = show_home and not _zone_contract_enabled
+
+	if _center_split != null:
+		_center_split.visible = show_market or show_company
+	if _market_panel != null:
+		_market_panel.visible = show_market
+	if _details_panel != null:
+		_details_panel.visible = show_company
+
+	_update_app_nav_buttons()
+
+
+func _update_app_nav_buttons() -> void:
+	_apply_app_nav_button_state(_app_home_button, "Home", _active_app_section == APP_SECTION_HOME)
+	_apply_app_nav_button_state(_app_market_button, "Mercado", _active_app_section == APP_SECTION_MARKET)
+	_apply_app_nav_button_state(_app_company_button, "Empresa", _active_app_section == APP_SECTION_COMPANY)
+
+
+func _apply_app_nav_button_state(button: Button, label: String, is_active: bool) -> void:
+	if button == null:
+		return
+	button.disabled = is_active
+	button.text = "[%s]" % label if is_active else label
+
+
+func _apply_monitor_compaction() -> void:
+	var compact := _zone_contract_enabled
+	if _quantity_plus_ten_button != null:
+		_quantity_plus_ten_button.visible = not compact
+	if _quantity_plus_twenty_five_button != null:
+		_quantity_plus_twenty_five_button.visible = not compact
+	if _quantity_max_button != null:
+		_quantity_max_button.visible = not compact
+	if _status_label != null:
+		_status_label.visible = not compact
+	if _selection_label != null:
+		_selection_label.custom_minimum_size = Vector2(96, 0) if compact else Vector2(150, 0)
+	if _quantity_input != null:
+		_quantity_input.custom_minimum_size = Vector2(66, 0) if compact else Vector2.ZERO
+	if _bottom_bar != null:
+		_bottom_bar.add_theme_constant_override("separation", 4 if compact else 8)
+	if _buy_button != null:
+		_buy_button.text = BUY_LABEL_COMPACT if compact else BUY_LABEL_FULL
+		_buy_button.tooltip_text = "Comprar acciones."
+	if _sell_button != null:
+		_sell_button.text = SELL_LABEL_COMPACT if compact else SELL_LABEL_FULL
+		_sell_button.tooltip_text = "Vender acciones."
+	if _end_day_button != null:
+		_end_day_button.text = END_DAY_LABEL_COMPACT if compact else END_DAY_LABEL_FULL
+		_end_day_button.tooltip_text = "Cierra el dia y procesa precios/noticias."
+	if _market_panel != null and compact:
+		_market_panel.custom_minimum_size = Vector2(300, 0)
+	if _details_panel != null and compact:
+		_details_panel.custom_minimum_size = Vector2(300, 0)
+
+
 func _update_market_table() -> void:
 	_clear_container(_market_rows)
 	if _market_selection_controller != null:
@@ -642,7 +1003,7 @@ func _update_market_table() -> void:
 	var companies := _market_manager.get_sorted_active_companies()
 	var header_model := MARKET_TABLE_PRESENTER.build_table_header(companies.size(), HOTKEYS_HINT)
 	_market_title.text = str(header_model.get("title", "Mercado"))
-	_market_header.text = str(header_model.get("header", "Selecciona una empresa para operar."))
+	_market_header.text = "%s | Pulsa Info para abrir ficha." % str(header_model.get("header", "Selecciona una empresa para operar."))
 	_market_header.tooltip_text = str(header_model.get("header_tooltip", HOTKEYS_HINT))
 	if companies.is_empty():
 		var empty_label := Label.new()
@@ -669,7 +1030,8 @@ func _update_market_table() -> void:
 			ROW_NAME_MIN_WIDTH,
 			ROW_PRICE_MIN_WIDTH,
 			ROW_CHANGE_MIN_WIDTH,
-			_on_company_selected
+			_on_company_selected,
+			_on_company_info_requested
 		)
 		var row_card := row_view.get("row_card", null) as Control
 		if row_card == null:
@@ -772,6 +1134,18 @@ func _on_news_history_button_pressed() -> void:
 		refresh_all_ui()
 		return
 	_news_history_visible = not _news_history_visible
+	_newspaper_current_page = 0
+	refresh_all_ui()
+
+
+func _on_newspaper_prev_page_pressed() -> void:
+	_newspaper_current_page = maxi(0, _newspaper_current_page - 1)
+	refresh_all_ui()
+
+
+func _on_newspaper_next_page_pressed() -> void:
+	var max_page_index := maxi(0, _newspaper_total_pages - 1)
+	_newspaper_current_page = mini(max_page_index, _newspaper_current_page + 1)
 	refresh_all_ui()
 
 
@@ -796,6 +1170,21 @@ func _on_history_button_pressed() -> void:
 	refresh_all_ui()
 
 
+func _on_home_section_pressed() -> void:
+	_set_app_section(APP_SECTION_HOME, true)
+	refresh_all_ui()
+
+
+func _on_market_section_pressed() -> void:
+	_set_app_section(APP_SECTION_MARKET, true)
+	refresh_all_ui()
+
+
+func _on_company_section_pressed() -> void:
+	_set_app_section(APP_SECTION_COMPANY, true)
+	refresh_all_ui()
+
+
 func _on_company_selected(ticker: String) -> void:
 	if _market_selection_controller == null:
 		return
@@ -812,6 +1201,13 @@ func _on_company_selected(ticker: String) -> void:
 	refresh_all_ui()
 	if bool(selection_result.get("emit_signal", false)):
 		emit_signal("company_selected", ticker)
+
+
+func _on_company_info_requested(ticker: String) -> void:
+	_on_company_selected(ticker)
+	if _get_selected_ticker() == ticker:
+		_set_app_section(APP_SECTION_COMPANY, true)
+		refresh_all_ui()
 
 
 func _on_market_panel_gui_input(event: InputEvent) -> void:
@@ -932,10 +1328,11 @@ func _clear_container(container: Node) -> void:
 func _set_action_buttons_enabled(enabled: bool) -> void:
 	if _trade_action_controller != null:
 		_trade_action_controller.set_action_buttons_enabled(enabled)
-		return
-	_buy_button.disabled = not enabled
-	_sell_button.disabled = not enabled
-	_end_day_button.disabled = not enabled
+	else:
+		_buy_button.disabled = not enabled
+		_sell_button.disabled = not enabled
+		_end_day_button.disabled = not enabled
+	_sync_desk_end_day_button_state()
 
 
 func _is_tutorial_active() -> bool:
@@ -1027,9 +1424,213 @@ func _update_selection_context() -> void:
 	_selection_label.tooltip_text = str(selection_model.get("tooltip", HOTKEYS_HINT))
 
 
+func _update_home_dashboard() -> void:
+	if _home_summary_label == null or _home_pulse_label == null or _home_holdings_label == null:
+		return
+	if _player_portfolio == null or _market_manager == null:
+		_home_summary_label.text = "Sin datos de cartera disponibles."
+		_home_pulse_label.text = "Pulso mercado no disponible."
+		_home_holdings_label.text = "No tienes posiciones activas."
+		_update_home_pie_chart([], 0.0)
+		_update_home_trend_chart([])
+		return
+
+	var cash_value := _player_portfolio.cash
+	var debt_value := _player_portfolio.debt
+	var holdings_value := _player_portfolio.get_holdings_value(_market_manager)
+	var net_worth := _player_portfolio.get_net_worth(_market_manager)
+
+	var positions: Array[Dictionary] = []
+	var weighted_change_value := 0.0
+	for ticker_variant in _player_portfolio.holdings.keys():
+		var ticker := str(ticker_variant)
+		var amount := _player_portfolio.get_holding_amount(ticker)
+		if amount <= 0:
+			continue
+		var company := _market_manager.get_company_by_ticker(ticker)
+		if company == null:
+			continue
+		var position_value := company.current_price * float(amount)
+		weighted_change_value += position_value * company.last_daily_change
+		positions.append({
+			"ticker": company.ticker,
+			"amount": amount,
+			"value": position_value,
+			"daily_change": company.last_daily_change
+		})
+	positions.sort_custom(func(a: Dictionary, b: Dictionary): return float(a.get("value", 0.0)) > float(b.get("value", 0.0)))
+
+	var holdings_count := positions.size()
+	var holdings_change_percent := 0.0
+	if holdings_value > 0.01:
+		holdings_change_percent = weighted_change_value / holdings_value
+	_home_summary_label.text = "Caja $%.2f | Deuda $%.2f | Patrimonio $%.2f\nCartera $%.2f en %d posicion(es) | Hoy %s" % [
+		cash_value,
+		debt_value,
+		net_worth,
+		holdings_value,
+		holdings_count,
+		_format_percent_signed(holdings_change_percent)
+	]
+	_update_home_pie_chart(positions, holdings_value)
+	_update_home_trend_chart(_build_home_estimated_series(positions))
+
+	var movers: Array[Dictionary] = []
+	for company in _market_manager.get_sorted_active_companies():
+		movers.append({
+			"ticker": company.ticker,
+			"change": company.last_daily_change
+		})
+	movers.sort_custom(func(a: Dictionary, b: Dictionary): return absf(float(a.get("change", 0.0))) > absf(float(b.get("change", 0.0))))
+	var pulse_parts: Array[String] = []
+	for index in range(mini(3, movers.size())):
+		var mover := movers[index]
+		pulse_parts.append("%s %s" % [
+			str(mover.get("ticker", "--")),
+			_format_percent_signed(float(mover.get("change", 0.0)))
+		])
+	var pulse_text := "Pulso mercado: %s" % (" | ".join(pulse_parts) if not pulse_parts.is_empty() else "Sin variaciones registradas.")
+	_home_pulse_label.text = "%s\nTip: abre Mercado y pulsa Info para ver la ficha completa de una empresa." % pulse_text
+
+	if positions.is_empty():
+		_home_holdings_label.text = "No tienes posiciones activas. Ve a Mercado para abrir una posicion."
+		_home_holdings_label.tooltip_text = _home_holdings_label.text
+		return
+
+	var detail_lines: Array[String] = []
+	var detail_tooltip_lines: Array[String] = []
+	var visible_rows := mini(8, positions.size())
+	for index in range(visible_rows):
+		var position := positions[index]
+		var ticker := str(position.get("ticker", "--"))
+		var amount := int(position.get("amount", 0))
+		var value := float(position.get("value", 0.0))
+		var daily_change := float(position.get("daily_change", 0.0))
+		detail_lines.append("%s x%d | $%.2f | %s" % [ticker, amount, value, _format_percent_signed(daily_change)])
+	for position in positions:
+		var ticker := str(position.get("ticker", "--"))
+		var amount := int(position.get("amount", 0))
+		var value := float(position.get("value", 0.0))
+		var daily_change := float(position.get("daily_change", 0.0))
+		detail_tooltip_lines.append("%s x%d | $%.2f | %s" % [ticker, amount, value, _format_percent_signed(daily_change)])
+	if positions.size() > visible_rows:
+		detail_lines.append("+%d posicion(es) mas..." % (positions.size() - visible_rows))
+	_home_holdings_label.text = "\n".join(detail_lines)
+	_home_holdings_label.tooltip_text = "\n".join(detail_tooltip_lines)
+
+
+func _update_home_pie_chart(positions: Array[Dictionary], total_value: float) -> void:
+	if _home_pie_chart == null and _home_pie_legend_label == null:
+		return
+	if positions.is_empty() or total_value <= 0.01:
+		if _home_pie_chart != null:
+			_home_pie_chart.call("set_segments", [])
+		if _home_pie_legend_label != null:
+			_home_pie_legend_label.text = "Sin cartera para distribuir."
+		return
+
+	var palette: Array[Color] = [
+		Color(0.24, 0.70, 0.52, 0.95),
+		Color(0.33, 0.56, 0.92, 0.95),
+		Color(0.88, 0.56, 0.22, 0.95),
+		Color(0.78, 0.38, 0.80, 0.95),
+		Color(0.85, 0.32, 0.36, 0.95)
+	]
+	var segments: Array[Dictionary] = []
+	var legend_parts: Array[String] = []
+	var used_value := 0.0
+	var visible_slots := mini(4, positions.size())
+	for index in range(visible_slots):
+		var position := positions[index]
+		var ticker := str(position.get("ticker", "--"))
+		var value := maxf(0.0, float(position.get("value", 0.0)))
+		if value <= 0.0:
+			continue
+		var ratio := value / total_value
+		used_value += value
+		segments.append({
+			"value": value,
+			"color": palette[index % palette.size()]
+		})
+		legend_parts.append("%s %.0f%%" % [ticker, clampf(ratio * 100.0, 0.0, 999.0)])
+
+	var remainder := maxf(0.0, total_value - used_value)
+	if positions.size() > visible_slots and remainder > 0.01:
+		segments.append({
+			"value": remainder,
+			"color": Color(0.56, 0.61, 0.67, 0.90)
+		})
+		legend_parts.append("Otros %.0f%%" % clampf((remainder / total_value) * 100.0, 0.0, 999.0))
+
+	if _home_pie_chart != null:
+		_home_pie_chart.call("set_segments", segments)
+	if _home_pie_legend_label != null:
+		_home_pie_legend_label.text = " | ".join(legend_parts)
+
+
+func _build_home_estimated_series(positions: Array[Dictionary]) -> Array[float]:
+	var series: Array[float] = []
+	if _player_portfolio == null or _market_manager == null:
+		return series
+	if positions.is_empty():
+		var neutral_value := maxf(1.0, _player_portfolio.cash - _player_portfolio.debt)
+		series.append(neutral_value)
+		series.append(neutral_value)
+		return series
+
+	var horizon := 0
+	for position in positions:
+		var ticker := str(position.get("ticker", ""))
+		var company := _market_manager.get_company_by_ticker(ticker)
+		if company == null:
+			continue
+		horizon = maxi(horizon, company.price_history.size())
+	horizon = clampi(horizon, 2, 24)
+
+	for step in range(horizon):
+		var value := _player_portfolio.cash - _player_portfolio.debt
+		for position in positions:
+			var ticker := str(position.get("ticker", ""))
+			var shares := int(position.get("amount", 0))
+			if shares <= 0:
+				continue
+			var company := _market_manager.get_company_by_ticker(ticker)
+			if company == null or company.price_history.is_empty():
+				continue
+			var history := company.price_history
+			var history_start := maxi(0, history.size() - horizon)
+			var history_index := mini(history.size() - 1, history_start + step)
+			value += float(shares) * maxf(0.01, float(history[history_index]))
+		series.append(maxf(1.0, value))
+	return series
+
+
+func _update_home_trend_chart(series: Array[float]) -> void:
+	if _home_trend_chart == null and _home_trend_delta_label == null:
+		return
+	var safe_series := series.duplicate()
+	if safe_series.size() < 2:
+		var neutral_value := maxf(1.0, _player_portfolio.cash - _player_portfolio.debt) if _player_portfolio != null else 1.0
+		safe_series = [neutral_value, neutral_value]
+	if _home_trend_chart != null:
+		_home_trend_chart.set_price_history(safe_series)
+		_home_trend_chart.set_trade_markers([])
+
+	var first_value := maxf(0.01, float(safe_series.front()))
+	var last_value := float(safe_series.back())
+	var delta := (last_value / first_value) - 1.0
+	if _home_trend_delta_label != null:
+		_home_trend_delta_label.text = "Cambio estimado: %s" % _format_percent_signed(delta)
+
+
+func _format_percent_signed(value: float) -> String:
+	var percent := value * 100.0
+	return "%+.2f%%" % percent
+
+
 func _apply_ui_tone() -> void:
 	UI_CHROME_STYLER.apply_tone(
-		[_news_panel, _market_panel, _details_panel, _feedback_panel, _bottom_panel],
+		[_home_panel, _news_panel, _market_panel, _details_panel, _feedback_panel, _bottom_panel],
 		_market_header,
 		_week_label,
 		_upgrade_label,
@@ -1056,268 +1657,404 @@ func _apply_action_hints() -> void:
 
 
 func _build_diegetic_runtime_zones() -> void:
-	if _newspaper_zone != null:
-		var runtime_margin := _newspaper_zone.get_node_or_null("NewsRuntime") as MarginContainer
-		if runtime_margin == null:
-			runtime_margin = MarginContainer.new()
-			runtime_margin.name = "NewsRuntime"
-			runtime_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			runtime_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
-			runtime_margin.mouse_filter = Control.MOUSE_FILTER_STOP
-			runtime_margin.add_theme_constant_override("margin_left", 18)
-			runtime_margin.add_theme_constant_override("margin_top", 14)
-			runtime_margin.add_theme_constant_override("margin_right", 18)
-			runtime_margin.add_theme_constant_override("margin_bottom", 14)
+	_build_newspaper_runtime_zone()
+	_build_invoice_runtime_zone()
+	_build_calendar_runtime_zone()
+	_build_desk_end_day_surface()
 
-			var news_vbox := VBoxContainer.new()
-			news_vbox.name = "NewsVBox"
-			news_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			news_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-			news_vbox.add_theme_constant_override("separation", 10)
 
-			var top_row := HBoxContainer.new()
-			top_row.name = "NewsTopRow"
-			top_row.add_theme_constant_override("separation", 10)
+func _build_newspaper_runtime_zone() -> void:
+	if _newspaper_zone == null:
+		return
+	var runtime_margin := _newspaper_zone.get_node_or_null("NewsRuntime") as MarginContainer
+	if runtime_margin == null:
+		runtime_margin = MarginContainer.new()
+		runtime_margin.name = "NewsRuntime"
+		runtime_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		runtime_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		runtime_margin.mouse_filter = Control.MOUSE_FILTER_STOP
+		runtime_margin.add_theme_constant_override("margin_left", 24)
+		runtime_margin.add_theme_constant_override("margin_top", 18)
+		runtime_margin.add_theme_constant_override("margin_right", 24)
+		runtime_margin.add_theme_constant_override("margin_bottom", 16)
 
-			var title := Label.new()
-			title.name = "NewsTitle"
-			title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			title.add_theme_font_size_override("font_size", 28)
-			title.add_theme_color_override("font_color", Color(0.17, 0.12, 0.08, 0.98))
-			title.text = "Capital Gazette"
+		var news_vbox := VBoxContainer.new()
+		news_vbox.name = "NewsVBox"
+		news_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		news_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		news_vbox.add_theme_constant_override("separation", 8)
 
-			var history_button := Button.new()
-			history_button.name = "NewsHistoryButton"
-			history_button.text = "Ver historico"
+		var top_row := HBoxContainer.new()
+		top_row.name = "NewsTopRow"
+		top_row.add_theme_constant_override("separation", 6)
 
-			var scroll := ScrollContainer.new()
-			scroll.name = "NewsScroll"
-			scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-			scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		var title := Label.new()
+		title.name = "NewsTitle"
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		title.add_theme_font_size_override("font_size", 20)
+		title.add_theme_color_override("font_color", Color(0.14, 0.11, 0.08, 0.98))
+		title.text = "Capital Gazette"
 
-			var content := VBoxContainer.new()
-			content.name = "NewsContent"
-			content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			content.add_theme_constant_override("separation", 10)
+		var page_prev := Button.new()
+		page_prev.name = "NewsPagePrev"
+		page_prev.custom_minimum_size = Vector2(26, 0)
+		page_prev.text = "<"
 
-			scroll.add_child(content)
-			top_row.add_child(title)
-			top_row.add_child(history_button)
-			news_vbox.add_child(top_row)
-			news_vbox.add_child(scroll)
-			runtime_margin.add_child(news_vbox)
-			_newspaper_zone.add_child(runtime_margin)
-		_newspaper_runtime = runtime_margin
-		_newspaper_runtime_title = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsTitle") as Label
-		_newspaper_runtime_history_button = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsHistoryButton") as Button
-		_newspaper_runtime_content = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsScroll/NewsContent") as VBoxContainer
+		var page_label := Label.new()
+		page_label.name = "NewsPageLabel"
+		page_label.custom_minimum_size = Vector2(64, 0)
+		page_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		page_label.text = "1/1"
 
-	if _invoice_zone != null:
-		var invoice_runtime_margin := _invoice_zone.get_node_or_null("InvoiceRuntime") as MarginContainer
-		if invoice_runtime_margin == null:
-			invoice_runtime_margin = MarginContainer.new()
-			invoice_runtime_margin.name = "InvoiceRuntime"
-			invoice_runtime_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			invoice_runtime_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
-			invoice_runtime_margin.mouse_filter = Control.MOUSE_FILTER_STOP
-			invoice_runtime_margin.add_theme_constant_override("margin_left", 14)
-			invoice_runtime_margin.add_theme_constant_override("margin_top", 12)
-			invoice_runtime_margin.add_theme_constant_override("margin_right", 14)
-			invoice_runtime_margin.add_theme_constant_override("margin_bottom", 12)
+		var page_next := Button.new()
+		page_next.name = "NewsPageNext"
+		page_next.custom_minimum_size = Vector2(26, 0)
+		page_next.text = ">"
 
-			var invoice_vbox := VBoxContainer.new()
-			invoice_vbox.name = "InvoiceVBox"
-			invoice_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			invoice_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-			invoice_vbox.add_theme_constant_override("separation", 5)
+		var history_button := Button.new()
+		history_button.name = "NewsHistoryButton"
+		history_button.text = "Ver historico"
 
-			var weekly_invoice_panel := PanelContainer.new()
-			weekly_invoice_panel.name = "WeeklyInvoicePanel"
-			weekly_invoice_panel.visible = false
-			weekly_invoice_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		var scroll := ScrollContainer.new()
+		scroll.name = "NewsScroll"
+		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 
-			var weekly_invoice_style := StyleBoxFlat.new()
-			weekly_invoice_style.bg_color = Color(0.74, 0.90, 0.78, 0.92)
-			weekly_invoice_style.border_color = Color(0.21, 0.32, 0.21, 0.80)
-			weekly_invoice_style.border_width_left = 2
-			weekly_invoice_style.border_width_top = 2
-			weekly_invoice_style.border_width_right = 2
-			weekly_invoice_style.border_width_bottom = 2
-			weekly_invoice_style.corner_radius_top_left = 8
-			weekly_invoice_style.corner_radius_top_right = 8
-			weekly_invoice_style.corner_radius_bottom_left = 8
-			weekly_invoice_style.corner_radius_bottom_right = 8
-			weekly_invoice_panel.add_theme_stylebox_override("panel", weekly_invoice_style)
+		var content := VBoxContainer.new()
+		content.name = "NewsContent"
+		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		content.add_theme_constant_override("separation", 6)
 
-			var weekly_invoice_margin := MarginContainer.new()
-			weekly_invoice_margin.name = "WeeklyInvoiceMargin"
-			weekly_invoice_margin.add_theme_constant_override("margin_left", 9)
-			weekly_invoice_margin.add_theme_constant_override("margin_top", 8)
-			weekly_invoice_margin.add_theme_constant_override("margin_right", 9)
-			weekly_invoice_margin.add_theme_constant_override("margin_bottom", 8)
+		scroll.add_child(content)
+		top_row.add_child(title)
+		top_row.add_child(page_prev)
+		top_row.add_child(page_label)
+		top_row.add_child(page_next)
+		top_row.add_child(history_button)
+		news_vbox.add_child(top_row)
+		news_vbox.add_child(scroll)
+		runtime_margin.add_child(news_vbox)
+		_newspaper_zone.add_child(runtime_margin)
+	_newspaper_runtime = runtime_margin
+	_newspaper_runtime_title = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsTitle") as Label
+	_newspaper_runtime_history_button = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsHistoryButton") as Button
+	_newspaper_runtime_page_prev_button = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsPagePrev") as Button
+	_newspaper_runtime_page_next_button = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsPageNext") as Button
+	_newspaper_runtime_page_label = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsPageLabel") as Label
+	_newspaper_runtime_content = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsScroll/NewsContent") as VBoxContainer
 
-			var weekly_invoice_vbox := VBoxContainer.new()
-			weekly_invoice_vbox.name = "WeeklyInvoiceVBox"
-			weekly_invoice_vbox.add_theme_constant_override("separation", 4)
 
-			var weekly_invoice_title := Label.new()
-			weekly_invoice_title.name = "WeeklyInvoiceTitle"
-			weekly_invoice_title.add_theme_font_size_override("font_size", 19)
-			weekly_invoice_title.text = "Factura Semanal"
+func _build_invoice_runtime_zone() -> void:
+	if _invoice_zone == null:
+		return
+	var invoice_runtime_margin := _invoice_zone.get_node_or_null("InvoiceRuntime") as MarginContainer
+	if invoice_runtime_margin == null:
+		invoice_runtime_margin = MarginContainer.new()
+		invoice_runtime_margin.name = "InvoiceRuntime"
+		invoice_runtime_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		invoice_runtime_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		invoice_runtime_margin.mouse_filter = Control.MOUSE_FILTER_STOP
+		invoice_runtime_margin.add_theme_constant_override("margin_left", 18)
+		invoice_runtime_margin.add_theme_constant_override("margin_top", 16)
+		invoice_runtime_margin.add_theme_constant_override("margin_right", 18)
+		invoice_runtime_margin.add_theme_constant_override("margin_bottom", 12)
 
-			var weekly_invoice_summary := Label.new()
-			weekly_invoice_summary.name = "WeeklyInvoiceSummary"
-			weekly_invoice_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			weekly_invoice_summary.text = "Sin cobro semanal pendiente."
+		var invoice_vbox := VBoxContainer.new()
+		invoice_vbox.name = "InvoiceVBox"
+		invoice_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		invoice_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		invoice_vbox.add_theme_constant_override("separation", 6)
 
-			var weekly_invoice_amounts := Label.new()
-			weekly_invoice_amounts.name = "WeeklyInvoiceAmounts"
-			weekly_invoice_amounts.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			weekly_invoice_amounts.text = "Base: $0.00 | Actividad: $0.00 | Total: $0.00"
+		var ledger_row := HBoxContainer.new()
+		ledger_row.name = "LedgerRow"
+		ledger_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ledger_row.add_theme_constant_override("separation", 6)
 
-			var weekly_invoice_debt := Label.new()
-			weekly_invoice_debt.name = "WeeklyInvoiceDebt"
-			weekly_invoice_debt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			weekly_invoice_debt.text = "Deuda: $0.00 / $1000.00 (uso 0%)."
+		var cash_ledger_label := Label.new()
+		cash_ledger_label.name = "CashLedgerLabel"
+		cash_ledger_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_configure_text_slot_label(cash_ledger_label, 13, 2)
+		cash_ledger_label.text = "Caja $0.00"
 
-			var weekly_invoice_risk := Label.new()
-			weekly_invoice_risk.name = "WeeklyInvoiceRisk"
-			weekly_invoice_risk.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			weekly_invoice_risk.text = "Riesgo: Bajo. Sin alertas."
+		var debt_ledger_label := Label.new()
+		debt_ledger_label.name = "DebtLedgerLabel"
+		debt_ledger_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_configure_text_slot_label(debt_ledger_label, 13, 2)
+		debt_ledger_label.text = "Deuda $0.00 (0%)"
 
-			var weekly_invoice_continue_button := Button.new()
-			weekly_invoice_continue_button.name = "WeeklyInvoiceContinueButton"
-			weekly_invoice_continue_button.text = "Confirmar factura"
+		ledger_row.add_child(cash_ledger_label)
+		ledger_row.add_child(debt_ledger_label)
 
-			weekly_invoice_vbox.add_child(weekly_invoice_title)
-			weekly_invoice_vbox.add_child(weekly_invoice_summary)
-			weekly_invoice_vbox.add_child(weekly_invoice_amounts)
-			weekly_invoice_vbox.add_child(weekly_invoice_debt)
-			weekly_invoice_vbox.add_child(weekly_invoice_risk)
-			weekly_invoice_vbox.add_child(weekly_invoice_continue_button)
-			weekly_invoice_margin.add_child(weekly_invoice_vbox)
-			weekly_invoice_panel.add_child(weekly_invoice_margin)
+		var weekly_invoice_panel := PanelContainer.new()
+		weekly_invoice_panel.name = "WeeklyInvoicePanel"
+		weekly_invoice_panel.visible = false
+		weekly_invoice_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
-			var critical_document_panel := PanelContainer.new()
-			critical_document_panel.name = "CriticalDocumentPanel"
-			critical_document_panel.visible = false
-			critical_document_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		var weekly_invoice_style := StyleBoxFlat.new()
+		weekly_invoice_style.bg_color = Color(0.74, 0.90, 0.78, 0.78)
+		weekly_invoice_style.border_color = Color(0.21, 0.32, 0.21, 0.66)
+		weekly_invoice_style.border_width_left = 1
+		weekly_invoice_style.border_width_top = 1
+		weekly_invoice_style.border_width_right = 1
+		weekly_invoice_style.border_width_bottom = 1
+		weekly_invoice_style.corner_radius_top_left = 5
+		weekly_invoice_style.corner_radius_top_right = 5
+		weekly_invoice_style.corner_radius_bottom_left = 5
+		weekly_invoice_style.corner_radius_bottom_right = 5
+		weekly_invoice_panel.add_theme_stylebox_override("panel", weekly_invoice_style)
 
-			var critical_document_style := StyleBoxFlat.new()
-			critical_document_style.bg_color = Color(0.97, 0.93, 0.84, 0.95)
-			critical_document_style.border_color = Color(0.80, 0.58, 0.30, 0.92)
-			critical_document_style.border_width_left = 2
-			critical_document_style.border_width_top = 2
-			critical_document_style.border_width_right = 2
-			critical_document_style.border_width_bottom = 2
-			critical_document_style.corner_radius_top_left = 8
-			critical_document_style.corner_radius_top_right = 8
-			critical_document_style.corner_radius_bottom_left = 8
-			critical_document_style.corner_radius_bottom_right = 8
-			critical_document_panel.add_theme_stylebox_override("panel", critical_document_style)
+		var weekly_invoice_margin := MarginContainer.new()
+		weekly_invoice_margin.name = "WeeklyInvoiceMargin"
+		weekly_invoice_margin.add_theme_constant_override("margin_left", 8)
+		weekly_invoice_margin.add_theme_constant_override("margin_top", 6)
+		weekly_invoice_margin.add_theme_constant_override("margin_right", 8)
+		weekly_invoice_margin.add_theme_constant_override("margin_bottom", 6)
 
-			var critical_document_margin := MarginContainer.new()
-			critical_document_margin.name = "CriticalDocumentMargin"
-			critical_document_margin.add_theme_constant_override("margin_left", 9)
-			critical_document_margin.add_theme_constant_override("margin_top", 8)
-			critical_document_margin.add_theme_constant_override("margin_right", 9)
-			critical_document_margin.add_theme_constant_override("margin_bottom", 8)
+		var weekly_invoice_vbox := VBoxContainer.new()
+		weekly_invoice_vbox.name = "WeeklyInvoiceVBox"
+		weekly_invoice_vbox.add_theme_constant_override("separation", 3)
 
-			var critical_document_vbox := VBoxContainer.new()
-			critical_document_vbox.name = "CriticalDocumentVBox"
-			critical_document_vbox.add_theme_constant_override("separation", 4)
+		var weekly_invoice_title := Label.new()
+		weekly_invoice_title.name = "WeeklyInvoiceTitle"
+		weekly_invoice_title.add_theme_font_size_override("font_size", 15)
+		weekly_invoice_title.text = "Factura Semanal"
 
-			var critical_stamp := Label.new()
-			critical_stamp.name = "CriticalStampLabel"
-			critical_stamp.add_theme_font_size_override("font_size", 11)
-			critical_stamp.add_theme_color_override("font_color", Color(0.80, 0.58, 0.30))
-			critical_stamp.text = "ARCHIVO"
+		var weekly_invoice_summary := Label.new()
+		weekly_invoice_summary.name = "WeeklyInvoiceSummary"
+		_configure_text_slot_label(weekly_invoice_summary, 12, 2)
+		weekly_invoice_summary.text = "Sin cobro semanal pendiente."
 
-			var critical_title := Label.new()
-			critical_title.name = "CriticalTitleLabel"
-			critical_title.add_theme_font_size_override("font_size", 18)
-			critical_title.text = "Documento Critico"
+		var weekly_invoice_amounts := Label.new()
+		weekly_invoice_amounts.name = "WeeklyInvoiceAmounts"
+		_configure_text_slot_label(weekly_invoice_amounts, 12, 2)
+		weekly_invoice_amounts.text = "Base: $0.00 | Actividad: $0.00 | Total: $0.00"
 
-			var critical_subtitle := Label.new()
-			critical_subtitle.name = "CriticalSubtitleLabel"
-			critical_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			critical_subtitle.text = "Registro operativo"
+		var weekly_invoice_debt := Label.new()
+		weekly_invoice_debt.name = "WeeklyInvoiceDebt"
+		_configure_text_slot_label(weekly_invoice_debt, 12, 2)
+		weekly_invoice_debt.text = "Deuda: $0.00 / $1000.00 (uso 0%)."
 
-			var critical_body := Label.new()
-			critical_body.name = "CriticalBodyLabel"
-			critical_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			critical_body.text = "Sin detalle disponible."
+		var weekly_invoice_risk := Label.new()
+		weekly_invoice_risk.name = "WeeklyInvoiceRisk"
+		_configure_text_slot_label(weekly_invoice_risk, 12, 2)
+		weekly_invoice_risk.text = "Riesgo: Bajo. Sin alertas."
 
-			var critical_footer := Label.new()
-			critical_footer.name = "CriticalFooterLabel"
-			critical_footer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			critical_footer.text = "Documento archivado."
+		var weekly_invoice_continue_button := Button.new()
+		weekly_invoice_continue_button.name = "WeeklyInvoiceContinueButton"
+		weekly_invoice_continue_button.text = "Confirmar factura"
 
-			var critical_continue_button := Button.new()
-			critical_continue_button.name = "CriticalContinueButton"
-			critical_continue_button.text = "Archivar documento"
+		weekly_invoice_vbox.add_child(weekly_invoice_title)
+		weekly_invoice_vbox.add_child(weekly_invoice_summary)
+		weekly_invoice_vbox.add_child(weekly_invoice_amounts)
+		weekly_invoice_vbox.add_child(weekly_invoice_debt)
+		weekly_invoice_vbox.add_child(weekly_invoice_risk)
+		weekly_invoice_vbox.add_child(weekly_invoice_continue_button)
+		weekly_invoice_margin.add_child(weekly_invoice_vbox)
+		weekly_invoice_panel.add_child(weekly_invoice_margin)
 
-			critical_document_vbox.add_child(critical_stamp)
-			critical_document_vbox.add_child(critical_title)
-			critical_document_vbox.add_child(critical_subtitle)
-			critical_document_vbox.add_child(critical_body)
-			critical_document_vbox.add_child(critical_footer)
-			critical_document_vbox.add_child(critical_continue_button)
-			critical_document_margin.add_child(critical_document_vbox)
-			critical_document_panel.add_child(critical_document_margin)
+		var critical_document_panel := PanelContainer.new()
+		critical_document_panel.name = "CriticalDocumentPanel"
+		critical_document_panel.visible = false
+		critical_document_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
-			var debt_risk_label := Label.new()
-			debt_risk_label.name = "DebtRiskLabel"
-			debt_risk_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			debt_risk_label.text = "Deuda actual, limite y margen."
+		var critical_document_style := StyleBoxFlat.new()
+		critical_document_style.bg_color = Color(0.97, 0.93, 0.84, 0.95)
+		critical_document_style.border_color = Color(0.80, 0.58, 0.30, 0.92)
+		critical_document_style.border_width_left = 2
+		critical_document_style.border_width_top = 2
+		critical_document_style.border_width_right = 2
+		critical_document_style.border_width_bottom = 2
+		critical_document_style.corner_radius_top_left = 8
+		critical_document_style.corner_radius_top_right = 8
+		critical_document_style.corner_radius_bottom_left = 8
+		critical_document_style.corner_radius_bottom_right = 8
+		critical_document_panel.add_theme_stylebox_override("panel", critical_document_style)
 
-			var invoice_label := Label.new()
-			invoice_label.name = "InvoicePreviewLabel"
-			invoice_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			invoice_label.text = "Factura semanal estimada."
+		var critical_document_margin := MarginContainer.new()
+		critical_document_margin.name = "CriticalDocumentMargin"
+		critical_document_margin.add_theme_constant_override("margin_left", 9)
+		critical_document_margin.add_theme_constant_override("margin_top", 8)
+		critical_document_margin.add_theme_constant_override("margin_right", 9)
+		critical_document_margin.add_theme_constant_override("margin_bottom", 8)
 
-			var event_title := Label.new()
-			event_title.name = "EventDocTitle"
-			event_title.text = "Documento de Eventos"
+		var critical_document_vbox := VBoxContainer.new()
+		critical_document_vbox.name = "CriticalDocumentVBox"
+		critical_document_vbox.add_theme_constant_override("separation", 4)
 
-			var event_scroll := ScrollContainer.new()
-			event_scroll.name = "EventLogScroll"
-			event_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-			event_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		var critical_stamp := Label.new()
+		critical_stamp.name = "CriticalStampLabel"
+		critical_stamp.add_theme_font_size_override("font_size", 11)
+		critical_stamp.add_theme_color_override("font_color", Color(0.80, 0.58, 0.30))
+		critical_stamp.text = "ARCHIVO"
 
-			var event_log_label := Label.new()
-			event_log_label.name = "EventLogLabel"
-			event_log_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			event_log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			event_log_label.text = "Sin eventos importantes todavia."
+		var critical_title := Label.new()
+		critical_title.name = "CriticalTitleLabel"
+		critical_title.add_theme_font_size_override("font_size", 18)
+		critical_title.text = "Documento Critico"
 
-			event_scroll.add_child(event_log_label)
-			invoice_vbox.add_child(weekly_invoice_panel)
-			invoice_vbox.add_child(critical_document_panel)
-			invoice_vbox.add_child(debt_risk_label)
-			invoice_vbox.add_child(invoice_label)
-			invoice_vbox.add_child(event_title)
-			invoice_vbox.add_child(event_scroll)
-			invoice_runtime_margin.add_child(invoice_vbox)
-			_invoice_zone.add_child(invoice_runtime_margin)
-		_invoice_runtime = invoice_runtime_margin
-		_invoice_runtime_weekly_panel = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel") as PanelContainer
-		_invoice_runtime_weekly_title = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceTitle") as Label
-		_invoice_runtime_weekly_summary = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceSummary") as Label
-		_invoice_runtime_weekly_amounts = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceAmounts") as Label
-		_invoice_runtime_weekly_debt = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceDebt") as Label
-		_invoice_runtime_weekly_risk = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceRisk") as Label
-		_invoice_runtime_weekly_continue_button = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceContinueButton") as Button
-		_invoice_runtime_critical_document_panel = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel") as PanelContainer
-		_invoice_runtime_critical_stamp = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalStampLabel") as Label
-		_invoice_runtime_critical_title = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalTitleLabel") as Label
-		_invoice_runtime_critical_subtitle = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalSubtitleLabel") as Label
-		_invoice_runtime_critical_body = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalBodyLabel") as Label
-		_invoice_runtime_critical_footer = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalFooterLabel") as Label
-		_invoice_runtime_critical_continue_button = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalContinueButton") as Button
-		_invoice_runtime_debt_risk_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/DebtRiskLabel") as Label
-		_invoice_runtime_invoice_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/InvoicePreviewLabel") as Label
-		_invoice_runtime_event_log_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/EventLogScroll/EventLogLabel") as Label
+		var critical_subtitle := Label.new()
+		critical_subtitle.name = "CriticalSubtitleLabel"
+		critical_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		critical_subtitle.text = "Registro operativo"
+
+		var critical_body := Label.new()
+		critical_body.name = "CriticalBodyLabel"
+		critical_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		critical_body.text = "Sin detalle disponible."
+
+		var critical_footer := Label.new()
+		critical_footer.name = "CriticalFooterLabel"
+		critical_footer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		critical_footer.text = "Documento archivado."
+
+		var critical_continue_button := Button.new()
+		critical_continue_button.name = "CriticalContinueButton"
+		critical_continue_button.text = "Archivar documento"
+
+		critical_document_vbox.add_child(critical_stamp)
+		critical_document_vbox.add_child(critical_title)
+		critical_document_vbox.add_child(critical_subtitle)
+		critical_document_vbox.add_child(critical_body)
+		critical_document_vbox.add_child(critical_footer)
+		critical_document_vbox.add_child(critical_continue_button)
+		critical_document_margin.add_child(critical_document_vbox)
+		critical_document_panel.add_child(critical_document_margin)
+
+		var debt_risk_label := Label.new()
+		debt_risk_label.name = "DebtRiskLabel"
+		_configure_text_slot_label(debt_risk_label, 12, 3)
+		debt_risk_label.text = "Deuda actual, limite y margen."
+
+		var invoice_label := Label.new()
+		invoice_label.name = "InvoicePreviewLabel"
+		_configure_text_slot_label(invoice_label, 12, 3)
+		invoice_label.text = "Factura semanal estimada."
+
+		var event_title := Label.new()
+		event_title.name = "EventDocTitle"
+		event_title.text = "Documento de Eventos"
+
+		var event_scroll := ScrollContainer.new()
+		event_scroll.name = "EventLogScroll"
+		event_scroll.custom_minimum_size = Vector2(0, 56)
+		event_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		event_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+
+		var event_log_label := Label.new()
+		event_log_label.name = "EventLogLabel"
+		event_log_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_configure_text_slot_label(event_log_label, 12, 8)
+		event_log_label.text = "Sin eventos importantes todavia."
+
+		event_scroll.add_child(event_log_label)
+		invoice_vbox.add_child(ledger_row)
+		invoice_vbox.add_child(weekly_invoice_panel)
+		invoice_vbox.add_child(critical_document_panel)
+		invoice_vbox.add_child(debt_risk_label)
+		invoice_vbox.add_child(invoice_label)
+		invoice_vbox.add_child(event_title)
+		invoice_vbox.add_child(event_scroll)
+		invoice_runtime_margin.add_child(invoice_vbox)
+		_invoice_zone.add_child(invoice_runtime_margin)
+	_invoice_runtime = invoice_runtime_margin
+	_invoice_runtime_cash_ledger_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/LedgerRow/CashLedgerLabel") as Label
+	_invoice_runtime_debt_ledger_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/LedgerRow/DebtLedgerLabel") as Label
+	_invoice_runtime_weekly_panel = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel") as PanelContainer
+	_invoice_runtime_weekly_title = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceTitle") as Label
+	_invoice_runtime_weekly_summary = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceSummary") as Label
+	_invoice_runtime_weekly_amounts = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceAmounts") as Label
+	_invoice_runtime_weekly_debt = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceDebt") as Label
+	_invoice_runtime_weekly_risk = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceRisk") as Label
+	_invoice_runtime_weekly_continue_button = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceContinueButton") as Button
+	_invoice_runtime_critical_document_panel = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel") as PanelContainer
+	_invoice_runtime_critical_stamp = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalStampLabel") as Label
+	_invoice_runtime_critical_title = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalTitleLabel") as Label
+	_invoice_runtime_critical_subtitle = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalSubtitleLabel") as Label
+	_invoice_runtime_critical_body = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalBodyLabel") as Label
+	_invoice_runtime_critical_footer = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalFooterLabel") as Label
+	_invoice_runtime_critical_continue_button = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalContinueButton") as Button
+	_invoice_runtime_debt_risk_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/DebtRiskLabel") as Label
+	_invoice_runtime_invoice_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/InvoicePreviewLabel") as Label
+	_invoice_runtime_event_log_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/EventLogScroll/EventLogLabel") as Label
+
+
+func _build_calendar_runtime_zone() -> void:
+	if _desk_docs == null:
+		return
+	_calendar_zone = _desk_docs.get_node_or_null("CalendarZone") as PanelContainer
+	if _calendar_zone == null:
+		_calendar_zone = PanelContainer.new()
+		_calendar_zone.name = "CalendarZone"
+		_calendar_zone.mouse_filter = Control.MOUSE_FILTER_STOP
+		_desk_docs.add_child(_calendar_zone)
+	var calendar_runtime := _calendar_zone.get_node_or_null("CalendarRuntime") as MarginContainer
+	if calendar_runtime == null:
+		calendar_runtime = MarginContainer.new()
+		calendar_runtime.name = "CalendarRuntime"
+		calendar_runtime.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		calendar_runtime.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		calendar_runtime.add_theme_constant_override("margin_left", 10)
+		calendar_runtime.add_theme_constant_override("margin_top", 8)
+		calendar_runtime.add_theme_constant_override("margin_right", 10)
+		calendar_runtime.add_theme_constant_override("margin_bottom", 8)
+
+		var calendar_vbox := VBoxContainer.new()
+		calendar_vbox.name = "CalendarVBox"
+		calendar_vbox.add_theme_constant_override("separation", 4)
+
+		var calendar_title := Label.new()
+		calendar_title.name = "CalendarTitle"
+		calendar_title.add_theme_font_size_override("font_size", 13)
+		calendar_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		calendar_title.text = "Dia 01/30 - S1"
+
+		var day_grid := GridContainer.new()
+		day_grid.name = "DayGrid"
+		day_grid.columns = 6
+		day_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		day_grid.add_theme_constant_override("h_separation", 4)
+		day_grid.add_theme_constant_override("v_separation", 2)
+		for day in range(1, CALENDAR_DAYS + 1):
+			var day_label := Label.new()
+			day_label.name = "Day%02d" % day
+			day_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			day_label.text = "%02d" % day
+			day_grid.add_child(day_label)
+
+		calendar_vbox.add_child(calendar_title)
+		calendar_vbox.add_child(day_grid)
+		calendar_runtime.add_child(calendar_vbox)
+		_calendar_zone.add_child(calendar_runtime)
+	_calendar_runtime = calendar_runtime
+	_calendar_title_label = _calendar_zone.get_node_or_null("CalendarRuntime/CalendarVBox/CalendarTitle") as Label
+	_calendar_day_labels.clear()
+	var day_grid_node := _calendar_zone.get_node_or_null("CalendarRuntime/CalendarVBox/DayGrid") as GridContainer
+	if day_grid_node != null:
+		for child in day_grid_node.get_children():
+			if child is Label:
+				_calendar_day_labels.append(child as Label)
+
+
+func _build_desk_end_day_surface() -> void:
+	if _desk_docs == null:
+		return
+	var existing_button := get_node_or_null("DeskEndDayButton") as Button
+	if existing_button == null:
+		existing_button = Button.new()
+		existing_button.name = "DeskEndDayButton"
+		existing_button.text = "Sellar cierre del dia"
+		existing_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		existing_button.custom_minimum_size = Vector2(220, 0)
+		add_child(existing_button)
+	_desk_end_day_button = existing_button
+
+
+func _configure_text_slot_label(label: Label, font_size: int, max_lines: int) -> void:
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.clip_text = true
+	label.max_lines_visible = maxi(1, max_lines)
+	label.add_theme_font_size_override("font_size", font_size)
 
 
 func _resolve_content_targets() -> void:
@@ -1350,6 +2087,10 @@ func _apply_zone_contract() -> void:
 		"invoice_runtime": _invoice_runtime
 	}
 	_zone_policy.apply_visual_contract(targets)
+	_apply_header_visibility_contract()
+	if _calendar_runtime != null:
+		_calendar_runtime.visible = contract_active
+	_sync_desk_end_day_button_state()
 	var violations: Array[String] = _zone_policy.collect_contract_violations(targets)
 	for violation in violations:
 		push_warning("Zone contract violation: %s" % violation)
@@ -1364,20 +2105,7 @@ func _is_document_zone_ready(zone: Control, runtime_zone: Control) -> bool:
 func _apply_diegetic_shell_styles() -> void:
 	var monitor_panel := _monitor_frame as PanelContainer
 	if monitor_panel != null:
-		var monitor_style := StyleBoxFlat.new()
-		monitor_style.bg_color = Color(0.10, 0.11, 0.13, 0.94)
-		monitor_style.border_color = Color(0.64, 0.57, 0.45, 0.95)
-		monitor_style.border_width_left = 5
-		monitor_style.border_width_top = 5
-		monitor_style.border_width_right = 5
-		monitor_style.border_width_bottom = 10
-		monitor_style.corner_radius_top_left = 16
-		monitor_style.corner_radius_top_right = 16
-		monitor_style.corner_radius_bottom_left = 24
-		monitor_style.corner_radius_bottom_right = 24
-		monitor_style.shadow_color = Color(0, 0, 0, 0.55)
-		monitor_style.shadow_size = 22
-		monitor_panel.add_theme_stylebox_override("panel", monitor_style)
+		monitor_panel.visible = false
 
 	if _newspaper_zone == null or _invoice_zone == null:
 		return
@@ -1403,6 +2131,27 @@ func _apply_diegetic_shell_styles() -> void:
 	invoice_style.border_color = Color(0.30, 0.46, 0.58, 0.72)
 	_invoice_zone.add_theme_stylebox_override("panel", invoice_style)
 
+	if _calendar_zone != null:
+		var calendar_style := StyleBoxFlat.new()
+		calendar_style.bg_color = Color(0.95, 0.91, 0.78, 0.82)
+		calendar_style.border_color = Color(0.48, 0.36, 0.22, 0.78)
+		calendar_style.border_width_left = 2
+		calendar_style.border_width_top = 2
+		calendar_style.border_width_right = 2
+		calendar_style.border_width_bottom = 2
+		calendar_style.corner_radius_top_left = 6
+		calendar_style.corner_radius_top_right = 6
+		calendar_style.corner_radius_bottom_left = 6
+		calendar_style.corner_radius_bottom_right = 6
+		calendar_style.shadow_color = Color(0, 0, 0, 0.20)
+		calendar_style.shadow_size = 6
+		calendar_style.shadow_offset = Vector2(1, 2)
+		_calendar_zone.add_theme_stylebox_override("panel", calendar_style)
+
+	if _desk_end_day_button != null:
+		_desk_end_day_button.add_theme_font_size_override("font_size", 15)
+		_desk_end_day_button.add_theme_color_override("font_color", Color(0.12, 0.07, 0.05, 0.98))
+
 
 func _apply_crt_monitor_skin() -> void:
 	_apply_crt_profile_to_chart()
@@ -1424,7 +2173,7 @@ func _apply_crt_monitor_skin() -> void:
 		var overlay_tint_variant: Variant = profile.get("tint", Color(0.76, 0.93, 0.84, 1.0))
 		var overlay_tint: Color = overlay_tint_variant if overlay_tint_variant is Color else Color(0.76, 0.93, 0.84, 1.0)
 		var intensity: float = float(profile.get("effect_intensity", 0.52))
-		var overlay_alpha := lerpf(0.018, 0.040, clampf(intensity, 0.0, 1.0))
+		var overlay_alpha := lerpf(0.008, 0.020, clampf(intensity, 0.0, 1.0))
 		var overlay_rect := _monitor_overlay as ColorRect
 		overlay_rect.color = Color(overlay_tint.r, overlay_tint.g, overlay_tint.b, overlay_alpha)
 
@@ -1432,14 +2181,22 @@ func _apply_crt_monitor_skin() -> void:
 func _apply_crt_profile_to_chart() -> void:
 	if _price_chart != null and _price_chart.has_method("apply_crt_profile"):
 		_price_chart.call("apply_crt_profile", crt_profile)
+	if _home_trend_chart != null and _home_trend_chart.has_method("apply_crt_profile"):
+		_home_trend_chart.call("apply_crt_profile", crt_profile)
 
 
 func _apply_diegetic_artwork() -> void:
 	_assign_png_texture(_desk_backdrop_texture, DESK_BACKDROP_TEXTURE_PATH)
+	# Capa separada para futuro prop de PC (por ahora no activa).
+	_assign_png_texture(_desk_computer_prop_texture, DESK_COMPUTER_PROP_TEXTURE_PATH)
+	if _desk_computer_prop != null:
+		_desk_computer_prop.visible = false
 	# El frame actual viene con chroma verde sólido; lo ocultamos hasta tener asset usable.
 	_assign_png_texture(_monitor_frame_texture, MONITOR_FRAME_TEXTURE_PATH)
 	if _monitor_frame_texture != null:
 		_monitor_frame_texture.visible = false
+	if _monitor_frame != null:
+		_monitor_frame.visible = false
 
 	# El overlay actual oscurece demasiado la UI dentro de pantalla.
 	_assign_png_texture(_monitor_overlay_texture, MONITOR_OVERLAY_TEXTURE_PATH)
@@ -1512,6 +2269,9 @@ func _tutorial_blocked_hint_message(fallback: String) -> String:
 func _setup_diegetic_layout() -> void:
 	if _monitor_frame == null or _monitor_overlay == null or _newspaper_zone == null or _invoice_zone == null:
 		return
+	_monitor_frame.clip_contents = true
+	if _main_margin != null:
+		_main_margin.clip_contents = true
 	_diegetic_desk_layout = DIEGETIC_DESK_LAYOUT.new()
 	_diegetic_desk_layout.setup(
 		self,
@@ -1519,6 +2279,8 @@ func _setup_diegetic_layout() -> void:
 		_monitor_overlay,
 		_main_margin,
 		_newspaper_zone,
-		_invoice_zone
+		_invoice_zone,
+		_calendar_zone,
+		_desk_end_day_button
 	)
 	_apply_diegetic_layout()

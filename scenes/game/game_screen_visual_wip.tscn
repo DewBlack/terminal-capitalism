@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/ui_manager.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/price_chart.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/ui/tutorial_overlay.gd" id="3"]
 [ext_resource type="PackedScene" path="res://scenes/ui/desk_props_layer.tscn" id="4"]
+[ext_resource type="Script" path="res://scripts/ui/home_pie_chart.gd" id="5"]
 
 [node name="GameScreen" type="Control"]
 layout_mode = 3
@@ -44,6 +45,27 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(0.0470588, 0.054902, 0.0666667, 0.1)
+
+[node name="DeskComputerProp" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="DeskComputerPropTexture" type="TextureRect" parent="DeskComputerProp"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
 
 [node name="DeskPropsLayer" parent="." instance=ExtResource("4")]
 layout_mode = 1
@@ -152,10 +174,10 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 12
-theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 12
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
 
 [node name="MonitorOverlay" type="ColorRect" parent="."]
 layout_mode = 0
@@ -218,10 +240,160 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "Mejora: -"
 
+[node name="AppNavBar" type="HBoxContainer" parent="MainMargin/MainVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+theme_override_constants/separation = 6
+
+[node name="HomeButton" type="Button" parent="MainMargin/MainVBox/AppNavBar"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "Home"
+
+[node name="MarketButton" type="Button" parent="MainMargin/MainVBox/AppNavBar"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Mercado"
+
+[node name="CompanyButton" type="Button" parent="MainMargin/MainVBox/AppNavBar"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Empresa"
+
 [node name="BodySplit" type="HBoxContainer" parent="MainMargin/MainVBox"]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 10
+
+[node name="HomePanel" type="PanelContainer" parent="MainMargin/MainVBox/BodySplit"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="HomeMargin" type="MarginContainer" parent="MainMargin/MainVBox/BodySplit/HomePanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="HomeVBox" type="VBoxContainer" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
+[node name="HomeTitle" type="Label" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Home | Cartera"
+
+[node name="HomeSummaryLabel" type="Label" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox"]
+layout_mode = 2
+autowrap_mode = 3
+max_lines_visible = 2
+clip_text = true
+text = "Resumen general de cartera."
+
+[node name="HomeChartsRow" type="HBoxContainer" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox"]
+custom_minimum_size = Vector2(0, 164)
+layout_mode = 2
+size_flags_vertical = 1
+theme_override_constants/separation = 6
+
+[node name="HomePiePanel" type="PanelContainer" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+size_flags_horizontal = 1
+
+[node name="HomePieMargin" type="MarginContainer" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomePiePanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="HomePieVBox" type="VBoxContainer" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomePiePanel/HomePieMargin"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HomePieTitle" type="Label" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomePiePanel/HomePieMargin/HomePieVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Distribucion cartera"
+
+[node name="HomePieChart" type="Control" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomePiePanel/HomePieMargin/HomePieVBox"]
+custom_minimum_size = Vector2(0, 106)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("5")
+
+[node name="HomePieLegendLabel" type="Label" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomePiePanel/HomePieMargin/HomePieVBox"]
+layout_mode = 2
+autowrap_mode = 3
+max_lines_visible = 2
+clip_text = true
+text = "Sin cartera."
+
+[node name="HomeTrendPanel" type="PanelContainer" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="HomeTrendMargin" type="MarginContainer" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomeTrendPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="HomeTrendVBox" type="VBoxContainer" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomeTrendPanel/HomeTrendMargin"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="HomeTrendTitle" type="Label" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomeTrendPanel/HomeTrendMargin/HomeTrendVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Tendencia cartera (estimada)"
+
+[node name="HomeTrendChart" type="Control" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomeTrendPanel/HomeTrendMargin/HomeTrendVBox"]
+custom_minimum_size = Vector2(0, 106)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("2")
+
+[node name="HomeTrendDeltaLabel" type="Label" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomeTrendPanel/HomeTrendMargin/HomeTrendVBox"]
+layout_mode = 2
+text = "Cambio estimado: +0.00%"
+
+[node name="HomePulseLabel" type="Label" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox"]
+layout_mode = 2
+autowrap_mode = 3
+max_lines_visible = 2
+clip_text = true
+text = "Pulso del mercado."
+
+[node name="HomeHoldingsTitle" type="Label" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Posiciones"
+
+[node name="HomeHoldingsScroll" type="ScrollContainer" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox"]
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="HomeHoldingsLabel" type="Label" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeHoldingsScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+autowrap_mode = 3
+text = "No tienes posiciones activas."
 
 [node name="NewsPanel" type="PanelContainer" parent="MainMargin/MainVBox/BodySplit"]
 custom_minimum_size = Vector2(320, 0)
@@ -262,7 +434,7 @@ size_flags_vertical = 3
 theme_override_constants/separation = 10
 
 [node name="MarketPanel" type="PanelContainer" parent="MainMargin/MainVBox/BodySplit/CenterSplit"]
-custom_minimum_size = Vector2(420, 0)
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 1.2
@@ -291,7 +463,7 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 4
 
 [node name="DetailsPanel" type="PanelContainer" parent="MainMargin/MainVBox/BodySplit/CenterSplit"]
-custom_minimum_size = Vector2(360, 0)
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 1.0
@@ -426,7 +598,7 @@ theme_override_constants/separation = 8
 
 [node name="SelectionLabel" type="Label" parent="MainMargin/MainVBox/BottomPanel/BottomBar"]
 layout_mode = 2
-custom_minimum_size = Vector2(220, 0)
+custom_minimum_size = Vector2(96, 0)
 size_flags_horizontal = 1
 clip_text = true
 text = "Selecciona una empresa."
@@ -468,7 +640,7 @@ text = "Pasar Dia"
 
 [node name="StatusLabel" type="Label" parent="MainMargin/MainVBox/BottomPanel/BottomBar"]
 layout_mode = 2
-custom_minimum_size = Vector2(300, 0)
+custom_minimum_size = Vector2(0, 0)
 size_flags_horizontal = 3
 size_flags_vertical = 1
 clip_text = true

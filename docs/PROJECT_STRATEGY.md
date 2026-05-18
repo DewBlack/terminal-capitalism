@@ -98,3 +98,16 @@ Regla operativa para `game_screen_visual_wip`:
 
 Validacion automatica:
 - Smoke `scripts/utils/diegetic_zone_contract_smoke.gd` en CI para bloquear regresiones de duplicacion de zonas.
+
+## Protocolo QA visual por PR (2026-05-17)
+
+Checklist versionada:
+- `docs/visual_qa_checklist.md`
+
+Plantillas/reportes:
+- `reports/visual_qa_report_template.md`
+- `reports/visual_qa_report_YYYY-MM-DD_issue-<numero>.md`
+
+Regla operativa:
+- Todo PR de `block-visual` debe enlazar un reporte de iteracion QA visual.
+- Si CI o checklist manual fallan, decision `NO GO` hasta corregir y revalidar.
