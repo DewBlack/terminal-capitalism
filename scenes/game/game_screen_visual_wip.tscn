@@ -239,10 +239,81 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "Mejora: -"
 
+[node name="AppNavBar" type="HBoxContainer" parent="MainMargin/MainVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="HomeButton" type="Button" parent="MainMargin/MainVBox/AppNavBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Home"
+
+[node name="MarketButton" type="Button" parent="MainMargin/MainVBox/AppNavBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Mercado"
+
+[node name="CompanyButton" type="Button" parent="MainMargin/MainVBox/AppNavBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Empresa"
+
 [node name="BodySplit" type="HBoxContainer" parent="MainMargin/MainVBox"]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 10
+
+[node name="HomePanel" type="PanelContainer" parent="MainMargin/MainVBox/BodySplit"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="HomeMargin" type="MarginContainer" parent="MainMargin/MainVBox/BodySplit/HomePanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="HomeVBox" type="VBoxContainer" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
+[node name="HomeTitle" type="Label" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Home | Cartera"
+
+[node name="HomeSummaryLabel" type="Label" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Resumen general de cartera."
+
+[node name="HomePulseLabel" type="Label" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Pulso del mercado."
+
+[node name="HomeHoldingsTitle" type="Label" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Posiciones"
+
+[node name="HomeHoldingsScroll" type="ScrollContainer" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox"]
+custom_minimum_size = Vector2(0, 160)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="HomeHoldingsLabel" type="Label" parent="MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeHoldingsScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+autowrap_mode = 3
+text = "No tienes posiciones activas."
 
 [node name="NewsPanel" type="PanelContainer" parent="MainMargin/MainVBox/BodySplit"]
 custom_minimum_size = Vector2(320, 0)

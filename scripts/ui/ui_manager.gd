@@ -47,6 +47,9 @@ const ROW_NAME_MIN_WIDTH := 176.0
 const ROW_PRICE_MIN_WIDTH := 84.0
 const ROW_CHANGE_MIN_WIDTH := 74.0
 const HOTKEYS_HINT := "Atajos: Up/Down empresa | B comprar | V vender | Enter pasar dia"
+const APP_SECTION_HOME := "home"
+const APP_SECTION_MARKET := "market"
+const APP_SECTION_COMPANY := "company"
 const DESK_BACKDROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_bg_v1.png"
 const DESK_COMPUTER_PROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_bg_v1.png"
 const MONITOR_FRAME_TEXTURE_PATH := "res://art/placeholder/desk/crt_monitor_frame_v1.png"
@@ -65,6 +68,7 @@ var _upgrade_manager: UpgradeManager
 var _history_visible: bool = false
 var _news_history_visible: bool = false
 var _last_status_message: String = ""
+var _active_app_section: String = APP_SECTION_MARKET
 var _ui_feedback_controller = null
 var _trade_action_controller = null
 var _market_selection_controller = null
@@ -123,6 +127,15 @@ var _crt_shader_material: ShaderMaterial = null
 @onready var _net_worth_label: Label = $MainMargin/MainVBox/HeaderBar/NetWorthLabel
 @onready var _upgrade_label: Label = $MainMargin/MainVBox/HeaderBar/UpgradeLabel
 @onready var _header_bar: GridContainer = $MainMargin/MainVBox/HeaderBar
+@onready var _app_home_button: Button = get_node_or_null("MainMargin/MainVBox/AppNavBar/HomeButton") as Button
+@onready var _app_market_button: Button = get_node_or_null("MainMargin/MainVBox/AppNavBar/MarketButton") as Button
+@onready var _app_company_button: Button = get_node_or_null("MainMargin/MainVBox/AppNavBar/CompanyButton") as Button
+@onready var _body_split: HBoxContainer = $MainMargin/MainVBox/BodySplit
+@onready var _center_split: HBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit
+@onready var _home_panel: PanelContainer = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel") as PanelContainer
+@onready var _home_summary_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeSummaryLabel") as Label
+@onready var _home_pulse_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomePulseLabel") as Label
+@onready var _home_holdings_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeHoldingsScroll/HomeHoldingsLabel") as Label
 @onready var _market_title: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketTitle
 @onready var _market_header: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketHeader
 @onready var _details_title: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/DetailsTitle
@@ -195,6 +208,12 @@ func _ready() -> void:
 	_buy_button.pressed.connect(_on_buy_button_pressed)
 	_sell_button.pressed.connect(_on_sell_button_pressed)
 	_end_day_button.pressed.connect(_on_end_day_button_pressed)
+	if _app_home_button != null:
+		_app_home_button.pressed.connect(_on_home_section_pressed)
+	if _app_market_button != null:
+		_app_market_button.pressed.connect(_on_market_section_pressed)
+	if _app_company_button != null:
+		_app_company_button.pressed.connect(_on_company_section_pressed)
 	if _desk_end_day_button != null:
 		_desk_end_day_button.pressed.connect(_on_end_day_button_pressed)
 	_quantity_input.value_changed.connect(_on_quantity_value_changed)
@@ -297,6 +316,7 @@ func _ready() -> void:
 		_news_title.text = "Capital Gazette"
 	if _news_history_button != null:
 		_news_history_button.text = "Ver historico"
+	_set_app_section(_active_app_section, true)
 
 
 func bind_managers(
@@ -340,6 +360,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 	_update_news_panel()
 	_update_market_table()
 	_update_selected_company_details()
+	_update_home_dashboard()
 	_update_selection_context()
 	_update_trade_action_state()
 	_sync_desk_end_day_button_state()
@@ -347,6 +368,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 		_ui_feedback_controller.update_feedback_panel(_player_portfolio)
 		_ui_feedback_controller.apply_status_text(_last_status_message)
 	_apply_tutorial_visual_state()
+	_apply_app_section_visibility()
 	_apply_diegetic_layout()
 	_update_desk_props_alert_state()
 
@@ -877,6 +899,60 @@ func _sync_desk_end_day_button_state() -> void:
 	else:
 		_desk_end_day_button.tooltip_text = "Cierra el dia cuando termines de operar."
 
+
+func _set_app_section(section_id: String, force_apply: bool = false) -> void:
+	var normalized := _normalize_app_section(section_id)
+	if not force_apply and normalized == _active_app_section:
+		return
+	_active_app_section = normalized
+	_apply_app_section_visibility()
+
+
+func _normalize_app_section(section_id: String) -> String:
+	if section_id == APP_SECTION_HOME:
+		return APP_SECTION_HOME
+	if section_id == APP_SECTION_COMPANY:
+		return APP_SECTION_COMPANY
+	return APP_SECTION_MARKET
+
+
+func _apply_app_section_visibility() -> void:
+	var show_home := _active_app_section == APP_SECTION_HOME
+	var show_market := _active_app_section == APP_SECTION_MARKET
+	var show_company := _active_app_section == APP_SECTION_COMPANY
+
+	if _home_panel != null:
+		_home_panel.visible = show_home
+
+	# La experiencia app usa una sola seccion principal; noticias/factura viven fuera del monitor.
+	if _news_panel != null:
+		_news_panel.visible = false
+	if _feedback_panel != null:
+		_feedback_panel.visible = show_home and not _zone_contract_enabled
+
+	if _center_split != null:
+		_center_split.visible = show_market or show_company
+	if _market_panel != null:
+		_market_panel.visible = show_market
+	if _details_panel != null:
+		_details_panel.visible = show_company
+
+	_update_app_nav_buttons()
+
+
+func _update_app_nav_buttons() -> void:
+	_apply_app_nav_button_state(_app_home_button, "Home", _active_app_section == APP_SECTION_HOME)
+	_apply_app_nav_button_state(_app_market_button, "Mercado", _active_app_section == APP_SECTION_MARKET)
+	_apply_app_nav_button_state(_app_company_button, "Empresa", _active_app_section == APP_SECTION_COMPANY)
+
+
+func _apply_app_nav_button_state(button: Button, label: String, is_active: bool) -> void:
+	if button == null:
+		return
+	button.disabled = is_active
+	button.text = "[%s]" % label if is_active else label
+
+
 func _update_market_table() -> void:
 	_clear_container(_market_rows)
 	if _market_selection_controller != null:
@@ -884,7 +960,7 @@ func _update_market_table() -> void:
 	var companies := _market_manager.get_sorted_active_companies()
 	var header_model := MARKET_TABLE_PRESENTER.build_table_header(companies.size(), HOTKEYS_HINT)
 	_market_title.text = str(header_model.get("title", "Mercado"))
-	_market_header.text = str(header_model.get("header", "Selecciona una empresa para operar."))
+	_market_header.text = "%s | Pulsa Info para abrir ficha." % str(header_model.get("header", "Selecciona una empresa para operar."))
 	_market_header.tooltip_text = str(header_model.get("header_tooltip", HOTKEYS_HINT))
 	if companies.is_empty():
 		var empty_label := Label.new()
@@ -911,7 +987,8 @@ func _update_market_table() -> void:
 			ROW_NAME_MIN_WIDTH,
 			ROW_PRICE_MIN_WIDTH,
 			ROW_CHANGE_MIN_WIDTH,
-			_on_company_selected
+			_on_company_selected,
+			_on_company_info_requested
 		)
 		var row_card := row_view.get("row_card", null) as Control
 		if row_card == null:
@@ -1050,6 +1127,21 @@ func _on_history_button_pressed() -> void:
 	refresh_all_ui()
 
 
+func _on_home_section_pressed() -> void:
+	_set_app_section(APP_SECTION_HOME, true)
+	refresh_all_ui()
+
+
+func _on_market_section_pressed() -> void:
+	_set_app_section(APP_SECTION_MARKET, true)
+	refresh_all_ui()
+
+
+func _on_company_section_pressed() -> void:
+	_set_app_section(APP_SECTION_COMPANY, true)
+	refresh_all_ui()
+
+
 func _on_company_selected(ticker: String) -> void:
 	if _market_selection_controller == null:
 		return
@@ -1066,6 +1158,13 @@ func _on_company_selected(ticker: String) -> void:
 	refresh_all_ui()
 	if bool(selection_result.get("emit_signal", false)):
 		emit_signal("company_selected", ticker)
+
+
+func _on_company_info_requested(ticker: String) -> void:
+	_on_company_selected(ticker)
+	if _get_selected_ticker() == ticker:
+		_set_app_section(APP_SECTION_COMPANY, true)
+		refresh_all_ui()
 
 
 func _on_market_panel_gui_input(event: InputEvent) -> void:
@@ -1282,9 +1381,105 @@ func _update_selection_context() -> void:
 	_selection_label.tooltip_text = str(selection_model.get("tooltip", HOTKEYS_HINT))
 
 
+func _update_home_dashboard() -> void:
+	if _home_summary_label == null or _home_pulse_label == null or _home_holdings_label == null:
+		return
+	if _player_portfolio == null or _market_manager == null:
+		_home_summary_label.text = "Sin datos de cartera disponibles."
+		_home_pulse_label.text = "Pulso mercado no disponible."
+		_home_holdings_label.text = "No tienes posiciones activas."
+		return
+
+	var cash_value := _player_portfolio.cash
+	var debt_value := _player_portfolio.debt
+	var holdings_value := _player_portfolio.get_holdings_value(_market_manager)
+	var net_worth := _player_portfolio.get_net_worth(_market_manager)
+
+	var positions: Array[Dictionary] = []
+	var weighted_change_value := 0.0
+	for ticker_variant in _player_portfolio.holdings.keys():
+		var ticker := str(ticker_variant)
+		var amount := _player_portfolio.get_holding_amount(ticker)
+		if amount <= 0:
+			continue
+		var company := _market_manager.get_company_by_ticker(ticker)
+		if company == null:
+			continue
+		var position_value := company.current_price * float(amount)
+		weighted_change_value += position_value * company.last_daily_change
+		positions.append({
+			"ticker": company.ticker,
+			"amount": amount,
+			"value": position_value,
+			"daily_change": company.last_daily_change
+		})
+	positions.sort_custom(func(a: Dictionary, b: Dictionary): return float(a.get("value", 0.0)) > float(b.get("value", 0.0)))
+
+	var holdings_count := positions.size()
+	var holdings_change_percent := 0.0
+	if holdings_value > 0.01:
+		holdings_change_percent = weighted_change_value / holdings_value
+	_home_summary_label.text = "Caja $%.2f | Deuda $%.2f | Patrimonio $%.2f\nCartera $%.2f en %d posicion(es) | Hoy %s" % [
+		cash_value,
+		debt_value,
+		net_worth,
+		holdings_value,
+		holdings_count,
+		_format_percent_signed(holdings_change_percent)
+	]
+
+	var movers: Array[Dictionary] = []
+	for company in _market_manager.get_sorted_active_companies():
+		movers.append({
+			"ticker": company.ticker,
+			"change": company.last_daily_change
+		})
+	movers.sort_custom(func(a: Dictionary, b: Dictionary): return absf(float(a.get("change", 0.0))) > absf(float(b.get("change", 0.0))))
+	var pulse_parts: Array[String] = []
+	for index in range(mini(3, movers.size())):
+		var mover := movers[index]
+		pulse_parts.append("%s %s" % [
+			str(mover.get("ticker", "--")),
+			_format_percent_signed(float(mover.get("change", 0.0)))
+		])
+	var pulse_text := "Pulso mercado: %s" % (" | ".join(pulse_parts) if not pulse_parts.is_empty() else "Sin variaciones registradas.")
+	_home_pulse_label.text = "%s\nTip: abre Mercado y pulsa Info para ver la ficha completa de una empresa." % pulse_text
+
+	if positions.is_empty():
+		_home_holdings_label.text = "No tienes posiciones activas. Ve a Mercado para abrir una posicion."
+		_home_holdings_label.tooltip_text = _home_holdings_label.text
+		return
+
+	var detail_lines: Array[String] = []
+	var detail_tooltip_lines: Array[String] = []
+	var visible_rows := mini(8, positions.size())
+	for index in range(visible_rows):
+		var position := positions[index]
+		var ticker := str(position.get("ticker", "--"))
+		var amount := int(position.get("amount", 0))
+		var value := float(position.get("value", 0.0))
+		var daily_change := float(position.get("daily_change", 0.0))
+		detail_lines.append("%s x%d | $%.2f | %s" % [ticker, amount, value, _format_percent_signed(daily_change)])
+	for position in positions:
+		var ticker := str(position.get("ticker", "--"))
+		var amount := int(position.get("amount", 0))
+		var value := float(position.get("value", 0.0))
+		var daily_change := float(position.get("daily_change", 0.0))
+		detail_tooltip_lines.append("%s x%d | $%.2f | %s" % [ticker, amount, value, _format_percent_signed(daily_change)])
+	if positions.size() > visible_rows:
+		detail_lines.append("+%d posicion(es) mas..." % (positions.size() - visible_rows))
+	_home_holdings_label.text = "\n".join(detail_lines)
+	_home_holdings_label.tooltip_text = "\n".join(detail_tooltip_lines)
+
+
+func _format_percent_signed(value: float) -> String:
+	var percent := value * 100.0
+	return "%+.2f%%" % percent
+
+
 func _apply_ui_tone() -> void:
 	UI_CHROME_STYLER.apply_tone(
-		[_news_panel, _market_panel, _details_panel, _feedback_panel, _bottom_panel],
+		[_home_panel, _news_panel, _market_panel, _details_panel, _feedback_panel, _bottom_panel],
 		_market_header,
 		_week_label,
 		_upgrade_label,

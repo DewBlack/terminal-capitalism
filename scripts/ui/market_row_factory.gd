@@ -10,7 +10,8 @@ static func build_company_row(
 	row_name_min_width: float,
 	row_price_min_width: float,
 	row_change_min_width: float,
-	on_select_pressed: Callable
+	on_select_pressed: Callable,
+	on_info_pressed: Callable = Callable()
 ) -> Dictionary:
 	var row_card := PanelContainer.new()
 	row_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -57,6 +58,15 @@ static func build_company_row(
 	if on_select_pressed.is_valid():
 		select_button.button_down.connect(on_select_pressed.bind(company.ticker))
 	top_row.add_child(select_button)
+
+	var info_button := Button.new()
+	info_button.custom_minimum_size = Vector2(58, 0)
+	info_button.text = "Info"
+	info_button.tooltip_text = "Abrir ficha de %s" % company.name
+	info_button.focus_mode = Control.FOCUS_NONE
+	if on_info_pressed.is_valid():
+		info_button.pressed.connect(on_info_pressed.bind(company.ticker))
+	top_row.add_child(info_button)
 
 	var price_label := Label.new()
 	price_label.custom_minimum_size = Vector2(row_price_min_width, 0)
