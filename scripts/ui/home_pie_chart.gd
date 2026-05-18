@@ -8,7 +8,7 @@ const STROKE_COLOR := Color(0.70, 0.78, 0.90, 0.32)
 var _segments: Array[Dictionary] = []
 
 
-func set_segments(segments: Array[Dictionary]) -> void:
+func set_segments(segments: Array) -> void:
 	_segments.clear()
 	for segment in segments:
 		if not (segment is Dictionary):

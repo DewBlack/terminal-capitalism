@@ -1484,7 +1484,7 @@ func _update_home_pie_chart(positions: Array[Dictionary], total_value: float) ->
 	if _home_pie_chart == null and _home_pie_legend_label == null:
 		return
 	if positions.is_empty() or total_value <= 0.01:
-		if _home_pie_chart != null and _home_pie_chart.has_method("set_segments"):
+		if _home_pie_chart != null:
 			_home_pie_chart.call("set_segments", [])
 		if _home_pie_legend_label != null:
 			_home_pie_legend_label.text = "Sin cartera para distribuir."
@@ -1523,7 +1523,7 @@ func _update_home_pie_chart(positions: Array[Dictionary], total_value: float) ->
 		})
 		legend_parts.append("Otros %.0f%%" % clampf((remainder / total_value) * 100.0, 0.0, 999.0))
 
-	if _home_pie_chart != null and _home_pie_chart.has_method("set_segments"):
+	if _home_pie_chart != null:
 		_home_pie_chart.call("set_segments", segments)
 	if _home_pie_legend_label != null:
 		_home_pie_legend_label.text = " | ".join(legend_parts)
