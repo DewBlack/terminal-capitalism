@@ -48,6 +48,7 @@ const ROW_PRICE_MIN_WIDTH := 84.0
 const ROW_CHANGE_MIN_WIDTH := 74.0
 const HOTKEYS_HINT := "Atajos: Up/Down empresa | B comprar | V vender | Enter pasar dia"
 const DESK_BACKDROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_bg_v1.png"
+const DESK_COMPUTER_PROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_bg_v1.png"
 const MONITOR_FRAME_TEXTURE_PATH := "res://art/placeholder/desk/crt_monitor_frame_v1.png"
 const MONITOR_OVERLAY_TEXTURE_PATH := "res://art/placeholder/desk/crt_screen_overlay_v1.png"
 const NEWSPAPER_TEXTURE_PATH := "res://art/placeholder/news/newspaper_front_v1.png"
@@ -159,6 +160,8 @@ var _crt_shader_material: ShaderMaterial = null
 @onready var _event_log_label: Label = $MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/EventLogPanel/EventLogVBox/EventLogScroll/EventLogLabel
 @onready var _desk_props_layer: Control = get_node_or_null("DeskPropsLayer") as Control
 @onready var _desk_backdrop_texture: TextureRect = get_node_or_null("DeskBackdrop/DeskBackdropTexture") as TextureRect
+@onready var _desk_computer_prop: Control = get_node_or_null("DeskComputerProp") as Control
+@onready var _desk_computer_prop_texture: TextureRect = get_node_or_null("DeskComputerProp/DeskComputerPropTexture") as TextureRect
 @onready var _monitor_frame: Control = get_node_or_null("MonitorFrame") as Control
 @onready var _monitor_frame_texture: TextureRect = get_node_or_null("MonitorFrame/MonitorFrameTexture") as TextureRect
 @onready var _monitor_overlay: Control = get_node_or_null("MonitorOverlay") as Control
@@ -1836,6 +1839,10 @@ func _apply_crt_profile_to_chart() -> void:
 
 func _apply_diegetic_artwork() -> void:
 	_assign_png_texture(_desk_backdrop_texture, DESK_BACKDROP_TEXTURE_PATH)
+	# Capa separada para futuro prop de PC (por ahora no activa).
+	_assign_png_texture(_desk_computer_prop_texture, DESK_COMPUTER_PROP_TEXTURE_PATH)
+	if _desk_computer_prop != null:
+		_desk_computer_prop.visible = false
 	# El frame actual viene con chroma verde sólido; lo ocultamos hasta tener asset usable.
 	_assign_png_texture(_monitor_frame_texture, MONITOR_FRAME_TEXTURE_PATH)
 	if _monitor_frame_texture != null:
