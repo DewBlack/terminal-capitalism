@@ -4,8 +4,8 @@ extends RefCounted
 const REFERENCE_VIEWPORT := Vector2(1920.0, 1080.0)
 
 # Safe area de pantalla CRT (basado en ajuste manual desktop)
-const MONITOR_SAFE_RECT_REF := Rect2(Vector2(415.0, 80.0), Vector2(1175.0, 540.0))
-const MONITOR_FRAME_RECT_REF := Rect2(Vector2(360.0, 40.0), Vector2(1260.0, 690.0))
+const MONITOR_SAFE_RECT_REF := Rect2(Vector2(525.0, 110.0), Vector2(900.0, 470.0))
+const MONITOR_FRAME_RECT_REF := Rect2(Vector2(470.0, 70.0), Vector2(1010.0, 620.0))
 
 # Zonas diegeticas alrededor del monitor (desktop)
 const NEWSPAPER_RECT_REF := Rect2(Vector2(300.0, 700.0), Vector2(360.0, 320.0))
@@ -13,7 +13,7 @@ const INVOICE_RECT_REF := Rect2(Vector2(1260.0, 700.0), Vector2(360.0, 320.0))
 const CALENDAR_RECT_REF := Rect2(Vector2(1340.0, 18.0), Vector2(255.0, 165.0))
 const END_DAY_RECT_REF := Rect2(Vector2(815.0, 978.0), Vector2(290.0, 46.0))
 
-const MIN_CONTENT_SCALE := 0.64
+const MIN_CONTENT_SCALE := 0.60
 const MIN_DOC_SIZE := Vector2(240.0, 210.0)
 const MIN_CALENDAR_SIZE := Vector2(180.0, 120.0)
 const MIN_END_DAY_SIZE := Vector2(230.0, 42.0)
