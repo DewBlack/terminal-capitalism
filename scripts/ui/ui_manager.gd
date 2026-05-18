@@ -43,10 +43,10 @@ const MOVEMENT_REASON_MAX_CHARS := 88
 const MARKET_TAGS_VISIBLE := 3
 const MARKET_TAGS_MAX_CHARS := 24
 const COMPANY_TAGS_VISIBLE := 6
-const ROW_NAME_MIN_WIDTH := 176.0
-const ROW_PRICE_MIN_WIDTH := 84.0
-const ROW_CHANGE_MIN_WIDTH := 74.0
-const HOTKEYS_HINT := "Atajos: Up/Down empresa | B comprar | V vender | Enter pasar dia"
+const ROW_NAME_MIN_WIDTH := 150.0
+const ROW_PRICE_MIN_WIDTH := 72.0
+const ROW_CHANGE_MIN_WIDTH := 66.0
+const HOTKEYS_HINT := "Atajos: Up/Down empresa | B comprar | V vender | Enter dia"
 const APP_SECTION_HOME := "home"
 const APP_SECTION_MARKET := "market"
 const APP_SECTION_COMPANY := "company"
@@ -134,6 +134,10 @@ var _crt_shader_material: ShaderMaterial = null
 @onready var _center_split: HBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit
 @onready var _home_panel: PanelContainer = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel") as PanelContainer
 @onready var _home_summary_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeSummaryLabel") as Label
+@onready var _home_pie_chart: Control = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomePiePanel/HomePieMargin/HomePieVBox/HomePieChart") as Control
+@onready var _home_pie_legend_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomePiePanel/HomePieMargin/HomePieVBox/HomePieLegendLabel") as Label
+@onready var _home_trend_chart: PriceChart = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomeTrendPanel/HomeTrendMargin/HomeTrendVBox/HomeTrendChart") as PriceChart
+@onready var _home_trend_delta_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomeTrendPanel/HomeTrendMargin/HomeTrendVBox/HomeTrendDeltaLabel") as Label
 @onready var _home_pulse_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomePulseLabel") as Label
 @onready var _home_holdings_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeHoldingsScroll/HomeHoldingsLabel") as Label
 @onready var _market_title: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketTitle
@@ -1388,6 +1392,8 @@ func _update_home_dashboard() -> void:
 		_home_summary_label.text = "Sin datos de cartera disponibles."
 		_home_pulse_label.text = "Pulso mercado no disponible."
 		_home_holdings_label.text = "No tienes posiciones activas."
+		_update_home_pie_chart([], 0.0)
+		_update_home_trend_chart([])
 		return
 
 	var cash_value := _player_portfolio.cash
@@ -1427,6 +1433,8 @@ func _update_home_dashboard() -> void:
 		holdings_count,
 		_format_percent_signed(holdings_change_percent)
 	]
+	_update_home_pie_chart(positions, holdings_value)
+	_update_home_trend_chart(_build_home_estimated_series(positions))
 
 	var movers: Array[Dictionary] = []
 	for company in _market_manager.get_sorted_active_companies():
@@ -1470,6 +1478,110 @@ func _update_home_dashboard() -> void:
 		detail_lines.append("+%d posicion(es) mas..." % (positions.size() - visible_rows))
 	_home_holdings_label.text = "\n".join(detail_lines)
 	_home_holdings_label.tooltip_text = "\n".join(detail_tooltip_lines)
+
+
+func _update_home_pie_chart(positions: Array[Dictionary], total_value: float) -> void:
+	if _home_pie_chart == null and _home_pie_legend_label == null:
+		return
+	if positions.is_empty() or total_value <= 0.01:
+		if _home_pie_chart != null and _home_pie_chart.has_method("set_segments"):
+			_home_pie_chart.call("set_segments", [])
+		if _home_pie_legend_label != null:
+			_home_pie_legend_label.text = "Sin cartera para distribuir."
+		return
+
+	var palette: Array[Color] = [
+		Color(0.24, 0.70, 0.52, 0.95),
+		Color(0.33, 0.56, 0.92, 0.95),
+		Color(0.88, 0.56, 0.22, 0.95),
+		Color(0.78, 0.38, 0.80, 0.95),
+		Color(0.85, 0.32, 0.36, 0.95)
+	]
+	var segments: Array[Dictionary] = []
+	var legend_parts: Array[String] = []
+	var used_value := 0.0
+	var visible_slots := mini(4, positions.size())
+	for index in range(visible_slots):
+		var position := positions[index]
+		var ticker := str(position.get("ticker", "--"))
+		var value := maxf(0.0, float(position.get("value", 0.0)))
+		if value <= 0.0:
+			continue
+		var ratio := value / total_value
+		used_value += value
+		segments.append({
+			"value": value,
+			"color": palette[index % palette.size()]
+		})
+		legend_parts.append("%s %.0f%%" % [ticker, clampf(ratio * 100.0, 0.0, 999.0)])
+
+	var remainder := maxf(0.0, total_value - used_value)
+	if positions.size() > visible_slots and remainder > 0.01:
+		segments.append({
+			"value": remainder,
+			"color": Color(0.56, 0.61, 0.67, 0.90)
+		})
+		legend_parts.append("Otros %.0f%%" % clampf((remainder / total_value) * 100.0, 0.0, 999.0))
+
+	if _home_pie_chart != null and _home_pie_chart.has_method("set_segments"):
+		_home_pie_chart.call("set_segments", segments)
+	if _home_pie_legend_label != null:
+		_home_pie_legend_label.text = " | ".join(legend_parts)
+
+
+func _build_home_estimated_series(positions: Array[Dictionary]) -> Array[float]:
+	var series: Array[float] = []
+	if _player_portfolio == null or _market_manager == null:
+		return series
+	if positions.is_empty():
+		var neutral_value := maxf(1.0, _player_portfolio.cash - _player_portfolio.debt)
+		series.append(neutral_value)
+		series.append(neutral_value)
+		return series
+
+	var horizon := 0
+	for position in positions:
+		var ticker := str(position.get("ticker", ""))
+		var company := _market_manager.get_company_by_ticker(ticker)
+		if company == null:
+			continue
+		horizon = maxi(horizon, company.price_history.size())
+	horizon = clampi(horizon, 2, 24)
+
+	for step in range(horizon):
+		var value := _player_portfolio.cash - _player_portfolio.debt
+		for position in positions:
+			var ticker := str(position.get("ticker", ""))
+			var shares := int(position.get("amount", 0))
+			if shares <= 0:
+				continue
+			var company := _market_manager.get_company_by_ticker(ticker)
+			if company == null or company.price_history.is_empty():
+				continue
+			var history := company.price_history
+			var history_start := maxi(0, history.size() - horizon)
+			var history_index := mini(history.size() - 1, history_start + step)
+			value += float(shares) * maxf(0.01, float(history[history_index]))
+		series.append(maxf(1.0, value))
+	return series
+
+
+func _update_home_trend_chart(series: Array[float]) -> void:
+	if _home_trend_chart == null and _home_trend_delta_label == null:
+		return
+	var safe_series := series.duplicate()
+	if safe_series.size() < 2:
+		var neutral_value := maxf(1.0, _player_portfolio.cash - _player_portfolio.debt) if _player_portfolio != null else 1.0
+		safe_series = [neutral_value, neutral_value]
+	if _home_trend_chart != null:
+		_home_trend_chart.set_price_history(safe_series)
+		_home_trend_chart.set_trade_markers([])
+
+	var first_value := maxf(0.01, float(safe_series.front()))
+	var last_value := float(safe_series.back())
+	var delta := (last_value / first_value) - 1.0
+	if _home_trend_delta_label != null:
+		_home_trend_delta_label.text = "Cambio estimado: %s" % _format_percent_signed(delta)
 
 
 func _format_percent_signed(value: float) -> String:
@@ -2030,6 +2142,8 @@ func _apply_crt_monitor_skin() -> void:
 func _apply_crt_profile_to_chart() -> void:
 	if _price_chart != null and _price_chart.has_method("apply_crt_profile"):
 		_price_chart.call("apply_crt_profile", crt_profile)
+	if _home_trend_chart != null and _home_trend_chart.has_method("apply_crt_profile"):
+		_home_trend_chart.call("apply_crt_profile", crt_profile)
 
 
 func _apply_diegetic_artwork() -> void:
