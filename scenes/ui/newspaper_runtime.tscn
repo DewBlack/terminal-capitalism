@@ -121,6 +121,40 @@ theme_override_font_sizes/font_size = 13
 theme_override_colors/font_color = Color(0.243137, 0.192157, 0.145098, 0.94)
 text = "Resumen del contexto de mercado"
 
+[node name="GeneratedImageFrame" type="PanelContainer" parent="NewsVBox/NewsScroll/NewsContent"]
+custom_minimum_size = Vector2(0, 96)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="GeneratedImageTexture" type="TextureRect" parent="NewsVBox/NewsScroll/NewsContent/GeneratedImageFrame"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="GeneratedImageHint" type="Label" parent="NewsVBox/NewsScroll/NewsContent/GeneratedImageFrame"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -126.0
+offset_top = -10.0
+offset_right = 126.0
+offset_bottom = 10.0
+grow_horizontal = 2
+grow_vertical = 2
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.352941, 0.278431, 0.203922, 0.86)
+text = "Hueco para imagen generada"
+
 [node name="BodyColumns" type="HBoxContainer" parent="NewsVBox/NewsScroll/NewsContent"]
 layout_mode = 2
 theme_override_constants/separation = 12

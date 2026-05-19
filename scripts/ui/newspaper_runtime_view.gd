@@ -21,14 +21,21 @@ const TIGHT_WIDTH := 360.0
 @onready var _kicker_label: Label = $NewsVBox/NewsScroll/NewsContent/HeadlineBlock/PageKickerLabel
 @onready var _headline_label: Label = $NewsVBox/NewsScroll/NewsContent/HeadlineBlock/PageTitleLabel
 @onready var _deck_label: Label = $NewsVBox/NewsScroll/NewsContent/HeadlineBlock/PageDeckLabel
+@onready var _generated_image_frame: PanelContainer = $NewsVBox/NewsScroll/NewsContent/GeneratedImageFrame
+@onready var _generated_image_texture_rect: TextureRect = $NewsVBox/NewsScroll/NewsContent/GeneratedImageFrame/GeneratedImageTexture
+@onready var _generated_image_hint: Label = $NewsVBox/NewsScroll/NewsContent/GeneratedImageFrame/GeneratedImageHint
 @onready var _body_left_label: Label = $NewsVBox/NewsScroll/NewsContent/BodyColumns/BodyLeftLabel
 @onready var _body_right_label: Label = $NewsVBox/NewsScroll/NewsContent/BodyColumns/BodyRightLabel
 @onready var _trace_label: Label = $NewsVBox/NewsScroll/NewsContent/TraceLabel
 @onready var _page_hint_label: Label = $NewsVBox/NewsScroll/NewsContent/PageFooter/PageHintLabel
 
+var _generated_image_texture: Texture2D = null
+
 
 func _ready() -> void:
 	resized.connect(_on_resized)
+	_apply_generated_image_slot_style()
+	_apply_generated_image_slot_visibility()
 	_apply_responsive_layout(_history_button.text if _history_button != null else "")
 
 
@@ -54,6 +61,16 @@ func get_page_label() -> Label:
 
 func get_content_container() -> VBoxContainer:
 	return _news_content
+
+
+func set_generated_image(texture: Texture2D) -> void:
+	_generated_image_texture = texture
+	_apply_generated_image_slot_visibility()
+
+
+func clear_generated_image() -> void:
+	_generated_image_texture = null
+	_apply_generated_image_slot_visibility()
 
 
 func apply_page(
@@ -121,6 +138,30 @@ func apply_page(
 		_news_scroll.scroll_vertical = 0
 
 
+func _apply_generated_image_slot_style() -> void:
+	if _generated_image_frame == null:
+		return
+	var frame_style := StyleBoxFlat.new()
+	frame_style.bg_color = Color(0.92, 0.87, 0.76, 0.55)
+	frame_style.border_color = Color(0.44, 0.33, 0.20, 0.62)
+	frame_style.border_width_left = 1
+	frame_style.border_width_top = 1
+	frame_style.border_width_right = 1
+	frame_style.border_width_bottom = 1
+	frame_style.corner_radius_top_left = 4
+	frame_style.corner_radius_top_right = 4
+	frame_style.corner_radius_bottom_left = 4
+	frame_style.corner_radius_bottom_right = 4
+	_generated_image_frame.add_theme_stylebox_override("panel", frame_style)
+
+
+func _apply_generated_image_slot_visibility() -> void:
+	if _generated_image_texture_rect != null:
+		_generated_image_texture_rect.texture = _generated_image_texture
+	if _generated_image_hint != null:
+		_generated_image_hint.visible = _generated_image_texture == null
+
+
 func _on_resized() -> void:
 	_apply_responsive_layout(_history_button.text if _history_button != null else "")
 
@@ -178,6 +219,10 @@ func _apply_responsive_layout(history_button_base_text: String) -> void:
 		_headline_label.add_theme_font_size_override("font_size", int(round(24.0 * scale)))
 	if _deck_label != null:
 		_deck_label.add_theme_font_size_override("font_size", int(round(13.0 * scale)))
+	if _generated_image_frame != null:
+		_generated_image_frame.custom_minimum_size = Vector2(0, round(96.0 * scale))
+	if _generated_image_hint != null:
+		_generated_image_hint.add_theme_font_size_override("font_size", int(round(11.0 * scale)))
 	if _body_left_label != null:
 		_body_left_label.add_theme_font_size_override("font_size", int(round(12.0 * scale)))
 	if _body_right_label != null:
