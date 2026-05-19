@@ -90,7 +90,7 @@ layout_mode = 0
 offset_right = 250.0
 offset_bottom = 180.0
 mouse_filter = 2
-self_modulate = Color(0.886275, 0.831373, 0.690196, 0.46)
+self_modulate = Color(1, 1, 1, 1)
 
 [node name="NewspaperTexture" type="TextureRect" parent="DeskDocs/NewspaperZone"]
 layout_mode = 1

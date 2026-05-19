@@ -1,11 +1,19 @@
 class_name NewspaperRuntimeView
 extends MarginContainer
 
+const RESPONSIVE_BASE_WIDTH := 360.0
+const RESPONSIVE_MIN_SCALE := 0.62
+const COMPACT_WIDTH := 300.0
+const TIGHT_WIDTH := 360.0
+
+@onready var _news_vbox: VBoxContainer = $NewsVBox
+@onready var _news_top_row: HBoxContainer = $NewsVBox/NewsTopRow
+@onready var _pager_row: HBoxContainer = $NewsVBox/PagerRow
 @onready var _news_title: Label = $NewsVBox/NewsTopRow/NewsTitle
 @onready var _history_button: Button = $NewsVBox/NewsTopRow/NewsHistoryButton
-@onready var _page_prev_button: Button = $NewsVBox/NewsTopRow/NewsPagePrev
-@onready var _page_next_button: Button = $NewsVBox/NewsTopRow/NewsPageNext
-@onready var _page_label: Label = $NewsVBox/NewsTopRow/NewsPageLabel
+@onready var _page_prev_button: Button = $NewsVBox/PagerRow/NewsPagePrev
+@onready var _page_next_button: Button = $NewsVBox/PagerRow/NewsPageNext
+@onready var _page_label: Label = $NewsVBox/PagerRow/NewsPageLabel
 @onready var _news_scroll: ScrollContainer = $NewsVBox/NewsScroll
 @onready var _news_content: VBoxContainer = $NewsVBox/NewsScroll/NewsContent
 @onready var _edition_label: Label = $NewsVBox/NewsScroll/NewsContent/EditionStrip/EditionMargin/EditionRow/NewsEditionLabel
@@ -17,6 +25,11 @@ extends MarginContainer
 @onready var _body_right_label: Label = $NewsVBox/NewsScroll/NewsContent/BodyColumns/BodyRightLabel
 @onready var _trace_label: Label = $NewsVBox/NewsScroll/NewsContent/TraceLabel
 @onready var _page_hint_label: Label = $NewsVBox/NewsScroll/NewsContent/PageFooter/PageHintLabel
+
+
+func _ready() -> void:
+	resized.connect(_on_resized)
+	_apply_responsive_layout(_history_button.text if _history_button != null else "")
 
 
 func get_title_label() -> Label:
@@ -52,12 +65,14 @@ func apply_page(
 ) -> void:
 	if _news_title != null:
 		_news_title.text = str(news_model.get("title_text", "Capital Gazette"))
+	var history_button_text := str(news_model.get("history_button_text", "Ver historico"))
 	if _history_button != null:
-		_history_button.text = str(news_model.get("history_button_text", "Ver historico"))
+		_history_button.text = history_button_text
 	if _edition_label != null:
 		_edition_label.text = str(news_model.get("edition_text", "Edicion diaria"))
 	if _edition_badge_label != null:
 		_edition_badge_label.text = "ARCHIVO" if bool(news_model.get("history_mode", false)) else "LIVE"
+	_apply_responsive_layout(history_button_text)
 
 	var safe_total_pages := maxi(total_pages, 1)
 	var safe_page := clampi(current_page, 0, safe_total_pages - 1)
@@ -104,6 +119,84 @@ func apply_page(
 
 	if _news_scroll != null:
 		_news_scroll.scroll_vertical = 0
+
+
+func _on_resized() -> void:
+	_apply_responsive_layout(_history_button.text if _history_button != null else "")
+
+
+func _apply_responsive_layout(history_button_base_text: String) -> void:
+	var width := size.x
+	if width <= 0.0 and _news_vbox != null:
+		width = _news_vbox.size.x
+	if width <= 0.0:
+		return
+
+	var compact := width < COMPACT_WIDTH
+	var tight := width < TIGHT_WIDTH
+	var scale := clampf(width / RESPONSIVE_BASE_WIDTH, RESPONSIVE_MIN_SCALE, 1.0)
+
+	add_theme_constant_override("margin_left", int(round(24.0 * scale)))
+	add_theme_constant_override("margin_top", int(round(18.0 * scale)))
+	add_theme_constant_override("margin_right", int(round(24.0 * scale)))
+	add_theme_constant_override("margin_bottom", int(round(16.0 * scale)))
+
+	if _news_vbox != null:
+		_news_vbox.add_theme_constant_override("separation", int(round(8.0 * scale)))
+	if _news_top_row != null:
+		_news_top_row.add_theme_constant_override("separation", int(round((4.0 if tight else 6.0) * scale)))
+	if _pager_row != null:
+		_pager_row.add_theme_constant_override("separation", int(round((6.0 if tight else 8.0) * scale)))
+
+	if _news_title != null:
+		_news_title.autowrap_mode = TextServer.AUTOWRAP_OFF
+		_news_title.clip_text = true
+		_news_title.add_theme_font_size_override("font_size", int(round(20.0 * scale)))
+
+	if _history_button != null:
+		_history_button.text = _compact_history_button_text(history_button_base_text, compact)
+		_history_button.custom_minimum_size = Vector2(84 if compact else 112, 0)
+		_history_button.add_theme_font_size_override("font_size", int(round((10.0 if compact else 11.0) * scale)))
+
+	if _page_prev_button != null:
+		_page_prev_button.custom_minimum_size = Vector2(24 if compact else 28, 0)
+		_page_prev_button.add_theme_font_size_override("font_size", int(round(12.0 * scale)))
+	if _page_next_button != null:
+		_page_next_button.custom_minimum_size = Vector2(24 if compact else 28, 0)
+		_page_next_button.add_theme_font_size_override("font_size", int(round(12.0 * scale)))
+	if _page_label != null:
+		_page_label.custom_minimum_size = Vector2(52 if compact else 70, 0)
+		_page_label.add_theme_font_size_override("font_size", int(round(11.0 * scale)))
+
+	if _edition_label != null:
+		_edition_label.add_theme_font_size_override("font_size", int(round(12.0 * scale)))
+	if _edition_badge_label != null:
+		_edition_badge_label.add_theme_font_size_override("font_size", int(round(11.0 * scale)))
+	if _kicker_label != null:
+		_kicker_label.add_theme_font_size_override("font_size", int(round(11.0 * scale)))
+	if _headline_label != null:
+		_headline_label.add_theme_font_size_override("font_size", int(round(24.0 * scale)))
+	if _deck_label != null:
+		_deck_label.add_theme_font_size_override("font_size", int(round(13.0 * scale)))
+	if _body_left_label != null:
+		_body_left_label.add_theme_font_size_override("font_size", int(round(12.0 * scale)))
+	if _body_right_label != null:
+		_body_right_label.add_theme_font_size_override("font_size", int(round(12.0 * scale)))
+	if _trace_label != null:
+		_trace_label.add_theme_font_size_override("font_size", int(round(11.0 * scale)))
+	if _page_hint_label != null:
+		_page_hint_label.add_theme_font_size_override("font_size", int(round(11.0 * scale)))
+
+
+func _compact_history_button_text(base_text: String, compact: bool) -> String:
+	var safe_text := base_text.strip_edges()
+	if safe_text.is_empty():
+		safe_text = "Ver historico"
+	if not compact:
+		return safe_text
+	if safe_text.to_lower().contains("hoy"):
+		return "Hoy"
+	return "Archivo"
 
 
 func _split_body_columns(body_text: String) -> PackedStringArray:

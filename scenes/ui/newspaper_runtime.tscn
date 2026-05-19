@@ -29,30 +29,36 @@ theme_override_constants/separation = 6
 [node name="NewsTitle" type="Label" parent="NewsVBox/NewsTopRow"]
 layout_mode = 2
 size_flags_horizontal = 3
-autowrap_mode = 3
+clip_text = true
 theme_override_font_sizes/font_size = 20
 theme_override_colors/font_color = Color(0.141176, 0.109804, 0.0784314, 0.98)
 text = "Capital Gazette"
 
-[node name="NewsPagePrev" type="Button" parent="NewsVBox/NewsTopRow"]
-custom_minimum_size = Vector2(30, 0)
+[node name="NewsHistoryButton" type="Button" parent="NewsVBox/NewsTopRow"]
+custom_minimum_size = Vector2(112, 0)
+layout_mode = 2
+text = "Ver historico"
+
+[node name="PagerRow" type="HBoxContainer" parent="NewsVBox"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="NewsPagePrev" type="Button" parent="NewsVBox/PagerRow"]
+custom_minimum_size = Vector2(28, 0)
 layout_mode = 2
 text = "<"
 
-[node name="NewsPageLabel" type="Label" parent="NewsVBox/NewsTopRow"]
+[node name="NewsPageLabel" type="Label" parent="NewsVBox/PagerRow"]
 custom_minimum_size = Vector2(70, 0)
 layout_mode = 2
 horizontal_alignment = 1
 text = "1/1"
 
-[node name="NewsPageNext" type="Button" parent="NewsVBox/NewsTopRow"]
-custom_minimum_size = Vector2(30, 0)
+[node name="NewsPageNext" type="Button" parent="NewsVBox/PagerRow"]
+custom_minimum_size = Vector2(28, 0)
 layout_mode = 2
 text = ">"
-
-[node name="NewsHistoryButton" type="Button" parent="NewsVBox/NewsTopRow"]
-layout_mode = 2
-text = "Ver historico"
 
 [node name="NewsScroll" type="ScrollContainer" parent="NewsVBox"]
 layout_mode = 2

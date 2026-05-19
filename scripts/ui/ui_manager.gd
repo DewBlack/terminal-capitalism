@@ -60,7 +60,6 @@ const DESK_BACKDROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_bg_v1.
 const DESK_COMPUTER_PROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_bg_v1.png"
 const MONITOR_FRAME_TEXTURE_PATH := "res://art/placeholder/desk/crt_monitor_frame_v1.png"
 const MONITOR_OVERLAY_TEXTURE_PATH := "res://art/placeholder/desk/crt_screen_overlay_v1.png"
-const NEWSPAPER_TEXTURE_PATH := "res://art/placeholder/news/newspaper_front_v1.png"
 const INVOICE_TEXTURE_PATH := "res://art/placeholder/weekly/invoice_sheet_v1.png"
 const CALENDAR_DAYS := 30
 
@@ -1637,9 +1636,9 @@ func _build_newspaper_runtime_zone() -> void:
 		return
 	_newspaper_runtime_title = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsTitle") as Label
 	_newspaper_runtime_history_button = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsHistoryButton") as Button
-	_newspaper_runtime_page_prev_button = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsPagePrev") as Button
-	_newspaper_runtime_page_next_button = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsPageNext") as Button
-	_newspaper_runtime_page_label = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsPageLabel") as Label
+	_newspaper_runtime_page_prev_button = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/PagerRow/NewsPagePrev") as Button
+	_newspaper_runtime_page_next_button = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/PagerRow/NewsPageNext") as Button
+	_newspaper_runtime_page_label = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/PagerRow/NewsPageLabel") as Label
 	_newspaper_runtime_content = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsScroll/NewsContent") as VBoxContainer
 
 
@@ -2101,10 +2100,13 @@ func _apply_diegetic_artwork() -> void:
 	if _monitor_overlay_texture != null:
 		_monitor_overlay_texture.visible = false
 
-	var newspaper_loaded := _assign_png_texture(_newspaper_texture, NEWSPAPER_TEXTURE_PATH)
+	# El periodico en WIP usa fondo plano estilo papel; sin arte impreso.
+	if _newspaper_texture != null:
+		_newspaper_texture.texture = null
+		_newspaper_texture.visible = false
 	var invoice_loaded := _assign_png_texture(_invoice_texture, INVOICE_TEXTURE_PATH)
 	if _newspaper_zone != null:
-		_newspaper_zone.visible = newspaper_loaded
+		_newspaper_zone.visible = true
 	if _invoice_zone != null:
 		_invoice_zone.visible = invoice_loaded
 
