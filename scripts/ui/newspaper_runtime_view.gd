@@ -72,7 +72,7 @@ func apply_page(
 	if kicker.is_empty():
 		kicker = "Titular"
 	if _kicker_label != null:
-		_kicker_label.text = "Pagina %d · %s" % [safe_page + 1, kicker]
+		_kicker_label.text = "Pagina %d - %s" % [safe_page + 1, kicker]
 
 	if _headline_label != null:
 		_headline_label.text = str(page_model.get("title", "Sin titular"))
