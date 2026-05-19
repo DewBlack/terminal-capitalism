@@ -62,7 +62,6 @@ const MONITOR_FRAME_TEXTURE_PATH := "res://art/placeholder/desk/crt_monitor_fram
 const MONITOR_OVERLAY_TEXTURE_PATH := "res://art/placeholder/desk/crt_screen_overlay_v1.png"
 const NEWSPAPER_TEXTURE_PATH := "res://art/placeholder/news/newspaper_front_v1.png"
 const INVOICE_TEXTURE_PATH := "res://art/placeholder/weekly/invoice_sheet_v1.png"
-const NEWSPAPER_PAGE_BLOCKS := 4
 const CALENDAR_DAYS := 30
 
 var _run_manager: RunManager
@@ -86,6 +85,7 @@ var _diegetic_desk_layout = null
 var _zone_policy = null
 var _tutorial_state: Dictionary = {"active": false}
 var _newspaper_runtime: Control = null
+var _newspaper_runtime_view: Node = null
 var _invoice_runtime: Control = null
 var _newspaper_runtime_title: Label = null
 var _newspaper_runtime_history_button: Button = null
@@ -675,7 +675,6 @@ func _update_header() -> void:
 func _update_news_panel() -> void:
 	if _news_title == null or _news_history_button == null or _news_content == null:
 		return
-	NEWS_PANEL_RENDERER.clear_container(_news_content)
 	var history_entries: Array = []
 	if _news_manager != null and _news_history_visible:
 		history_entries = _news_manager.get_news_history_entries(60)
@@ -694,9 +693,10 @@ func _update_news_panel() -> void:
 		history_entries,
 		run_context
 	)
-	if _newspaper_runtime != null and _news_content == _newspaper_runtime_content:
+	if _newspaper_runtime_view != null and _news_content == _newspaper_runtime_content:
 		_render_newspaper_template(news_model)
 		return
+	NEWS_PANEL_RENDERER.clear_container(_news_content)
 	NEWS_PANEL_RENDERER.apply_model(
 		_news_title,
 		_news_history_button,
@@ -708,58 +708,40 @@ func _update_news_panel() -> void:
 
 
 func _render_newspaper_template(news_model: Dictionary) -> void:
-	if _newspaper_runtime_title != null:
-		_newspaper_runtime_title.text = str(news_model.get("title_text", "Capital Gazette"))
-	if _newspaper_runtime_history_button != null:
-		_newspaper_runtime_history_button.text = str(news_model.get("history_button_text", "Ver historico"))
+	if _newspaper_runtime_view == null or not _newspaper_runtime_view.has_method("apply_page"):
+		return
 
-	var all_blocks := _collect_newspaper_blocks(news_model)
-	_newspaper_total_pages = maxi(1, int(ceili(float(all_blocks.size()) / float(NEWSPAPER_PAGE_BLOCKS))))
+	var pages := _collect_newspaper_pages(news_model)
+	_newspaper_total_pages = maxi(1, pages.size())
 	_newspaper_current_page = clampi(_newspaper_current_page, 0, _newspaper_total_pages - 1)
 
-	var start_index := _newspaper_current_page * NEWSPAPER_PAGE_BLOCKS
-	var end_index := mini(all_blocks.size(), start_index + NEWSPAPER_PAGE_BLOCKS)
-	var page_blocks := all_blocks.slice(start_index, end_index)
+	var current_page_model: Dictionary = {}
+	if not pages.is_empty():
+		current_page_model = pages[_newspaper_current_page]
 
-	var columns := HBoxContainer.new()
-	columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	columns.add_theme_constant_override("separation", 10)
+	var next_page_title := ""
+	var next_page_index := _newspaper_current_page + 1
+	if next_page_index < pages.size():
+		next_page_title = str((pages[next_page_index] as Dictionary).get("title", "")).strip_edges()
 
-	var left_column := VBoxContainer.new()
-	left_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left_column.add_theme_constant_override("separation", 5)
-	var right_column := VBoxContainer.new()
-	right_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right_column.add_theme_constant_override("separation", 5)
-
-	for index in range(page_blocks.size()):
-		var block_variant: Variant = page_blocks[index]
-		if not (block_variant is Dictionary):
-			continue
-		var block := block_variant as Dictionary
-		var target_column := left_column if index % 2 == 0 else right_column
-		target_column.add_child(_build_newspaper_block_node(block, start_index + index))
-
-	columns.add_child(left_column)
-	columns.add_child(right_column)
-	_news_content.add_child(columns)
-
-	if _newspaper_runtime_page_label != null:
-		_newspaper_runtime_page_label.text = "%d/%d" % [_newspaper_current_page + 1, _newspaper_total_pages]
-	if _newspaper_runtime_page_prev_button != null:
-		_newspaper_runtime_page_prev_button.disabled = _newspaper_current_page <= 0
-	if _newspaper_runtime_page_next_button != null:
-		_newspaper_runtime_page_next_button.disabled = _newspaper_current_page >= (_newspaper_total_pages - 1)
+	_newspaper_runtime_view.call(
+		"apply_page",
+		news_model,
+		current_page_model,
+		_newspaper_current_page,
+		_newspaper_total_pages,
+		next_page_title
+	)
 
 
-func _collect_newspaper_blocks(news_model: Dictionary) -> Array[Dictionary]:
-	var blocks: Array[Dictionary] = []
+func _collect_newspaper_pages(news_model: Dictionary) -> Array[Dictionary]:
+	var pages: Array[Dictionary] = []
 	var lead_variant: Variant = news_model.get("lead_article", {})
 	if lead_variant is Dictionary:
 		var lead_article := (lead_variant as Dictionary).duplicate(true)
 		if not lead_article.is_empty():
 			lead_article["slot"] = "lead"
-			blocks.append(lead_article)
+			pages.append(lead_article)
 
 	var secondary_variant: Variant = news_model.get("secondary_articles", [])
 	if secondary_variant is Array:
@@ -769,10 +751,10 @@ func _collect_newspaper_blocks(news_model: Dictionary) -> Array[Dictionary]:
 				continue
 			var article := (item as Dictionary).duplicate(true)
 			article["slot"] = "secondary"
-			blocks.append(article)
+			pages.append(article)
 
-	if blocks.is_empty():
-		blocks.append({
+	if pages.is_empty():
+		pages.append({
 			"kicker": "Sin titulares",
 			"title": str(news_model.get("placeholder_text", "Sin noticias.")),
 			"deck": "",
@@ -780,68 +762,7 @@ func _collect_newspaper_blocks(news_model: Dictionary) -> Array[Dictionary]:
 			"trace_text": "",
 			"slot": "placeholder"
 		})
-	return blocks
-
-
-func _build_newspaper_block_node(block: Dictionary, order_index: int) -> Control:
-	var wrapper := VBoxContainer.new()
-	wrapper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	wrapper.add_theme_constant_override("separation", 2)
-
-	var kicker := str(block.get("kicker", "Titular"))
-	if kicker.is_empty():
-		kicker = "Titular"
-	var kicker_label := Label.new()
-	kicker_label.text = "%d. %s" % [order_index + 1, kicker]
-	kicker_label.add_theme_font_size_override("font_size", 10)
-	kicker_label.add_theme_color_override("font_color", Color(0.39, 0.29, 0.20, 0.95))
-	wrapper.add_child(kicker_label)
-
-	var title_label := Label.new()
-	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title_label.max_lines_visible = 3
-	title_label.clip_text = true
-	title_label.add_theme_font_size_override("font_size", 13)
-	title_label.add_theme_color_override("font_color", Color(0.14, 0.11, 0.08, 0.98))
-	title_label.text = str(block.get("title", "Sin titular"))
-	wrapper.add_child(title_label)
-
-	var deck_text := str(block.get("deck", ""))
-	if not deck_text.is_empty():
-		var deck_label := Label.new()
-		deck_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		deck_label.max_lines_visible = 2
-		deck_label.clip_text = true
-		deck_label.add_theme_font_size_override("font_size", 11)
-		deck_label.add_theme_color_override("font_color", Color(0.24, 0.19, 0.14, 0.94))
-		deck_label.text = deck_text
-		wrapper.add_child(deck_label)
-
-	var body_text := str(block.get("body", ""))
-	if not body_text.is_empty():
-		var body_label := Label.new()
-		body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		body_label.max_lines_visible = 5
-		body_label.clip_text = true
-		body_label.add_theme_font_size_override("font_size", 10)
-		body_label.add_theme_color_override("font_color", Color(0.19, 0.15, 0.12, 0.94))
-		body_label.text = body_text
-		wrapper.add_child(body_label)
-
-	var trace_text := str(block.get("trace_text", ""))
-	if not trace_text.is_empty():
-		var trace_label := Label.new()
-		trace_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		trace_label.max_lines_visible = 2
-		trace_label.clip_text = true
-		trace_label.add_theme_font_size_override("font_size", 9)
-		trace_label.add_theme_color_override("font_color", Color(0.36, 0.27, 0.20, 0.92))
-		trace_label.text = trace_text
-		wrapper.add_child(trace_label)
-
-	var separator := HSeparator.new()
-	wrapper.add_child(separator)
-	return wrapper
+	return pages
 
 
 func _update_calendar_view(current_day: int, max_days: int, week_index: int) -> void:
@@ -1264,6 +1185,9 @@ func _on_quantity_max_pressed() -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if _handle_newspaper_page_hotkeys(event):
+		accept_event()
+		return
 	if _hotkey_input_controller == null:
 		return
 	var handled: bool = bool(_hotkey_input_controller.handle_unhandled_key_input(
@@ -1280,6 +1204,41 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	))
 	if handled:
 		accept_event()
+
+
+func _handle_newspaper_page_hotkeys(event: InputEvent) -> bool:
+	if _newspaper_runtime_view == null:
+		return false
+	if _newspaper_total_pages <= 1:
+		return false
+	if _is_tutorial_active():
+		return false
+	if not (event is InputEventKey):
+		return false
+	var key_event := event as InputEventKey
+	if key_event == null or not key_event.pressed or key_event.echo:
+		return false
+	if _newspaper_zone == null or _newspaper_runtime == null:
+		return false
+	if not _is_document_zone_ready(_newspaper_zone, _newspaper_runtime):
+		return false
+
+	match key_event.keycode:
+		KEY_LEFT, KEY_PAGEUP:
+			if _newspaper_current_page <= 0:
+				return false
+			_newspaper_current_page -= 1
+			refresh_all_ui()
+			return true
+		KEY_RIGHT, KEY_PAGEDOWN:
+			var max_page_index := maxi(0, _newspaper_total_pages - 1)
+			if _newspaper_current_page >= max_page_index:
+				return false
+			_newspaper_current_page += 1
+			refresh_all_ui()
+			return true
+		_:
+			return false
 
 
 func _on_hotkey_blocked(attempted_action: String, reason: String, keycode: int) -> void:
@@ -1666,77 +1625,16 @@ func _build_diegetic_runtime_zones() -> void:
 func _build_newspaper_runtime_zone() -> void:
 	if _newspaper_zone == null:
 		return
-	var runtime_margin := _newspaper_zone.get_node_or_null("NewsRuntime") as MarginContainer
-	if runtime_margin == null:
-		runtime_margin = MarginContainer.new()
-		runtime_margin.name = "NewsRuntime"
-		runtime_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		runtime_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		runtime_margin.mouse_filter = Control.MOUSE_FILTER_STOP
-		runtime_margin.add_theme_constant_override("margin_left", 24)
-		runtime_margin.add_theme_constant_override("margin_top", 18)
-		runtime_margin.add_theme_constant_override("margin_right", 24)
-		runtime_margin.add_theme_constant_override("margin_bottom", 16)
-
-		var news_vbox := VBoxContainer.new()
-		news_vbox.name = "NewsVBox"
-		news_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		news_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		news_vbox.add_theme_constant_override("separation", 8)
-
-		var top_row := HBoxContainer.new()
-		top_row.name = "NewsTopRow"
-		top_row.add_theme_constant_override("separation", 6)
-
-		var title := Label.new()
-		title.name = "NewsTitle"
-		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		title.add_theme_font_size_override("font_size", 20)
-		title.add_theme_color_override("font_color", Color(0.14, 0.11, 0.08, 0.98))
-		title.text = "Capital Gazette"
-
-		var page_prev := Button.new()
-		page_prev.name = "NewsPagePrev"
-		page_prev.custom_minimum_size = Vector2(26, 0)
-		page_prev.text = "<"
-
-		var page_label := Label.new()
-		page_label.name = "NewsPageLabel"
-		page_label.custom_minimum_size = Vector2(64, 0)
-		page_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		page_label.text = "1/1"
-
-		var page_next := Button.new()
-		page_next.name = "NewsPageNext"
-		page_next.custom_minimum_size = Vector2(26, 0)
-		page_next.text = ">"
-
-		var history_button := Button.new()
-		history_button.name = "NewsHistoryButton"
-		history_button.text = "Ver historico"
-
-		var scroll := ScrollContainer.new()
-		scroll.name = "NewsScroll"
-		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-
-		var content := VBoxContainer.new()
-		content.name = "NewsContent"
-		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		content.add_theme_constant_override("separation", 6)
-
-		scroll.add_child(content)
-		top_row.add_child(title)
-		top_row.add_child(page_prev)
-		top_row.add_child(page_label)
-		top_row.add_child(page_next)
-		top_row.add_child(history_button)
-		news_vbox.add_child(top_row)
-		news_vbox.add_child(scroll)
-		runtime_margin.add_child(news_vbox)
-		_newspaper_zone.add_child(runtime_margin)
-	_newspaper_runtime = runtime_margin
+	_newspaper_runtime_view = _newspaper_zone.get_node_or_null("NewsRuntime")
+	_newspaper_runtime = _newspaper_runtime_view as Control
+	if _newspaper_runtime_view != null and _newspaper_runtime_view.has_method("get_title_label"):
+		_newspaper_runtime_title = _newspaper_runtime_view.call("get_title_label") as Label
+		_newspaper_runtime_history_button = _newspaper_runtime_view.call("get_history_button") as Button
+		_newspaper_runtime_page_prev_button = _newspaper_runtime_view.call("get_prev_button") as Button
+		_newspaper_runtime_page_next_button = _newspaper_runtime_view.call("get_next_button") as Button
+		_newspaper_runtime_page_label = _newspaper_runtime_view.call("get_page_label") as Label
+		_newspaper_runtime_content = _newspaper_runtime_view.call("get_content_container") as VBoxContainer
+		return
 	_newspaper_runtime_title = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsTitle") as Label
 	_newspaper_runtime_history_button = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsHistoryButton") as Button
 	_newspaper_runtime_page_prev_button = _newspaper_zone.get_node_or_null("NewsRuntime/NewsVBox/NewsTopRow/NewsPagePrev") as Button
