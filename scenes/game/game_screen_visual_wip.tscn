@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/ui_manager.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/price_chart.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/ui/tutorial_overlay.gd" id="3"]
 [ext_resource type="PackedScene" path="res://scenes/ui/desk_props_layer.tscn" id="4"]
 [ext_resource type="Script" path="res://scripts/ui/home_pie_chart.gd" id="5"]
+[ext_resource type="PackedScene" path="res://scenes/ui/newspaper_runtime.tscn" id="6"]
 
 [node name="GameScreen" type="Control"]
 layout_mode = 3
@@ -89,7 +90,7 @@ layout_mode = 0
 offset_right = 250.0
 offset_bottom = 180.0
 mouse_filter = 2
-self_modulate = Color(0.886275, 0.831373, 0.690196, 0.46)
+self_modulate = Color(1, 1, 1, 1)
 
 [node name="NewspaperTexture" type="TextureRect" parent="DeskDocs/NewspaperZone"]
 layout_mode = 1
@@ -102,19 +103,13 @@ mouse_filter = 2
 expand_mode = 1
 stretch_mode = 6
 
-[node name="PaperMargin" type="MarginContainer" parent="DeskDocs/NewspaperZone"]
-visible = false
-layout_mode = 2
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 10
-
-[node name="PaperLabel" type="Label" parent="DeskDocs/NewspaperZone/PaperMargin"]
-layout_mode = 2
-horizontal_alignment = 1
-vertical_alignment = 1
-text = "Zona periodico"
+[node name="NewsRuntime" parent="DeskDocs/NewspaperZone" instance=ExtResource("6")]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="InvoiceZone" type="PanelContainer" parent="DeskDocs"]
 layout_mode = 0
