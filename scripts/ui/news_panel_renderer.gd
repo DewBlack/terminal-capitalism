@@ -38,7 +38,7 @@ static func apply_model(
 	if secondary_articles_variant is Array:
 		var secondary_articles := secondary_articles_variant as Array
 		if not secondary_articles.is_empty() and news_card_factory != null:
-			var section_title := "Archivo secundario" if bool(news_model.get("history_mode", false)) else "Mercado en segundo plano"
+			var section_title := "Archivo secundario" if bool(news_model.get("history_mode", false)) else "Resto de portada"
 			if news_card_factory.has_method("build_section_header"):
 				news_content.add_child(news_card_factory.build_section_header(section_title))
 			for index in range(secondary_articles.size()):

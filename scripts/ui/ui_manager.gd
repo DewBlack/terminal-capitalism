@@ -61,6 +61,7 @@ const DESK_COMPUTER_PROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_b
 const MONITOR_FRAME_TEXTURE_PATH := "res://art/placeholder/desk/crt_monitor_frame_v1.png"
 const MONITOR_OVERLAY_TEXTURE_PATH := "res://art/placeholder/desk/crt_screen_overlay_v1.png"
 const NEWSPAPER_TEXTURE_PATH := "res://art/placeholder/news/newspaper_front_v1.png"
+const NEWSPAPER_INNER_TEXTURE_PATH := "res://art/placeholder/news/newspaper_inner_v1.png"
 const INVOICE_TEXTURE_PATH := "res://art/placeholder/weekly/invoice_sheet_v1.png"
 const NEWSPAPER_PAGE_BLOCKS := 4
 const CALENDAR_DAYS := 30
@@ -95,6 +96,8 @@ var _newspaper_runtime_page_next_button: Button = null
 var _newspaper_runtime_page_label: Label = null
 var _newspaper_current_page: int = 0
 var _newspaper_total_pages: int = 1
+var _newspaper_front_texture: Texture2D = null
+var _newspaper_inner_texture: Texture2D = null
 var _calendar_zone: PanelContainer = null
 var _calendar_runtime: Control = null
 var _calendar_title_label: Label = null
@@ -716,40 +719,56 @@ func _render_newspaper_template(news_model: Dictionary) -> void:
 	var all_blocks := _collect_newspaper_blocks(news_model)
 	_newspaper_total_pages = maxi(1, int(ceili(float(all_blocks.size()) / float(NEWSPAPER_PAGE_BLOCKS))))
 	_newspaper_current_page = clampi(_newspaper_current_page, 0, _newspaper_total_pages - 1)
+	var page_text := "Pagina %d de %d" % [_newspaper_current_page + 1, _newspaper_total_pages]
+	var history_mode := bool(news_model.get("history_mode", false))
+	_update_newspaper_texture_variant(history_mode)
 
 	var start_index := _newspaper_current_page * NEWSPAPER_PAGE_BLOCKS
 	var end_index := mini(all_blocks.size(), start_index + NEWSPAPER_PAGE_BLOCKS)
 	var page_blocks := all_blocks.slice(start_index, end_index)
+	if NEWS_CARD_FACTORY.has_method("build_edition_strip"):
+		_news_content.add_child(
+			NEWS_CARD_FACTORY.build_edition_strip(
+				str(news_model.get("edition_text", "Edicion diaria")),
+				history_mode,
+				page_text
+			)
+		)
 
-	var columns := HBoxContainer.new()
-	columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	columns.add_theme_constant_override("separation", 10)
+	if NEWS_CARD_FACTORY.has_method("build_newspaper_page"):
+		_news_content.add_child(NEWS_CARD_FACTORY.build_newspaper_page(page_blocks, start_index))
+	else:
+		var columns := HBoxContainer.new()
+		columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		columns.add_theme_constant_override("separation", 10)
 
-	var left_column := VBoxContainer.new()
-	left_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left_column.add_theme_constant_override("separation", 5)
-	var right_column := VBoxContainer.new()
-	right_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right_column.add_theme_constant_override("separation", 5)
+		var left_column := VBoxContainer.new()
+		left_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		left_column.add_theme_constant_override("separation", 5)
+		var right_column := VBoxContainer.new()
+		right_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		right_column.add_theme_constant_override("separation", 5)
 
-	for index in range(page_blocks.size()):
-		var block_variant: Variant = page_blocks[index]
-		if not (block_variant is Dictionary):
-			continue
-		var block := block_variant as Dictionary
-		var target_column := left_column if index % 2 == 0 else right_column
-		target_column.add_child(_build_newspaper_block_node(block, start_index + index))
+		for index in range(page_blocks.size()):
+			var block_variant: Variant = page_blocks[index]
+			if not (block_variant is Dictionary):
+				continue
+			var block := block_variant as Dictionary
+			var target_column := left_column if index % 2 == 0 else right_column
+			target_column.add_child(_build_newspaper_block_node(block, start_index + index))
 
-	columns.add_child(left_column)
-	columns.add_child(right_column)
-	_news_content.add_child(columns)
+		columns.add_child(left_column)
+		columns.add_child(right_column)
+		_news_content.add_child(columns)
 
 	if _newspaper_runtime_page_label != null:
-		_newspaper_runtime_page_label.text = "%d/%d" % [_newspaper_current_page + 1, _newspaper_total_pages]
+		_newspaper_runtime_page_label.text = page_text
 	if _newspaper_runtime_page_prev_button != null:
 		_newspaper_runtime_page_prev_button.disabled = _newspaper_current_page <= 0
+		_newspaper_runtime_page_prev_button.tooltip_text = "Pagina anterior ([ o Left)"
 	if _newspaper_runtime_page_next_button != null:
 		_newspaper_runtime_page_next_button.disabled = _newspaper_current_page >= (_newspaper_total_pages - 1)
+		_newspaper_runtime_page_next_button.tooltip_text = "Pagina siguiente (] o Right)"
 
 
 func _collect_newspaper_blocks(news_model: Dictionary) -> Array[Dictionary]:
@@ -775,12 +794,29 @@ func _collect_newspaper_blocks(news_model: Dictionary) -> Array[Dictionary]:
 		blocks.append({
 			"kicker": "Sin titulares",
 			"title": str(news_model.get("placeholder_text", "Sin noticias.")),
+			"byline": "Mesa de redaccion",
 			"deck": "",
 			"body": "",
 			"trace_text": "",
 			"slot": "placeholder"
 		})
 	return blocks
+
+
+func _update_newspaper_texture_variant(history_mode: bool) -> void:
+	if _newspaper_texture == null:
+		return
+	var target_texture := _newspaper_front_texture
+	if _should_use_newspaper_inner_texture(history_mode):
+		target_texture = _newspaper_inner_texture if _newspaper_inner_texture != null else _newspaper_front_texture
+	if target_texture != null:
+		_newspaper_texture.texture = target_texture
+
+
+func _should_use_newspaper_inner_texture(history_mode: bool) -> bool:
+	if history_mode:
+		return true
+	return _newspaper_current_page > 0
 
 
 func _build_newspaper_block_node(block: Dictionary, order_index: int) -> Control:
@@ -1280,6 +1316,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	))
 	if handled:
 		accept_event()
+		return
+
+	if _try_handle_newspaper_pagination_hotkey(event):
+		accept_event()
 
 
 func _on_hotkey_blocked(attempted_action: String, reason: String, keycode: int) -> void:
@@ -1292,6 +1332,32 @@ func _on_hotkey_blocked(attempted_action: String, reason: String, keycode: int) 
 			"keycode": keycode
 		}
 	)
+
+
+func _try_handle_newspaper_pagination_hotkey(event: InputEvent) -> bool:
+	if not (event is InputEventKey):
+		return false
+	var key_event := event as InputEventKey
+	if key_event == null or not key_event.pressed or key_event.echo:
+		return false
+	if _are_actions_locked():
+		return false
+	if _newspaper_runtime == null or not _newspaper_runtime.is_visible_in_tree():
+		return false
+
+	match key_event.keycode:
+		KEY_LEFT, KEY_BRACKETLEFT, KEY_PAGEUP:
+			if _newspaper_current_page <= 0:
+				return false
+			_on_newspaper_prev_page_pressed()
+			return true
+		KEY_RIGHT, KEY_BRACKETRIGHT, KEY_PAGEDOWN:
+			if _newspaper_current_page >= (_newspaper_total_pages - 1):
+				return false
+			_on_newspaper_next_page_pressed()
+			return true
+		_:
+			return false
 
 
 func _select_relative_company(direction: int) -> void:
@@ -1686,34 +1752,40 @@ func _build_newspaper_runtime_zone() -> void:
 
 		var top_row := HBoxContainer.new()
 		top_row.name = "NewsTopRow"
-		top_row.add_theme_constant_override("separation", 6)
+		top_row.add_theme_constant_override("separation", 5)
 
 		var title := Label.new()
 		title.name = "NewsTitle"
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		title.add_theme_font_size_override("font_size", 20)
+		title.add_theme_font_size_override("font_size", 19)
 		title.add_theme_color_override("font_color", Color(0.14, 0.11, 0.08, 0.98))
 		title.text = "Capital Gazette"
 
 		var page_prev := Button.new()
 		page_prev.name = "NewsPagePrev"
-		page_prev.custom_minimum_size = Vector2(26, 0)
-		page_prev.text = "<"
+		page_prev.custom_minimum_size = Vector2(72, 0)
+		page_prev.text = "Anterior"
+		page_prev.add_theme_font_size_override("font_size", 11)
 
 		var page_label := Label.new()
 		page_label.name = "NewsPageLabel"
-		page_label.custom_minimum_size = Vector2(64, 0)
+		page_label.custom_minimum_size = Vector2(108, 0)
 		page_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		page_label.text = "1/1"
+		page_label.text = "Pagina 1 de 1"
+		page_label.add_theme_font_size_override("font_size", 11)
+		page_label.add_theme_color_override("font_color", Color(0.29, 0.23, 0.16, 0.95))
 
 		var page_next := Button.new()
 		page_next.name = "NewsPageNext"
-		page_next.custom_minimum_size = Vector2(26, 0)
-		page_next.text = ">"
+		page_next.custom_minimum_size = Vector2(72, 0)
+		page_next.text = "Siguiente"
+		page_next.add_theme_font_size_override("font_size", 11)
 
 		var history_button := Button.new()
 		history_button.name = "NewsHistoryButton"
+		history_button.custom_minimum_size = Vector2(86, 0)
+		history_button.add_theme_font_size_override("font_size", 11)
 		history_button.text = "Ver historico"
 
 		var scroll := ScrollContainer.new()
@@ -1724,7 +1796,7 @@ func _build_newspaper_runtime_zone() -> void:
 		var content := VBoxContainer.new()
 		content.name = "NewsContent"
 		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		content.add_theme_constant_override("separation", 6)
+		content.add_theme_constant_override("separation", 8)
 
 		scroll.add_child(content)
 		top_row.add_child(title)
@@ -2203,7 +2275,14 @@ func _apply_diegetic_artwork() -> void:
 	if _monitor_overlay_texture != null:
 		_monitor_overlay_texture.visible = false
 
-	var newspaper_loaded := _assign_png_texture(_newspaper_texture, NEWSPAPER_TEXTURE_PATH)
+	_newspaper_front_texture = _load_png_texture(NEWSPAPER_TEXTURE_PATH)
+	_newspaper_inner_texture = _load_png_texture(NEWSPAPER_INNER_TEXTURE_PATH)
+	if _newspaper_inner_texture == null:
+		_newspaper_inner_texture = _newspaper_front_texture
+	var newspaper_loaded := false
+	if _newspaper_texture != null:
+		_newspaper_texture.texture = _newspaper_front_texture
+		newspaper_loaded = _newspaper_front_texture != null
 	var invoice_loaded := _assign_png_texture(_invoice_texture, INVOICE_TEXTURE_PATH)
 	if _newspaper_zone != null:
 		_newspaper_zone.visible = newspaper_loaded
@@ -2214,17 +2293,18 @@ func _apply_diegetic_artwork() -> void:
 func _assign_png_texture(target: TextureRect, png_path: String) -> bool:
 	if target == null:
 		return false
+	var texture := _load_png_texture(png_path)
+	target.texture = texture
+	return texture != null
+
+
+func _load_png_texture(png_path: String) -> Texture2D:
 	var image := Image.new()
 	var image_error := image.load(png_path)
 	if image_error != OK:
-		target.texture = null
-		return false
+		return null
 	var texture := ImageTexture.create_from_image(image)
-	if texture == null:
-		target.texture = null
-		return false
-	target.texture = texture
-	return true
+	return texture
 
 
 func _apply_diegetic_layout() -> void:

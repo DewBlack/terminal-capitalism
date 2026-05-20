@@ -71,6 +71,7 @@ static func _build_history_articles(history_entries: Array) -> Array[Dictionary]
 			"kind": "history",
 			"kicker": "Hemeroteca D%02d" % day_value,
 			"title": title,
+			"byline": "Archivo de mercado",
 			"deck": "Revision del cierre del dia y sus implicaciones.",
 			"body": description,
 			"trace_text": "",
@@ -90,6 +91,7 @@ static func _build_headline_articles(latest_headlines: Array) -> Array[Dictionar
 			"kind": "headline",
 			"kicker": _build_kicker(news_event),
 			"title": str(news_event.title),
+			"byline": _build_byline(news_event),
 			"deck": _build_deck(news_event),
 			"body": str(news_event.description),
 			"trace_text": trace_text,
@@ -109,6 +111,7 @@ static func _build_run_context_article(run_context: Dictionary) -> Dictionary:
 		"kind": "briefing",
 		"kicker": "Apertura de run",
 		"title": "Briefing de contexto",
+		"byline": "Mesa de analisis interno",
 		"deck": "Panorama previo al primer cierre.",
 		"body": "\n".join(context_lines),
 		"trace_text": "",
@@ -154,6 +157,19 @@ static func _build_trace_text(news_event) -> String:
 	if segments.is_empty():
 		return ""
 	return "Traza -> %s" % " | ".join(segments)
+
+
+static func _build_byline(news_event) -> String:
+	if news_event == null:
+		return "Mesa de mercado"
+	var impacted_count := int(news_event.trace_affected_tickers.size())
+	if impacted_count <= 0:
+		return "Redaccion central"
+	if impacted_count == 1:
+		return "Cobertura focalizada"
+	if impacted_count == 2:
+		return "Cobertura sectorial"
+	return "Cobertura amplia"
 
 
 static func _build_signal_hint(news_event) -> String:
