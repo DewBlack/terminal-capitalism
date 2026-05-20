@@ -120,6 +120,7 @@ var _invoice_runtime_critical_footer: Label = null
 var _invoice_runtime_critical_continue_button: Button = null
 var _last_critical_document_id: String = ""
 var _zone_contract_enabled: bool = false
+var _calendar_contract_active: bool = false
 var _crt_shader_material: ShaderMaterial = null
 
 @export_enum("low", "medium", "high") var crt_profile: String = UI_THEME_TOKENS.CRT_PROFILE_FALLBACK
@@ -811,7 +812,7 @@ func _update_finance_ledger_view(cash_value: float, debt_value: float, debt_limi
 
 
 func _apply_header_visibility_contract() -> void:
-	var use_diegetic_day_and_finance := _zone_contract_enabled and _calendar_runtime != null
+	var use_diegetic_day_and_finance := _calendar_contract_active
 	if _day_label != null:
 		_day_label.visible = not use_diegetic_day_and_finance
 	if _cash_label != null:
@@ -1976,6 +1977,7 @@ func _apply_zone_contract() -> void:
 	var contract_active := _zone_contract_enabled \
 		and _is_document_zone_ready(_newspaper_zone, _newspaper_runtime) \
 		and _is_document_zone_ready(_invoice_zone, _invoice_runtime)
+	_calendar_contract_active = contract_active and _is_calendar_zone_available()
 	var targets := {
 		"enabled": contract_active,
 		"news_panel": _news_panel,
@@ -1984,9 +1986,9 @@ func _apply_zone_contract() -> void:
 		"invoice_runtime": _invoice_runtime
 	}
 	_zone_policy.apply_visual_contract(targets)
-	_apply_header_visibility_contract()
 	if _calendar_runtime != null:
-		_calendar_runtime.visible = contract_active
+		_calendar_runtime.visible = _calendar_contract_active
+	_apply_header_visibility_contract()
 	_sync_desk_end_day_button_state()
 	var violations: Array[String] = _zone_policy.collect_contract_violations(targets)
 	for violation in violations:
@@ -1997,6 +1999,12 @@ func _is_document_zone_ready(zone: Control, runtime_zone: Control) -> bool:
 	if zone == null or runtime_zone == null:
 		return false
 	return zone.is_visible_in_tree() and runtime_zone.is_visible_in_tree()
+
+
+func _is_calendar_zone_available() -> bool:
+	if _calendar_zone == null or _calendar_runtime == null:
+		return false
+	return _calendar_zone.is_visible_in_tree()
 
 
 func _apply_diegetic_shell_styles() -> void:
