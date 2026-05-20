@@ -726,16 +726,15 @@ func _render_newspaper_template(news_model: Dictionary) -> void:
 	var start_index := _newspaper_current_page * NEWSPAPER_PAGE_BLOCKS
 	var end_index := mini(all_blocks.size(), start_index + NEWSPAPER_PAGE_BLOCKS)
 	var page_blocks := all_blocks.slice(start_index, end_index)
-	if NEWS_CARD_FACTORY.has_method("build_edition_strip"):
-		_news_content.add_child(
-			NEWS_CARD_FACTORY.build_edition_strip(
-				str(news_model.get("edition_text", "Edicion diaria")),
-				history_mode,
-				page_text
-			)
+	_news_content.add_child(
+		NEWS_CARD_FACTORY.build_edition_strip(
+			str(news_model.get("edition_text", "Edicion diaria")),
+			history_mode,
+			page_text
 		)
+	)
 
-	if NEWS_CARD_FACTORY.has_method("build_newspaper_page"):
+	if NEWS_CARD_FACTORY != null:
 		_news_content.add_child(NEWS_CARD_FACTORY.build_newspaper_page(page_blocks, start_index))
 	else:
 		var columns := HBoxContainer.new()
