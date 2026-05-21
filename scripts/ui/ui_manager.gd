@@ -120,6 +120,7 @@ var _invoice_runtime_critical_footer: Label = null
 var _invoice_runtime_critical_continue_button: Button = null
 var _last_critical_document_id: String = ""
 var _zone_contract_enabled: bool = false
+var _zone_contract_active: bool = false
 var _calendar_contract_active: bool = false
 var _crt_shader_material: ShaderMaterial = null
 
@@ -429,14 +430,16 @@ func set_tutorial_state(state: Dictionary) -> void:
 	# Recalcula botones al cambiar de paso tutorial (ej. cuando Pasar Dia pasa de bloqueado a habilitado).
 	if _run_manager != null:
 		_update_trade_action_state()
+	_sync_desk_end_day_button_state()
 
 
 func get_tutorial_target_rect(target_id: String, ticker_hint: String = "") -> Rect2:
 	if _tutorial_target_rect_resolver == null:
 		return _header_bar.get_global_rect()
 	var news_target: Control = _news_panel
-	if _zone_contract_enabled and _newspaper_runtime != null:
+	if _zone_contract_active and _newspaper_runtime != null:
 		news_target = _newspaper_runtime
+	var end_day_target := _resolve_end_day_target_control()
 	return _tutorial_target_rect_resolver.resolve_target_rect(
 		target_id,
 		ticker_hint,
@@ -450,10 +453,16 @@ func get_tutorial_target_rect(target_id: String, ticker_hint: String = "") -> Re
 			"bottom_panel": _bottom_panel,
 			"buy_button": _buy_button,
 			"sell_button": _sell_button,
-			"end_day_button": _end_day_button,
+			"end_day_button": end_day_target,
 			"quantity_input": _quantity_input
 		}
 	)
+
+
+func _resolve_end_day_target_control() -> Control:
+	if _zone_contract_active and _desk_end_day_button != null and _desk_end_day_button.visible:
+		return _desk_end_day_button
+	return _end_day_button
 
 
 func get_selected_ticker() -> String:
@@ -822,9 +831,13 @@ func _apply_header_visibility_contract() -> void:
 
 
 func _sync_desk_end_day_button_state() -> void:
-	if _desk_end_day_button == null or _end_day_button == null:
+	if _end_day_button == null:
 		return
-	_desk_end_day_button.visible = _zone_contract_enabled
+	var use_diegetic_end_day := _zone_contract_active and _desk_end_day_button != null
+	_end_day_button.visible = not use_diegetic_end_day
+	if _desk_end_day_button == null:
+		return
+	_desk_end_day_button.visible = use_diegetic_end_day
 	_desk_end_day_button.disabled = _end_day_button.disabled
 	_desk_end_day_button.text = "Sellar cierre del dia"
 	if _is_tutorial_active():
@@ -1977,6 +1990,7 @@ func _apply_zone_contract() -> void:
 	var contract_active := _zone_contract_enabled \
 		and _is_document_zone_ready(_newspaper_zone, _newspaper_runtime) \
 		and _is_document_zone_ready(_invoice_zone, _invoice_runtime)
+	_zone_contract_active = contract_active
 	_calendar_contract_active = contract_active and _is_calendar_zone_available()
 	var targets := {
 		"enabled": contract_active,
