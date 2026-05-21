@@ -13,6 +13,9 @@ const INVOICE_DEBT_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/Invoice
 const INVOICE_PREVIEW_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/InvoicePreviewLabel")
 const INVOICE_EVENT_LOG_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/EventLogScroll/EventLogLabel")
 const DAY_LABEL_PATH := NodePath("MainMargin/MainVBox/HeaderBar/DayLabel")
+const MONITOR_END_DAY_BUTTON_PATH := NodePath("MainMargin/MainVBox/BottomPanel/BottomBar/EndDayButton")
+const DESK_END_DAY_BUTTON_PATH := NodePath("DeskEndDayButton")
+const TUTORIAL_FOCUS_FRAME_PATH := NodePath("TutorialOverlay/FocusFrame")
 
 
 func _initialize() -> void:
@@ -43,6 +46,9 @@ func _run_smoke() -> void:
 	var invoice_label := ui.get_node_or_null(INVOICE_PREVIEW_PATH) as Label
 	var event_log_label := ui.get_node_or_null(INVOICE_EVENT_LOG_PATH) as Label
 	var day_label := ui.get_node_or_null(DAY_LABEL_PATH) as Label
+	var monitor_end_day_button := ui.get_node_or_null(MONITOR_END_DAY_BUTTON_PATH) as Button
+	var desk_end_day_button := ui.get_node_or_null(DESK_END_DAY_BUTTON_PATH) as Button
+	var tutorial_focus_frame := ui.get_node_or_null(TUTORIAL_FOCUS_FRAME_PATH) as Control
 
 	if news_panel == null:
 		failures.append("No se encontro NewsPanel en monitor.")
@@ -68,6 +74,12 @@ func _run_smoke() -> void:
 		failures.append("No se encontro EventLogLabel en documento diegetico.")
 	if day_label == null:
 		failures.append("No se encontro DayLabel del fallback de monitor.")
+	if monitor_end_day_button == null:
+		failures.append("No se encontro EndDayButton en monitor para fallback.")
+	if desk_end_day_button == null:
+		failures.append("No se encontro DeskEndDayButton diegetico.")
+	if tutorial_focus_frame == null:
+		failures.append("No se encontro FocusFrame del tutorial.")
 
 	if _is_visible_in_tree(news_panel):
 		failures.append("NewsPanel sigue visible en monitor (debe estar oculto).")
@@ -83,6 +95,24 @@ func _run_smoke() -> void:
 		failures.append("DayLabel sigue visible cuando calendario diegetico esta activo.")
 	if critical_document_panel != null and _is_visible_in_tree(critical_document_panel):
 		failures.append("CriticalDocumentPanel inicia visible sin evento critico.")
+	if desk_end_day_button != null and not _is_visible_in_tree(desk_end_day_button):
+		failures.append("DeskEndDayButton debe estar visible cuando el contrato diegetico esta activo.")
+	if monitor_end_day_button != null and _is_visible_in_tree(monitor_end_day_button):
+		failures.append("EndDayButton de monitor sigue visible pese a control diegetico activo.")
+
+	if desk_end_day_button != null and tutorial_focus_frame != null:
+		ui.set_tutorial_state({
+			"active": true,
+			"target": "end_day_button",
+			"allow_buy": false,
+			"allow_sell": false,
+			"allow_end_day": false
+		})
+		await process_frame
+		if not desk_end_day_button.disabled:
+			failures.append("DeskEndDayButton no refleja lock de tutorial en end_day.")
+		ui.set_tutorial_state({"active": false})
+		await process_frame
 
 	if calendar_zone != null and calendar_runtime != null and day_label != null:
 		calendar_zone.visible = false
@@ -121,6 +151,10 @@ func _run_smoke() -> void:
 				failures.append("Fallback roto: NewsRuntime sigue visible en arbol con zona padre oculta.")
 			if day_label != null and not _is_visible_in_tree(day_label):
 				failures.append("Fallback roto: DayLabel no vuelve durante fallback de periodico.")
+			if monitor_end_day_button != null and not _is_visible_in_tree(monitor_end_day_button):
+				failures.append("Fallback roto: EndDayButton de monitor no vuelve cuando falta zona diegetica.")
+			if desk_end_day_button != null and _is_visible_in_tree(desk_end_day_button):
+				failures.append("Fallback roto: DeskEndDayButton sigue visible con contrato diegetico caido.")
 
 	ui.queue_free()
 	if failures.is_empty():
