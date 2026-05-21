@@ -271,7 +271,9 @@ func _ready() -> void:
 	_apply_diegetic_shell_styles()
 	_apply_diegetic_artwork()
 	_apply_crt_monitor_skin()
-	_build_market_preview_panel()
+	if _market_scroll != null:
+		_market_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		_market_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	_setup_diegetic_layout()
 	_ui_feedback_controller = UI_FEEDBACK_CONTROLLER.new()
 	add_child(_ui_feedback_controller)
@@ -390,7 +392,6 @@ func refresh_all_ui(status_message: String = "") -> void:
 	_update_news_panel()
 	_update_market_table()
 	_update_selected_company_details()
-	_update_market_preview()
 	_update_home_dashboard()
 	_update_selection_context()
 	_update_trade_action_state()
@@ -903,8 +904,6 @@ func _apply_app_section_visibility() -> void:
 		_center_split.visible = show_market or show_company
 	if _market_panel != null:
 		_market_panel.visible = show_market
-	if _market_preview_panel != null:
-		_market_preview_panel.visible = show_market
 	if _details_panel != null:
 		_details_panel.visible = show_company
 

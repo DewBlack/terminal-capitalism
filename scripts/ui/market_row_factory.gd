@@ -4,6 +4,57 @@ extends RefCounted
 const UI_THEME_TOKENS := preload("res://scripts/ui/ui_theme_tokens.gd")
 
 
+class MiniSparkline:
+	extends Control
+
+	var _series: Array[float] = []
+	var _line_color: Color = UI_THEME_TOKENS.CHART_LINE_BULL_MEDIUM
+
+
+	func set_series(values: Array[float], bullish: bool) -> void:
+		_series.clear()
+		for value in values:
+			var variant: Variant = value
+			if variant is float or variant is int:
+				_series.append(maxf(0.01, float(variant)))
+		_line_color = UI_THEME_TOKENS.CHART_LINE_BULL_MEDIUM if bullish else UI_THEME_TOKENS.CHART_LINE_BEAR_MEDIUM
+		queue_redraw()
+
+
+	func _draw() -> void:
+		var rect := Rect2(Vector2.ZERO, size)
+		draw_rect(rect, Color(0.05, 0.07, 0.11, 0.58), true)
+		draw_rect(rect, Color(0.23, 0.31, 0.41, 0.45), false, 1.0)
+		if _series.size() < 2:
+			return
+
+		var min_value := _series[0]
+		var max_value := _series[0]
+		for value in _series:
+			min_value = minf(min_value, value)
+			max_value = maxf(max_value, value)
+		var spread := maxf(0.01, max_value - min_value)
+		var margin := 3.0
+		var left := margin
+		var right := maxf(margin + 1.0, size.x - margin)
+		var top := margin
+		var bottom := maxf(margin + 1.0, size.y - margin)
+
+		var points: Array[Vector2] = []
+		var count := _series.size()
+		for index in range(count):
+			var x_ratio := float(index) / float(maxi(1, count - 1))
+			var x := lerpf(left, right, x_ratio)
+			var normalized := (_series[index] - min_value) / spread
+			var y := lerpf(bottom, top, normalized)
+			points.append(Vector2(x, y))
+
+		for index in range(1, points.size()):
+			draw_line(points[index - 1], points[index], _line_color, 2.0, true)
+
+		draw_circle(points[-1], 2.5, Color(_line_color.r, _line_color.g, _line_color.b, 0.95))
+
+
 static func build_company_row(
 	row_model: Dictionary,
 	company: Company,
@@ -104,10 +155,32 @@ static func build_company_row(
 		owned_label.add_theme_color_override("font_color", Color(0.67, 0.89, 0.73, 0.95))
 		row_vbox.add_child(owned_label)
 
+	var sparkline := MiniSparkline.new()
+	sparkline.custom_minimum_size = Vector2(0, 28)
+	sparkline.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sparkline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sparkline_series := _build_sparkline_series(company)
+	var bullish := company.last_daily_change >= 0.0
+	sparkline.set_series(sparkline_series, bullish)
+	row_vbox.add_child(sparkline)
+
 	return {
 		"row_card": row_card,
 		"interactive_controls": [row_card]
 	}
+
+
+static func _build_sparkline_series(company: Company) -> Array[float]:
+	if company == null:
+		return [1.0, 1.0]
+	var history: Array[float] = company.price_history.duplicate()
+	if history.size() < 2:
+		var base_price := maxf(0.01, company.current_price)
+		return [base_price, base_price]
+	var max_points := 16
+	if history.size() <= max_points:
+		return history
+	return history.slice(history.size() - max_points, history.size())
 
 
 static func _build_company_logo_badge(company: Company, side_size: int) -> Control:
