@@ -3,9 +3,10 @@ extends RefCounted
 
 const REFERENCE_VIEWPORT := Vector2(1920.0, 1080.0)
 
-# Safe area de pantalla CRT (basado en ajuste manual desktop)
-const MONITOR_SAFE_RECT_REF := Rect2(Vector2(707.0, 131.0), Vector2(863.0, 371.0))
-const MONITOR_FRAME_RECT_REF := Rect2(Vector2(660.0, 131.0), Vector2(957.0, 371.0))
+# Safe area CRT recalibrada contra art/placeholder/desk/desk_base_bg_v1.png.
+# Mantiene el contenido operativo dentro de la pantalla dibujada del monitor.
+const MONITOR_SAFE_RECT_REF := Rect2(Vector2(718.0, 132.0), Vector2(470.0, 360.0))
+const MONITOR_FRAME_RECT_REF := Rect2(Vector2(684.0, 108.0), Vector2(536.0, 402.0))
 
 # Zonas diegeticas alrededor del monitor (desktop)
 const NEWSPAPER_RECT_REF := Rect2(Vector2(225.0, 665.0), Vector2(470.0, 380.0))

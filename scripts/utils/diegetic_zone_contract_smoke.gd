@@ -1,6 +1,7 @@
 extends SceneTree
 
 const GAME_SCREEN_VISUAL_WIP := preload("res://scenes/game/game_screen_visual_wip.tscn")
+const MONITOR_LAYOUT_CONTRACT := preload("res://scripts/ui/monitor_layout_contract.gd")
 const NEWS_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/NewsPanel")
 const FEEDBACK_PANEL_PATH := NodePath("MainMargin/MainVBox/FeedbackPanel")
 const NEWSPAPER_RUNTIME_PATH := NodePath("DeskDocs/NewspaperZone/NewsRuntime")
@@ -192,29 +193,119 @@ func _validate_compaction_reacts_to_resize(ui: UIManager, failures: Array[String
 		failures.append("Monitor-first: faltan nodos para validar compaction reactivo a resize.")
 		return
 
+	var contract := MONITOR_LAYOUT_CONTRACT.new()
 	await _resize_root_and_wait(Vector2i(1920, 1080))
 	ui.call("_set_app_section", "market", true)
 	await _pulse_resize_for_section(Vector2i(1920, 1080))
-	var qty_label_visible_1920 := quantity_label.visible
-	var market_min_width_1920 := market_panel.custom_minimum_size.x
+	var snapshot_1920 := _read_monitor_snapshot(ui, failures, "1920x1080")
+	if snapshot_1920.is_empty():
+		return
+	_assert_market_profile_applied(
+		contract,
+		snapshot_1920,
+		quantity_label,
+		qty_plus_ten,
+		market_panel,
+		"1920x1080",
+		failures
+	)
 
 	await _resize_root_and_wait(Vector2i(1366, 768))
-	var qty_label_visible_1366 := quantity_label.visible
-	var market_min_width_1366 := market_panel.custom_minimum_size.x
-	if not qty_label_visible_1920:
-		failures.append("Monitor-first: QtyLabel no visible en 1920x1080 (esperado perfil no-cramped).")
-	if qty_label_visible_1366:
-		failures.append("Monitor-first: resize a 1366x768 no activo perfil cramped (QtyLabel sigue visible).")
-	if market_min_width_1366 >= market_min_width_1920:
-		failures.append("Monitor-first: resize a 1366x768 no redujo min-width de MarketPanel.")
+	var snapshot_1366 := _read_monitor_snapshot(ui, failures, "1366x768")
+	if snapshot_1366.is_empty():
+		return
+	_assert_market_profile_applied(
+		contract,
+		snapshot_1366,
+		quantity_label,
+		qty_plus_ten,
+		market_panel,
+		"1366x768",
+		failures
+	)
+	var safe_1920: Vector2 = snapshot_1920.get("safe_rect_size", Vector2.ZERO)
+	var safe_1366: Vector2 = snapshot_1366.get("safe_rect_size", Vector2.ZERO)
+	if safe_1366.x >= safe_1920.x - 0.5 or safe_1366.y >= safe_1920.y - 0.5:
+		failures.append(
+			"Monitor-first: resize a 1366x768 no actualizo safe rect como se esperaba (%s -> %s)." % [
+				str(safe_1920),
+				str(safe_1366)
+			]
+		)
 
 	await _resize_root_and_wait(Vector2i(1920, 1080))
-	var qty_label_visible_restored := quantity_label.visible
-	var market_min_width_restored := market_panel.custom_minimum_size.x
-	if not qty_label_visible_restored:
-		failures.append("Monitor-first: al volver a 1920x1080 no se restauro perfil no-cramped (QtyLabel oculto).")
-	if market_min_width_restored <= market_min_width_1366:
-		failures.append("Monitor-first: al volver a 1920x1080 no se restauro min-width de MarketPanel.")
+	var snapshot_restored := _read_monitor_snapshot(ui, failures, "1920x1080-restored")
+	if snapshot_restored.is_empty():
+		return
+	_assert_market_profile_applied(
+		contract,
+		snapshot_restored,
+		quantity_label,
+		qty_plus_ten,
+		market_panel,
+		"1920x1080-restored",
+		failures
+	)
+	var safe_restored: Vector2 = snapshot_restored.get("safe_rect_size", Vector2.ZERO)
+	if safe_restored.distance_to(safe_1920) > 1.0:
+		failures.append(
+			"Monitor-first: al volver a 1920x1080 no se restauro safe rect (%s vs %s)." % [
+				str(safe_1920),
+				str(safe_restored)
+			]
+		)
+
+
+func _read_monitor_snapshot(ui: UIManager, failures: Array[String], context: String) -> Dictionary:
+	var snapshot_variant: Variant = ui.call("get_monitor_layout_debug_snapshot")
+	if not (snapshot_variant is Dictionary):
+		failures.append("Monitor-first: snapshot de layout no disponible en %s." % context)
+		return {}
+	return snapshot_variant as Dictionary
+
+
+func _assert_market_profile_applied(
+	contract: RefCounted,
+	snapshot: Dictionary,
+	quantity_label: Label,
+	qty_plus_ten: Button,
+	market_panel: PanelContainer,
+	context: String,
+	failures: Array[String]
+) -> void:
+	var safe_rect_size: Vector2 = snapshot.get("safe_rect_size", Vector2.ZERO)
+	var zone_contract_enabled := bool(snapshot.get("zone_contract_enabled", false))
+	if safe_rect_size.x < 1.0 or safe_rect_size.y < 1.0:
+		failures.append("Monitor-first: safe rect invalido en %s para validar compaction." % context)
+		return
+	var profile: Dictionary = contract.call("build_profile", safe_rect_size, "market", zone_contract_enabled)
+	var expected_qty_label_visible := not bool(profile.get("cramped", false))
+	if quantity_label.visible != expected_qty_label_visible:
+		failures.append(
+			"Monitor-first: QtyLabel desalineado con perfil en %s (visible=%s expected=%s)." % [
+				context,
+				str(quantity_label.visible),
+				str(expected_qty_label_visible)
+			]
+		)
+	var expected_quick_buttons_visible := bool(profile.get("show_quick_quantity_buttons", true))
+	if qty_plus_ten.visible != expected_quick_buttons_visible:
+		failures.append(
+			"Monitor-first: quick quantity buttons desalineados en %s (visible=%s expected=%s)." % [
+				context,
+				str(qty_plus_ten.visible),
+				str(expected_quick_buttons_visible)
+			]
+		)
+	var expected_market_min_width := float(profile.get("market_panel_min_width", 300.0))
+	if absf(market_panel.custom_minimum_size.x - expected_market_min_width) > 0.6:
+		failures.append(
+			"Monitor-first: min-width de MarketPanel desalineado en %s (actual=%.2f expected=%.2f)." % [
+				context,
+				market_panel.custom_minimum_size.x,
+				expected_market_min_width
+			]
+		)
 
 
 func _validate_monitor_first_layout(ui: UIManager, failures: Array[String]) -> void:
