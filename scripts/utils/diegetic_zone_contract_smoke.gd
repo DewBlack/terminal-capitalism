@@ -14,6 +14,10 @@ const INVOICE_PREVIEW_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/Invo
 const INVOICE_EVENT_LOG_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/EventLogScroll/EventLogLabel")
 const DAY_LABEL_PATH := NodePath("MainMargin/MainVBox/HeaderBar/DayLabel")
 const MONITOR_OVERLAY_PATH := NodePath("MonitorOverlay")
+const MAIN_MARGIN_PATH := NodePath("MainMargin")
+const HEADER_BAR_PATH := NodePath("MainMargin/MainVBox/HeaderBar")
+const BODY_SPLIT_PATH := NodePath("MainMargin/MainVBox/BodySplit")
+const BOTTOM_PANEL_PATH := NodePath("MainMargin/MainVBox/BottomPanel")
 const HOME_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/HomePanel")
 const MARKET_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel")
 const DETAILS_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel")
@@ -255,22 +259,12 @@ func _assert_section_inside_monitor(
 		return
 	var snapshot := snapshot_variant as Dictionary
 	var safe_rect_size: Vector2 = snapshot.get("safe_rect_size", Vector2.ZERO)
-	var scaled_content_size: Vector2 = snapshot.get("scaled_content_size", Vector2.ZERO)
 	var content_size: Vector2 = snapshot.get("content_size", Vector2.ZERO)
 	var content_min_size: Vector2 = snapshot.get("content_min_size", Vector2.ZERO)
 	if safe_rect_size.x < 1.0 or safe_rect_size.y < 1.0:
 		failures.append("Monitor-first: safe rect invalido en %s section=%s" % [str(viewport_size), section_id])
 		return
 
-	if scaled_content_size.x > safe_rect_size.x + 0.6 or scaled_content_size.y > safe_rect_size.y + 0.6:
-		failures.append(
-			"Monitor-first: contenido escalado excede safe rect en %s section=%s scaled=%s safe=%s" % [
-				str(viewport_size),
-				section_id,
-				str(scaled_content_size),
-				str(safe_rect_size)
-			]
-		)
 	if content_min_size.x > content_size.x + 0.6 or content_min_size.y > content_size.y + 0.6:
 		failures.append(
 			"Monitor-first: minimo interno excede content_size en %s section=%s min=%s content=%s" % [
@@ -295,3 +289,49 @@ func _assert_section_inside_monitor(
 		failures.append(
 			"Monitor-first: panel de seccion no visible en %s section=%s" % [str(viewport_size), section_id]
 		)
+		return
+
+	var main_margin := ui.get_node_or_null(MAIN_MARGIN_PATH) as Control
+	var header_bar := ui.get_node_or_null(HEADER_BAR_PATH) as Control
+	var body_split := ui.get_node_or_null(BODY_SPLIT_PATH) as Control
+	var bottom_panel := ui.get_node_or_null(BOTTOM_PANEL_PATH) as Control
+	if main_margin == null or header_bar == null or body_split == null or bottom_panel == null:
+		failures.append(
+			"Monitor-first: nodos base faltantes para validar bounds globales en section=%s" % section_id
+		)
+		return
+
+	var safe_rect_global := monitor_overlay.get_global_rect()
+	var controls_to_check: Array[Control] = [
+		main_margin,
+		header_bar,
+		body_split,
+		bottom_panel,
+		expected_section_panel
+	]
+	for control in controls_to_check:
+		if control == null or not control.is_visible_in_tree():
+			continue
+		var control_rect := control.get_global_rect()
+		if not _rect_is_inside_with_tolerance(control_rect, safe_rect_global, 1.2):
+			failures.append(
+				"Monitor-first: overflow real en %s section=%s node=%s rect=%s safe=%s" % [
+					str(viewport_size),
+					section_id,
+					control.name,
+					str(control_rect),
+					str(safe_rect_global)
+				]
+			)
+
+
+func _rect_is_inside_with_tolerance(inner: Rect2, outer: Rect2, tolerance: float) -> bool:
+	if inner.position.x < outer.position.x - tolerance:
+		return false
+	if inner.position.y < outer.position.y - tolerance:
+		return false
+	if inner.end.x > outer.end.x + tolerance:
+		return false
+	if inner.end.y > outer.end.y + tolerance:
+		return false
+	return true
