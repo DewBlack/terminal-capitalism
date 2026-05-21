@@ -128,6 +128,11 @@ var _crt_shader_material: ShaderMaterial = null
 var _row_name_min_width_runtime: float = ROW_NAME_MIN_WIDTH
 var _row_price_min_width_runtime: float = ROW_PRICE_MIN_WIDTH
 var _row_change_min_width_runtime: float = ROW_CHANGE_MIN_WIDTH
+var _market_card_min_height_runtime: float = 108.0
+var _market_preview_min_height_runtime: float = 124.0
+var _market_preview_panel: PanelContainer = null
+var _market_preview_title: Label = null
+var _market_preview_chart: PriceChart = null
 
 @export_enum("low", "medium", "high") var crt_profile: String = UI_THEME_TOKENS.CRT_PROFILE_FALLBACK
 
@@ -157,12 +162,13 @@ var _row_change_min_width_runtime: float = ROW_CHANGE_MIN_WIDTH
 @onready var _home_holdings_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeHoldingsScroll/HomeHoldingsLabel") as Label
 @onready var _market_title: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketTitle
 @onready var _market_header: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketHeader
+@onready var _market_scroll: ScrollContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketScroll
 @onready var _details_title: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/DetailsTitle
 
 @onready var _news_title: Label = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsTopRow/NewsTitle
 @onready var _news_history_button: Button = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsTopRow/NewsHistoryButton
 @onready var _news_content: VBoxContainer = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsScroll/NewsContent
-@onready var _market_rows: VBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketScroll/MarketRows
+@onready var _market_rows: GridContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketScroll/MarketRows
 @onready var _company_details_label: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/CompanyDetailsScroll/CompanyDetailsLabel
 @onready var _movement_reasons_label: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/ReasonsScroll/MovementReasonsLabel
 @onready var _details_vbox: VBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox
@@ -265,6 +271,7 @@ func _ready() -> void:
 	_apply_diegetic_shell_styles()
 	_apply_diegetic_artwork()
 	_apply_crt_monitor_skin()
+	_build_market_preview_panel()
 	_setup_diegetic_layout()
 	_ui_feedback_controller = UI_FEEDBACK_CONTROLLER.new()
 	add_child(_ui_feedback_controller)
@@ -383,6 +390,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 	_update_news_panel()
 	_update_market_table()
 	_update_selected_company_details()
+	_update_market_preview()
 	_update_home_dashboard()
 	_update_selection_context()
 	_update_trade_action_state()
@@ -831,6 +839,11 @@ func _update_finance_ledger_view(cash_value: float, debt_value: float, debt_limi
 
 
 func _apply_header_visibility_contract() -> void:
+	var show_monitor_header := not _calendar_contract_active
+	if _header_bar != null:
+		_header_bar.visible = show_monitor_header
+	if not show_monitor_header:
+		return
 	var use_diegetic_day_and_finance := _calendar_contract_active
 	if _day_label != null:
 		_day_label.visible = not use_diegetic_day_and_finance
@@ -890,10 +903,13 @@ func _apply_app_section_visibility() -> void:
 		_center_split.visible = show_market or show_company
 	if _market_panel != null:
 		_market_panel.visible = show_market
+	if _market_preview_panel != null:
+		_market_preview_panel.visible = show_market
 	if _details_panel != null:
 		_details_panel.visible = show_company
 
 	_update_app_nav_buttons()
+	_apply_header_visibility_contract()
 
 
 func _update_app_nav_buttons() -> void:
@@ -913,6 +929,7 @@ func _apply_monitor_compaction() -> bool:
 	var previous_row_name_width := _row_name_min_width_runtime
 	var previous_row_price_width := _row_price_min_width_runtime
 	var previous_row_change_width := _row_change_min_width_runtime
+	var previous_market_card_min_height := _market_card_min_height_runtime
 	var profile: Dictionary = {}
 	if _monitor_layout_contract != null:
 		profile = _monitor_layout_contract.build_profile(
@@ -921,10 +938,11 @@ func _apply_monitor_compaction() -> bool:
 			_zone_contract_enabled
 		)
 
-	var compact := bool(profile.get("compact", _zone_contract_enabled))
+	var compact := bool(profile.get("compact", false))
 	var cramped := bool(profile.get("cramped", false))
 	var show_quick_quantity_buttons := bool(profile.get("show_quick_quantity_buttons", not compact))
 	var show_status_label := bool(profile.get("show_status_label", not compact))
+	var show_selection_label := bool(profile.get("show_selection_label", true))
 	var use_compact_button_labels := str(profile.get("button_label_mode", "full")) == "compact"
 
 	if _quantity_plus_ten_button != null:
@@ -938,6 +956,7 @@ func _apply_monitor_compaction() -> bool:
 	if _quantity_label != null:
 		_quantity_label.visible = not cramped
 	if _selection_label != null:
+		_selection_label.visible = show_selection_label
 		_selection_label.custom_minimum_size = Vector2(float(profile.get("selection_min_width", 96.0 if compact else 150.0)), 0)
 	if _quantity_input != null:
 		_quantity_input.custom_minimum_size = Vector2(float(profile.get("quantity_min_width", 66.0 if compact else 82.0)), 0)
@@ -954,16 +973,23 @@ func _apply_monitor_compaction() -> bool:
 	if _buy_button != null:
 		_buy_button.text = BUY_LABEL_COMPACT if use_compact_button_labels else BUY_LABEL_FULL
 		_buy_button.tooltip_text = "Comprar acciones."
+		_buy_button.custom_minimum_size = Vector2(float(profile.get("trade_button_min_width", 96.0)), 0)
 	if _sell_button != null:
 		_sell_button.text = SELL_LABEL_COMPACT if use_compact_button_labels else SELL_LABEL_FULL
 		_sell_button.tooltip_text = "Vender acciones."
+		_sell_button.custom_minimum_size = Vector2(float(profile.get("trade_button_min_width", 96.0)), 0)
 	if _end_day_button != null:
 		_end_day_button.text = END_DAY_LABEL_COMPACT if use_compact_button_labels else END_DAY_LABEL_FULL
 		_end_day_button.tooltip_text = "Cierra el dia y procesa precios/noticias."
+		_end_day_button.custom_minimum_size = Vector2(float(profile.get("end_day_button_min_width", 92.0)), 0)
 	if _market_panel != null:
 		_market_panel.custom_minimum_size = Vector2(float(profile.get("market_panel_min_width", 300.0)), 0)
 	if _details_panel != null:
 		_details_panel.custom_minimum_size = Vector2(float(profile.get("details_panel_min_width", 300.0)), 0)
+	if _market_rows != null:
+		_market_rows.columns = int(profile.get("market_cards_columns", 1))
+		_market_rows.add_theme_constant_override("h_separation", 8 if cramped else 10)
+		_market_rows.add_theme_constant_override("v_separation", 8 if cramped else 10)
 	if _home_charts_row != null:
 		_home_charts_row.custom_minimum_size = Vector2(0, float(profile.get("home_charts_min_height", 164.0)))
 	if _home_holdings_scroll != null:
@@ -975,13 +1001,19 @@ func _apply_monitor_compaction() -> bool:
 		_market_header.max_lines_visible = maxi(1, header_max_lines)
 		_market_header.clip_text = header_max_lines <= 1
 		_market_header.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if header_max_lines > 1 else TextServer.AUTOWRAP_OFF
+		_market_header.visible = false
 
 	_row_name_min_width_runtime = float(profile.get("row_name_min_width", ROW_NAME_MIN_WIDTH))
 	_row_price_min_width_runtime = float(profile.get("row_price_min_width", ROW_PRICE_MIN_WIDTH))
 	_row_change_min_width_runtime = float(profile.get("row_change_min_width", ROW_CHANGE_MIN_WIDTH))
+	_market_card_min_height_runtime = float(profile.get("market_card_min_height", 108.0))
+	_market_preview_min_height_runtime = float(profile.get("market_preview_min_height", 124.0))
+	if _market_preview_panel != null:
+		_market_preview_panel.custom_minimum_size = Vector2(0, _market_preview_min_height_runtime)
 	return not is_equal_approx(previous_row_name_width, _row_name_min_width_runtime) \
 		or not is_equal_approx(previous_row_price_width, _row_price_min_width_runtime) \
-		or not is_equal_approx(previous_row_change_width, _row_change_min_width_runtime)
+		or not is_equal_approx(previous_row_change_width, _row_change_min_width_runtime) \
+		or not is_equal_approx(previous_market_card_min_height, _market_card_min_height_runtime)
 
 
 func _resolve_monitor_content_size() -> Vector2:
@@ -1006,10 +1038,11 @@ func _update_market_table() -> void:
 	var companies := _market_manager.get_sorted_active_companies()
 	var header_model := MARKET_TABLE_PRESENTER.build_table_header(companies.size(), HOTKEYS_HINT)
 	_market_title.text = str(header_model.get("title", "Mercado"))
-	_market_header.text = "%s | Pulsa Info para abrir ficha." % str(header_model.get("header", "Selecciona una empresa para operar."))
+	_market_header.text = str(header_model.get("header", "Tarjetas de empresas"))
 	_market_header.tooltip_text = str(header_model.get("header_tooltip", HOTKEYS_HINT))
 	if companies.is_empty():
 		var empty_label := Label.new()
+		empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		empty_label.text = MARKET_TABLE_PRESENTER.build_empty_state_text()
 		_market_rows.add_child(empty_label)
 		return
@@ -1039,6 +1072,7 @@ func _update_market_table() -> void:
 		var row_card := row_view.get("row_card", null) as Control
 		if row_card == null:
 			continue
+		row_card.custom_minimum_size.y = _market_card_min_height_runtime
 		var interactive_controls_variant: Variant = row_view.get("interactive_controls", [])
 		if interactive_controls_variant is Array:
 			for interactive_control in interactive_controls_variant:
@@ -1096,6 +1130,30 @@ func _update_selected_company_details() -> void:
 		trade_markers,
 		UI_THEME_TOKENS.SURFACE_LOGO_FALLBACK
 	)
+
+
+func _update_market_preview() -> void:
+	if _market_preview_panel == null or _market_preview_chart == null:
+		return
+	if _market_manager == null:
+		_market_preview_panel.visible = false
+		return
+	_ensure_selected_company_is_valid()
+	var company := _market_manager.get_company_by_ticker(_get_selected_ticker())
+	if company == null:
+		_market_preview_panel.visible = false
+		return
+	_market_preview_panel.visible = true
+	if _market_preview_title != null:
+		_market_preview_title.text = "Vista rapida %s | %s" % [company.ticker, company.name]
+	var price_history: Array[float] = company.price_history.duplicate()
+	if price_history.size() < 2:
+		price_history = [company.current_price, company.current_price]
+	_market_preview_chart.set_price_history(price_history)
+	var trade_markers: Array[Dictionary] = []
+	if _player_portfolio != null:
+		trade_markers = _player_portfolio.get_trade_markers_for_ticker(company.ticker)
+	_market_preview_chart.set_trade_markers(trade_markers)
 
 
 func _on_buy_button_pressed() -> void:
@@ -1701,6 +1759,71 @@ func _apply_action_hints() -> void:
 	)
 
 
+func _build_market_preview_panel() -> void:
+	if _market_scroll == null:
+		return
+	var market_vbox := _market_scroll.get_parent() as VBoxContainer
+	if market_vbox == null:
+		return
+	var existing_panel := market_vbox.get_node_or_null("MarketPreviewPanel") as PanelContainer
+	if existing_panel == null:
+		existing_panel = PanelContainer.new()
+		existing_panel.name = "MarketPreviewPanel"
+		existing_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		existing_panel.custom_minimum_size = Vector2(0, _market_preview_min_height_runtime)
+
+		var panel_style := StyleBoxFlat.new()
+		panel_style.bg_color = Color(0.07, 0.09, 0.13, 0.88)
+		panel_style.border_color = Color(0.28, 0.39, 0.50, 0.74)
+		panel_style.border_width_left = 1
+		panel_style.border_width_top = 1
+		panel_style.border_width_right = 1
+		panel_style.border_width_bottom = 1
+		panel_style.corner_radius_top_left = 8
+		panel_style.corner_radius_top_right = 8
+		panel_style.corner_radius_bottom_left = 8
+		panel_style.corner_radius_bottom_right = 8
+		panel_style.content_margin_left = 8
+		panel_style.content_margin_top = 6
+		panel_style.content_margin_right = 8
+		panel_style.content_margin_bottom = 8
+		existing_panel.add_theme_stylebox_override("panel", panel_style)
+
+		var preview_vbox := VBoxContainer.new()
+		preview_vbox.name = "PreviewVBox"
+		preview_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		preview_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		preview_vbox.add_theme_constant_override("separation", 4)
+
+		var preview_title := Label.new()
+		preview_title.name = "PreviewTitle"
+		preview_title.text = "Vista rapida"
+		preview_title.clip_text = true
+		preview_title.max_lines_visible = 1
+		preview_title.add_theme_font_size_override("font_size", 13)
+		preview_title.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_SECONDARY)
+		preview_vbox.add_child(preview_title)
+
+		var preview_chart := PriceChart.new()
+		preview_chart.name = "PreviewChart"
+		preview_chart.custom_minimum_size = Vector2(0, 88)
+		preview_chart.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		preview_chart.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		preview_vbox.add_child(preview_chart)
+
+		existing_panel.add_child(preview_vbox)
+		market_vbox.add_child(existing_panel)
+		var scroll_index := market_vbox.get_children().find(_market_scroll)
+		if scroll_index > 0:
+			market_vbox.move_child(existing_panel, scroll_index)
+
+	_market_preview_panel = existing_panel
+	_market_preview_title = _market_preview_panel.get_node_or_null("PreviewVBox/PreviewTitle") as Label
+	_market_preview_chart = _market_preview_panel.get_node_or_null("PreviewVBox/PreviewChart") as PriceChart
+	if _market_preview_chart != null:
+		_market_preview_chart.apply_crt_profile(crt_profile)
+
+
 func _build_diegetic_runtime_zones() -> void:
 	_build_newspaper_runtime_zone()
 	_build_invoice_runtime_zone()
@@ -2175,6 +2298,8 @@ func _apply_crt_profile_to_chart() -> void:
 		_price_chart.call("apply_crt_profile", crt_profile)
 	if _home_trend_chart != null and _home_trend_chart.has_method("apply_crt_profile"):
 		_home_trend_chart.call("apply_crt_profile", crt_profile)
+	if _market_preview_chart != null and _market_preview_chart.has_method("apply_crt_profile"):
+		_market_preview_chart.call("apply_crt_profile", crt_profile)
 
 
 func _apply_diegetic_artwork() -> void:
