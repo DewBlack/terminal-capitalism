@@ -17,6 +17,7 @@ const MONITOR_OVERLAY_PATH := NodePath("MonitorOverlay")
 const HOME_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/HomePanel")
 const MARKET_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel")
 const DETAILS_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel")
+const QTY_PLUS_TEN_PATH := NodePath("MainMargin/MainVBox/BottomPanel/BottomBar/QuantityPlusTenButton")
 const MONITOR_END_DAY_BUTTON_PATH := NodePath("MainMargin/MainVBox/BottomPanel/BottomBar/EndDayButton")
 const DESK_END_DAY_BUTTON_PATH := NodePath("DeskEndDayButton")
 const TUTORIAL_FOCUS_FRAME_PATH := NodePath("TutorialOverlay/FocusFrame")
@@ -104,6 +105,7 @@ func _run_smoke() -> void:
 	if monitor_end_day_button != null and _is_visible_in_tree(monitor_end_day_button):
 		failures.append("EndDayButton de monitor sigue visible pese a control diegetico activo.")
 
+	await _validate_compaction_reacts_to_resize(ui, failures)
 	await _validate_monitor_first_layout(ui, failures)
 
 	if desk_end_day_button != null and tutorial_focus_frame != null:
@@ -176,6 +178,47 @@ func _run_smoke() -> void:
 
 func _is_visible_in_tree(control: Control) -> bool:
 	return control != null and control.is_visible_in_tree()
+
+
+func _validate_compaction_reacts_to_resize(ui: UIManager, failures: Array[String]) -> void:
+	var qty_plus_ten := ui.get_node_or_null(QTY_PLUS_TEN_PATH) as Button
+	var quantity_label := ui.get_node_or_null(NodePath("MainMargin/MainVBox/BottomPanel/BottomBar/QtyLabel")) as Label
+	var market_panel := ui.get_node_or_null(MARKET_PANEL_PATH) as PanelContainer
+	if qty_plus_ten == null or quantity_label == null or market_panel == null:
+		failures.append("Monitor-first: faltan nodos para validar compaction reactivo a resize.")
+		return
+
+	get_root().size = Vector2i(1920, 1080)
+	await process_frame
+	await process_frame
+	ui.call("_set_app_section", "market", true)
+	ui.call("_apply_monitor_compaction")
+	ui.call("_apply_diegetic_layout")
+	await process_frame
+	var qty_label_visible_1920 := quantity_label.visible
+	var market_min_width_1920 := market_panel.custom_minimum_size.x
+
+	get_root().size = Vector2i(1366, 768)
+	await process_frame
+	await process_frame
+	var qty_label_visible_1366 := quantity_label.visible
+	var market_min_width_1366 := market_panel.custom_minimum_size.x
+	if not qty_label_visible_1920:
+		failures.append("Monitor-first: QtyLabel no visible en 1920x1080 (esperado perfil no-cramped).")
+	if qty_label_visible_1366:
+		failures.append("Monitor-first: resize a 1366x768 no activo perfil cramped (QtyLabel sigue visible).")
+	if market_min_width_1366 >= market_min_width_1920:
+		failures.append("Monitor-first: resize a 1366x768 no redujo min-width de MarketPanel.")
+
+	get_root().size = Vector2i(1920, 1080)
+	await process_frame
+	await process_frame
+	var qty_label_visible_restored := quantity_label.visible
+	var market_min_width_restored := market_panel.custom_minimum_size.x
+	if not qty_label_visible_restored:
+		failures.append("Monitor-first: al volver a 1920x1080 no se restauro perfil no-cramped (QtyLabel oculto).")
+	if market_min_width_restored <= market_min_width_1366:
+		failures.append("Monitor-first: al volver a 1920x1080 no se restauro min-width de MarketPanel.")
 
 
 func _validate_monitor_first_layout(ui: UIManager, failures: Array[String]) -> void:
