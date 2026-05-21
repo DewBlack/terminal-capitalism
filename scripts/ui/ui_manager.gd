@@ -377,6 +377,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 	if not status_message.is_empty():
 		_last_status_message = status_message
 	_apply_zone_contract()
+	_apply_monitor_compaction()
 	_ensure_selected_company_is_valid()
 	_update_header()
 	_update_news_panel()
@@ -391,7 +392,6 @@ func refresh_all_ui(status_message: String = "") -> void:
 		_ui_feedback_controller.apply_status_text(_last_status_message)
 	_apply_tutorial_visual_state()
 	_apply_app_section_visibility()
-	_apply_monitor_compaction()
 	_apply_diegetic_layout()
 	_update_desk_props_alert_state()
 
@@ -909,7 +909,10 @@ func _apply_app_nav_button_state(button: Button, label: String, is_active: bool)
 	button.text = "[%s]" % label if is_active else label
 
 
-func _apply_monitor_compaction() -> void:
+func _apply_monitor_compaction() -> bool:
+	var previous_row_name_width := _row_name_min_width_runtime
+	var previous_row_price_width := _row_price_min_width_runtime
+	var previous_row_change_width := _row_change_min_width_runtime
 	var profile: Dictionary = {}
 	if _monitor_layout_contract != null:
 		profile = _monitor_layout_contract.build_profile(
@@ -976,6 +979,9 @@ func _apply_monitor_compaction() -> void:
 	_row_name_min_width_runtime = float(profile.get("row_name_min_width", ROW_NAME_MIN_WIDTH))
 	_row_price_min_width_runtime = float(profile.get("row_price_min_width", ROW_PRICE_MIN_WIDTH))
 	_row_change_min_width_runtime = float(profile.get("row_change_min_width", ROW_CHANGE_MIN_WIDTH))
+	return not is_equal_approx(previous_row_name_width, _row_name_min_width_runtime) \
+		or not is_equal_approx(previous_row_price_width, _row_price_min_width_runtime) \
+		or not is_equal_approx(previous_row_change_width, _row_change_min_width_runtime)
 
 
 func _resolve_monitor_content_size() -> Vector2:
@@ -1401,7 +1407,9 @@ func _are_actions_locked() -> bool:
 func _on_ui_resized() -> void:
 	_apply_zone_contract()
 	_apply_diegetic_layout()
-	_apply_monitor_compaction()
+	var row_profile_changed := _apply_monitor_compaction()
+	if row_profile_changed and _run_manager != null and _market_manager != null and _player_portfolio != null:
+		_update_market_table()
 	_apply_diegetic_layout()
 	if _tutorial_overlay_controller == null:
 		return
