@@ -192,19 +192,13 @@ func _validate_compaction_reacts_to_resize(ui: UIManager, failures: Array[String
 		failures.append("Monitor-first: faltan nodos para validar compaction reactivo a resize.")
 		return
 
-	get_root().size = Vector2i(1920, 1080)
-	await process_frame
-	await process_frame
+	await _resize_root_and_wait(Vector2i(1920, 1080))
 	ui.call("_set_app_section", "market", true)
-	ui.call("_apply_monitor_compaction")
-	ui.call("_apply_diegetic_layout")
-	await process_frame
+	await _pulse_resize_for_section(Vector2i(1920, 1080))
 	var qty_label_visible_1920 := quantity_label.visible
 	var market_min_width_1920 := market_panel.custom_minimum_size.x
 
-	get_root().size = Vector2i(1366, 768)
-	await process_frame
-	await process_frame
+	await _resize_root_and_wait(Vector2i(1366, 768))
 	var qty_label_visible_1366 := quantity_label.visible
 	var market_min_width_1366 := market_panel.custom_minimum_size.x
 	if not qty_label_visible_1920:
@@ -214,9 +208,7 @@ func _validate_compaction_reacts_to_resize(ui: UIManager, failures: Array[String
 	if market_min_width_1366 >= market_min_width_1920:
 		failures.append("Monitor-first: resize a 1366x768 no redujo min-width de MarketPanel.")
 
-	get_root().size = Vector2i(1920, 1080)
-	await process_frame
-	await process_frame
+	await _resize_root_and_wait(Vector2i(1920, 1080))
 	var qty_label_visible_restored := quantity_label.visible
 	var market_min_width_restored := market_panel.custom_minimum_size.x
 	if not qty_label_visible_restored:
@@ -232,14 +224,10 @@ func _validate_monitor_first_layout(ui: UIManager, failures: Array[String]) -> v
 	]
 	var sections := ["home", "market", "company"]
 	for viewport_size in viewport_sizes:
-		get_root().size = viewport_size
-		await process_frame
-		await process_frame
+		await _resize_root_and_wait(viewport_size)
 		for section_id in sections:
 			ui.call("_set_app_section", section_id, true)
-			ui.call("_apply_monitor_compaction")
-			ui.call("_apply_diegetic_layout")
-			await process_frame
+			await _pulse_resize_for_section(viewport_size)
 			_assert_section_inside_monitor(ui, section_id, viewport_size, failures)
 
 
@@ -335,3 +323,18 @@ func _rect_is_inside_with_tolerance(inner: Rect2, outer: Rect2, tolerance: float
 	if inner.end.y > outer.end.y + tolerance:
 		return false
 	return true
+
+
+func _resize_root_and_wait(viewport_size: Vector2i) -> void:
+	get_root().size = viewport_size
+	await process_frame
+	await process_frame
+
+
+func _pulse_resize_for_section(target_size: Vector2i) -> void:
+	var pulse_width := maxi(640, target_size.x - 1)
+	if pulse_width == target_size.x:
+		pulse_width = target_size.x + 1
+	var pulse_size := Vector2i(pulse_width, target_size.y)
+	await _resize_root_and_wait(pulse_size)
+	await _resize_root_and_wait(target_size)
