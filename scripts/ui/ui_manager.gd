@@ -979,6 +979,15 @@ func _apply_monitor_compaction() -> void:
 
 
 func _resolve_monitor_content_size() -> Vector2:
+	# Usa el tamaño escalado real del safe rect CRT para breakpoints.
+	# _main_margin.size es el canvas interno sin escalar y puede ocultar condiciones tight/cramped.
+	if _monitor_overlay != null and _monitor_overlay.size.x > 1.0 and _monitor_overlay.size.y > 1.0:
+		return _monitor_overlay.size
+	if _diegetic_desk_layout != null and _diegetic_desk_layout.has_method("get_last_layout_snapshot"):
+		var layout_snapshot: Dictionary = _diegetic_desk_layout.call("get_last_layout_snapshot")
+		var safe_rect_size: Vector2 = layout_snapshot.get("safe_rect_size", Vector2.ZERO)
+		if safe_rect_size.x > 1.0 and safe_rect_size.y > 1.0:
+			return safe_rect_size
 	if _main_margin != null and _main_margin.size.x > 1.0 and _main_margin.size.y > 1.0:
 		return _main_margin.size
 	return size
@@ -1391,6 +1400,8 @@ func _are_actions_locked() -> bool:
 
 func _on_ui_resized() -> void:
 	_apply_zone_contract()
+	_apply_diegetic_layout()
+	_apply_monitor_compaction()
 	_apply_diegetic_layout()
 	if _tutorial_overlay_controller == null:
 		return
