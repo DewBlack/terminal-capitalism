@@ -1,11 +1,11 @@
 # Visual QA Checklist (Phase Visual)
 
 ## Objetivo
-Reducir regresiones funcionales durante el rediseño visual, manteniendo el loop jugable, tutorial y contrato de zonas diegeticas.
+Reducir regresiones funcionales durante el rediseno visual, manteniendo el loop jugable, tutorial y contrato de zonas diegeticas.
 
 ## Alcance
 - Obligatorio para PRs de `block-visual`.
-- Recomendado para cambios en `scenes/`, `scripts/ui/`, `scripts/run/` o `art/placeholder/` que afecten lectura/operacion en pantalla.
+- Recomendado para cambios en `scenes/`, `scripts/ui/`, `scripts/run/` o `art/placeholder/` que afecten lectura u operacion en pantalla.
 
 ## Gate de merge para PR visual
 1. `content-validation.yml` en verde.
@@ -28,6 +28,28 @@ Godot_v4.6.2-stable_win64_console.exe --headless --path . --script res://scripts
 
 En entornos sin binario local, usar los resultados de CI y documentarlo en el reporte.
 
+## Contrato monitor-first (#85)
+
+### Reglas base
+- El monitor es la capa operativa principal y debe quedar siempre dentro del safe rect CRT.
+- `DeskDocs` (periodico/factura/calendario) es una capa separada de contenido narrativo/administrativo.
+- No se admite duplicacion simultanea de contenido narrativo entre monitor y documentos.
+- La app interna debe usar variantes por seccion (`home`, `market`, `company`) sin romper navegabilidad.
+
+### Breakpoints operativos internos
+- Perfil base: monitor >= `820x360`.
+- Perfil compacto: monitor por debajo de `820x360` o contrato diegetico activo.
+- Perfil tight: monitor por debajo de `760x332`.
+
+En perfiles compacto/tight se permiten:
+- reduccion de min-width de filas
+- simplificacion de botones de cantidad/estado
+- ajustes de altura en panel Home
+
+No se permite:
+- ocultar controles esenciales de compra/venta/fin de dia
+- overflow horizontal o vertical fuera del safe rect del monitor
+
 ## Checklist manual desktop (obligatoria)
 
 | Caso | Paso | Esperado | Estado |
@@ -39,6 +61,8 @@ En entornos sin binario local, usar los resultados de CI y documentarlo en el re
 | Lectura de noticias | Revisar `DeskDocs/NewspaperZone` | Noticias visibles en periodico, no duplicadas en monitor operativo | `PASS`/`FAIL` |
 | Lectura de factura semanal | Forzar/alcanzar cierre semanal | Factura y riesgo de deuda visibles en documento diegetico | `PASS`/`FAIL` |
 | Eventos criticos | Disparar evento de quiebra/fusion si aplica | Documento de evento aparece en escritorio, sin duplicacion operativa | `PASS`/`FAIL` |
+| Overflow monitor 1920x1080 | Recorrer `home`, `market`, `company` | Sin desbordes fuera del safe rect CRT | `PASS`/`FAIL` |
+| Overflow monitor 1366x768 | Recorrer `home`, `market`, `company` | Sin desbordes fuera del safe rect CRT | `PASS`/`FAIL` |
 
 ## Matriz de contrato de zonas (#73)
 

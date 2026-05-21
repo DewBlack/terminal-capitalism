@@ -36,6 +36,7 @@ const TUTORIAL_TARGET_RECT_RESOLVER := preload("res://scripts/ui/tutorial_target
 const UI_THEME_TOKENS := preload("res://scripts/ui/ui_theme_tokens.gd")
 const DIEGETIC_DESK_LAYOUT := preload("res://scripts/ui/diegetic_desk_layout.gd")
 const DIEGETIC_ZONE_POLICY := preload("res://scripts/ui/diegetic_zone_policy.gd")
+const MONITOR_LAYOUT_CONTRACT := preload("res://scripts/ui/monitor_layout_contract.gd")
 const CRT_MONITOR_SHADER := preload("res://shaders/crt_monitor.gdshader")
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
@@ -82,6 +83,7 @@ var _tutorial_overlay_controller = null
 var _tutorial_target_rect_resolver = null
 var _diegetic_desk_layout = null
 var _zone_policy = null
+var _monitor_layout_contract = null
 var _tutorial_state: Dictionary = {"active": false}
 var _newspaper_runtime: Control = null
 var _newspaper_runtime_view: Node = null
@@ -123,6 +125,9 @@ var _zone_contract_enabled: bool = false
 var _zone_contract_active: bool = false
 var _calendar_contract_active: bool = false
 var _crt_shader_material: ShaderMaterial = null
+var _row_name_min_width_runtime: float = ROW_NAME_MIN_WIDTH
+var _row_price_min_width_runtime: float = ROW_PRICE_MIN_WIDTH
+var _row_change_min_width_runtime: float = ROW_CHANGE_MIN_WIDTH
 
 @export_enum("low", "medium", "high") var crt_profile: String = UI_THEME_TOKENS.CRT_PROFILE_FALLBACK
 
@@ -134,6 +139,7 @@ var _crt_shader_material: ShaderMaterial = null
 @onready var _net_worth_label: Label = $MainMargin/MainVBox/HeaderBar/NetWorthLabel
 @onready var _upgrade_label: Label = $MainMargin/MainVBox/HeaderBar/UpgradeLabel
 @onready var _header_bar: GridContainer = $MainMargin/MainVBox/HeaderBar
+@onready var _app_nav_bar: HBoxContainer = get_node_or_null("MainMargin/MainVBox/AppNavBar") as HBoxContainer
 @onready var _app_home_button: Button = get_node_or_null("MainMargin/MainVBox/AppNavBar/HomeButton") as Button
 @onready var _app_market_button: Button = get_node_or_null("MainMargin/MainVBox/AppNavBar/MarketButton") as Button
 @onready var _app_company_button: Button = get_node_or_null("MainMargin/MainVBox/AppNavBar/CompanyButton") as Button
@@ -141,11 +147,13 @@ var _crt_shader_material: ShaderMaterial = null
 @onready var _center_split: HBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit
 @onready var _home_panel: PanelContainer = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel") as PanelContainer
 @onready var _home_summary_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeSummaryLabel") as Label
+@onready var _home_charts_row: HBoxContainer = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow") as HBoxContainer
 @onready var _home_pie_chart: Control = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomePiePanel/HomePieMargin/HomePieVBox/HomePieChart") as Control
 @onready var _home_pie_legend_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomePiePanel/HomePieMargin/HomePieVBox/HomePieLegendLabel") as Label
 @onready var _home_trend_chart: PriceChart = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomeTrendPanel/HomeTrendMargin/HomeTrendVBox/HomeTrendChart") as PriceChart
 @onready var _home_trend_delta_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomeTrendPanel/HomeTrendMargin/HomeTrendVBox/HomeTrendDeltaLabel") as Label
 @onready var _home_pulse_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomePulseLabel") as Label
+@onready var _home_holdings_scroll: ScrollContainer = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeHoldingsScroll") as ScrollContainer
 @onready var _home_holdings_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeHoldingsScroll/HomeHoldingsLabel") as Label
 @onready var _market_title: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketTitle
 @onready var _market_header: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketHeader
@@ -173,6 +181,7 @@ var _crt_shader_material: ShaderMaterial = null
 @onready var _end_day_button: Button = $MainMargin/MainVBox/BottomPanel/BottomBar/EndDayButton
 @onready var _selection_label: Label = $MainMargin/MainVBox/BottomPanel/BottomBar/SelectionLabel
 @onready var _status_label: Label = $MainMargin/MainVBox/BottomPanel/BottomBar/StatusLabel
+@onready var _quantity_label: Label = $MainMargin/MainVBox/BottomPanel/BottomBar/QtyLabel
 @onready var _bottom_bar: HBoxContainer = $MainMargin/MainVBox/BottomPanel/BottomBar
 @onready var _news_panel: PanelContainer = $MainMargin/MainVBox/BodySplit/NewsPanel
 @onready var _market_panel: PanelContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel
@@ -216,6 +225,7 @@ func _ready() -> void:
 	_build_diegetic_runtime_zones()
 	_resolve_content_targets()
 	_zone_policy = DIEGETIC_ZONE_POLICY.new()
+	_monitor_layout_contract = MONITOR_LAYOUT_CONTRACT.new()
 	_buy_button.pressed.connect(_on_buy_button_pressed)
 	_sell_button.pressed.connect(_on_sell_button_pressed)
 	_end_day_button.pressed.connect(_on_end_day_button_pressed)
@@ -900,34 +910,78 @@ func _apply_app_nav_button_state(button: Button, label: String, is_active: bool)
 
 
 func _apply_monitor_compaction() -> void:
-	var compact := _zone_contract_enabled
+	var profile: Dictionary = {}
+	if _monitor_layout_contract != null:
+		profile = _monitor_layout_contract.build_profile(
+			_resolve_monitor_content_size(),
+			_active_app_section,
+			_zone_contract_enabled
+		)
+
+	var compact := bool(profile.get("compact", _zone_contract_enabled))
+	var cramped := bool(profile.get("cramped", false))
+	var show_quick_quantity_buttons := bool(profile.get("show_quick_quantity_buttons", not compact))
+	var show_status_label := bool(profile.get("show_status_label", not compact))
+	var use_compact_button_labels := str(profile.get("button_label_mode", "full")) == "compact"
+
 	if _quantity_plus_ten_button != null:
-		_quantity_plus_ten_button.visible = not compact
+		_quantity_plus_ten_button.visible = show_quick_quantity_buttons
 	if _quantity_plus_twenty_five_button != null:
-		_quantity_plus_twenty_five_button.visible = not compact
+		_quantity_plus_twenty_five_button.visible = show_quick_quantity_buttons
 	if _quantity_max_button != null:
-		_quantity_max_button.visible = not compact
+		_quantity_max_button.visible = show_quick_quantity_buttons
 	if _status_label != null:
-		_status_label.visible = not compact
+		_status_label.visible = show_status_label
+	if _quantity_label != null:
+		_quantity_label.visible = not cramped
 	if _selection_label != null:
-		_selection_label.custom_minimum_size = Vector2(96, 0) if compact else Vector2(150, 0)
+		_selection_label.custom_minimum_size = Vector2(float(profile.get("selection_min_width", 96.0 if compact else 150.0)), 0)
 	if _quantity_input != null:
-		_quantity_input.custom_minimum_size = Vector2(66, 0) if compact else Vector2.ZERO
+		_quantity_input.custom_minimum_size = Vector2(float(profile.get("quantity_min_width", 66.0 if compact else 82.0)), 0)
 	if _bottom_bar != null:
-		_bottom_bar.add_theme_constant_override("separation", 4 if compact else 8)
+		_bottom_bar.add_theme_constant_override("separation", int(profile.get("bottom_bar_separation", 4 if compact else 8)))
+	if _app_nav_bar != null:
+		_app_nav_bar.add_theme_constant_override("separation", int(profile.get("app_nav_separation", 4 if compact else 6)))
+	if _app_home_button != null:
+		_app_home_button.custom_minimum_size = Vector2(float(profile.get("home_nav_min_width", 80.0)), 0)
+	if _app_market_button != null:
+		_app_market_button.custom_minimum_size = Vector2(float(profile.get("market_nav_min_width", 90.0)), 0)
+	if _app_company_button != null:
+		_app_company_button.custom_minimum_size = Vector2(float(profile.get("company_nav_min_width", 90.0)), 0)
 	if _buy_button != null:
-		_buy_button.text = BUY_LABEL_COMPACT if compact else BUY_LABEL_FULL
+		_buy_button.text = BUY_LABEL_COMPACT if use_compact_button_labels else BUY_LABEL_FULL
 		_buy_button.tooltip_text = "Comprar acciones."
 	if _sell_button != null:
-		_sell_button.text = SELL_LABEL_COMPACT if compact else SELL_LABEL_FULL
+		_sell_button.text = SELL_LABEL_COMPACT if use_compact_button_labels else SELL_LABEL_FULL
 		_sell_button.tooltip_text = "Vender acciones."
 	if _end_day_button != null:
-		_end_day_button.text = END_DAY_LABEL_COMPACT if compact else END_DAY_LABEL_FULL
+		_end_day_button.text = END_DAY_LABEL_COMPACT if use_compact_button_labels else END_DAY_LABEL_FULL
 		_end_day_button.tooltip_text = "Cierra el dia y procesa precios/noticias."
-	if _market_panel != null and compact:
-		_market_panel.custom_minimum_size = Vector2(300, 0)
-	if _details_panel != null and compact:
-		_details_panel.custom_minimum_size = Vector2(300, 0)
+	if _market_panel != null:
+		_market_panel.custom_minimum_size = Vector2(float(profile.get("market_panel_min_width", 300.0)), 0)
+	if _details_panel != null:
+		_details_panel.custom_minimum_size = Vector2(float(profile.get("details_panel_min_width", 300.0)), 0)
+	if _home_charts_row != null:
+		_home_charts_row.custom_minimum_size = Vector2(0, float(profile.get("home_charts_min_height", 164.0)))
+	if _home_holdings_scroll != null:
+		_home_holdings_scroll.custom_minimum_size = Vector2(0, float(profile.get("home_holdings_min_height", 90.0)))
+	if _home_holdings_label != null:
+		_home_holdings_label.max_lines_visible = int(profile.get("home_holdings_max_lines", 9))
+	if _market_header != null:
+		var header_max_lines := int(profile.get("market_header_max_lines", 1))
+		_market_header.max_lines_visible = maxi(1, header_max_lines)
+		_market_header.clip_text = header_max_lines <= 1
+		_market_header.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if header_max_lines > 1 else TextServer.AUTOWRAP_OFF
+
+	_row_name_min_width_runtime = float(profile.get("row_name_min_width", ROW_NAME_MIN_WIDTH))
+	_row_price_min_width_runtime = float(profile.get("row_price_min_width", ROW_PRICE_MIN_WIDTH))
+	_row_change_min_width_runtime = float(profile.get("row_change_min_width", ROW_CHANGE_MIN_WIDTH))
+
+
+func _resolve_monitor_content_size() -> Vector2:
+	if _main_margin != null and _main_margin.size.x > 1.0 and _main_margin.size.y > 1.0:
+		return _main_margin.size
+	return size
 
 
 func _update_market_table() -> void:
@@ -961,9 +1015,9 @@ func _update_market_table() -> void:
 		var row_view := MARKET_ROW_FACTORY.build_company_row(
 			row_model,
 			company,
-			ROW_NAME_MIN_WIDTH,
-			ROW_PRICE_MIN_WIDTH,
-			ROW_CHANGE_MIN_WIDTH,
+			_row_name_min_width_runtime,
+			_row_price_min_width_runtime,
+			_row_change_min_width_runtime,
 			_on_company_selected,
 			_on_company_info_requested
 		)
@@ -2152,6 +2206,19 @@ func _assign_png_texture(target: TextureRect, png_path: String) -> bool:
 func _apply_diegetic_layout() -> void:
 	if _diegetic_desk_layout != null:
 		_diegetic_desk_layout.apply_layout()
+
+
+func get_monitor_layout_debug_snapshot() -> Dictionary:
+	var snapshot: Dictionary = {}
+	if _diegetic_desk_layout != null and _diegetic_desk_layout.has_method("get_last_layout_snapshot"):
+		snapshot = _diegetic_desk_layout.call("get_last_layout_snapshot")
+	if _main_margin != null:
+		snapshot["content_min_size"] = _main_margin.get_combined_minimum_size()
+	else:
+		snapshot["content_min_size"] = Vector2.ZERO
+	snapshot["active_section"] = _active_app_section
+	snapshot["zone_contract_enabled"] = _zone_contract_enabled
+	return snapshot
 
 
 func _update_desk_props_alert_state() -> void:

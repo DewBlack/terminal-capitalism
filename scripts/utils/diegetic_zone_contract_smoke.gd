@@ -13,6 +13,10 @@ const INVOICE_DEBT_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/Invoice
 const INVOICE_PREVIEW_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/InvoicePreviewLabel")
 const INVOICE_EVENT_LOG_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/EventLogScroll/EventLogLabel")
 const DAY_LABEL_PATH := NodePath("MainMargin/MainVBox/HeaderBar/DayLabel")
+const MONITOR_OVERLAY_PATH := NodePath("MonitorOverlay")
+const HOME_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/HomePanel")
+const MARKET_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel")
+const DETAILS_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel")
 const MONITOR_END_DAY_BUTTON_PATH := NodePath("MainMargin/MainVBox/BottomPanel/BottomBar/EndDayButton")
 const DESK_END_DAY_BUTTON_PATH := NodePath("DeskEndDayButton")
 const TUTORIAL_FOCUS_FRAME_PATH := NodePath("TutorialOverlay/FocusFrame")
@@ -100,6 +104,8 @@ func _run_smoke() -> void:
 	if monitor_end_day_button != null and _is_visible_in_tree(monitor_end_day_button):
 		failures.append("EndDayButton de monitor sigue visible pese a control diegetico activo.")
 
+	await _validate_monitor_first_layout(ui, failures)
+
 	if desk_end_day_button != null and tutorial_focus_frame != null:
 		ui.set_tutorial_state({
 			"active": true,
@@ -170,3 +176,79 @@ func _run_smoke() -> void:
 
 func _is_visible_in_tree(control: Control) -> bool:
 	return control != null and control.is_visible_in_tree()
+
+
+func _validate_monitor_first_layout(ui: UIManager, failures: Array[String]) -> void:
+	var viewport_sizes := [
+		Vector2i(1920, 1080),
+		Vector2i(1366, 768)
+	]
+	var sections := ["home", "market", "company"]
+	for viewport_size in viewport_sizes:
+		get_root().size = viewport_size
+		await process_frame
+		await process_frame
+		for section_id in sections:
+			ui.call("_set_app_section", section_id, true)
+			ui.call("_apply_monitor_compaction")
+			ui.call("_apply_diegetic_layout")
+			await process_frame
+			_assert_section_inside_monitor(ui, section_id, viewport_size, failures)
+
+
+func _assert_section_inside_monitor(
+	ui: UIManager,
+	section_id: String,
+	viewport_size: Vector2i,
+	failures: Array[String]
+) -> void:
+	var monitor_overlay := ui.get_node_or_null(MONITOR_OVERLAY_PATH) as Control
+	if monitor_overlay == null:
+		failures.append("Monitor-first: falta MonitorOverlay para validar overflow.")
+		return
+	var snapshot_variant: Variant = ui.call("get_monitor_layout_debug_snapshot")
+	if not (snapshot_variant is Dictionary):
+		failures.append("Monitor-first: snapshot de layout no disponible.")
+		return
+	var snapshot := snapshot_variant as Dictionary
+	var safe_rect_size: Vector2 = snapshot.get("safe_rect_size", Vector2.ZERO)
+	var scaled_content_size: Vector2 = snapshot.get("scaled_content_size", Vector2.ZERO)
+	var content_size: Vector2 = snapshot.get("content_size", Vector2.ZERO)
+	var content_min_size: Vector2 = snapshot.get("content_min_size", Vector2.ZERO)
+	if safe_rect_size.x < 1.0 or safe_rect_size.y < 1.0:
+		failures.append("Monitor-first: safe rect invalido en %s section=%s" % [str(viewport_size), section_id])
+		return
+
+	if scaled_content_size.x > safe_rect_size.x + 0.6 or scaled_content_size.y > safe_rect_size.y + 0.6:
+		failures.append(
+			"Monitor-first: contenido escalado excede safe rect en %s section=%s scaled=%s safe=%s" % [
+				str(viewport_size),
+				section_id,
+				str(scaled_content_size),
+				str(safe_rect_size)
+			]
+		)
+	if content_min_size.x > content_size.x + 0.6 or content_min_size.y > content_size.y + 0.6:
+		failures.append(
+			"Monitor-first: minimo interno excede content_size en %s section=%s min=%s content=%s" % [
+				str(viewport_size),
+				section_id,
+				str(content_min_size),
+				str(content_size)
+			]
+		)
+
+	var expected_section_panel: Control = null
+	match section_id:
+		"home":
+			expected_section_panel = ui.get_node_or_null(HOME_PANEL_PATH) as Control
+		"market":
+			expected_section_panel = ui.get_node_or_null(MARKET_PANEL_PATH) as Control
+		"company":
+			expected_section_panel = ui.get_node_or_null(DETAILS_PANEL_PATH) as Control
+		_:
+			pass
+	if expected_section_panel == null or not expected_section_panel.is_visible_in_tree():
+		failures.append(
+			"Monitor-first: panel de seccion no visible en %s section=%s" % [str(viewport_size), section_id]
+		)
