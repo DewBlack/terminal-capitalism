@@ -168,7 +168,7 @@ var _market_preview_chart: PriceChart = null
 @onready var _news_title: Label = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsTopRow/NewsTitle
 @onready var _news_history_button: Button = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsTopRow/NewsHistoryButton
 @onready var _news_content: VBoxContainer = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsScroll/NewsContent
-@onready var _market_rows: GridContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketScroll/MarketRows
+@onready var _market_rows: Container = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketScroll/MarketRows as Container
 @onready var _company_details_label: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/CompanyDetailsScroll/CompanyDetailsLabel
 @onready var _movement_reasons_label: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/ReasonsScroll/MovementReasonsLabel
 @onready var _details_vbox: VBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox
@@ -985,10 +985,14 @@ func _apply_monitor_compaction() -> bool:
 		_market_panel.custom_minimum_size = Vector2(float(profile.get("market_panel_min_width", 300.0)), 0)
 	if _details_panel != null:
 		_details_panel.custom_minimum_size = Vector2(float(profile.get("details_panel_min_width", 300.0)), 0)
-	if _market_rows != null:
-		_market_rows.columns = int(profile.get("market_cards_columns", 1))
-		_market_rows.add_theme_constant_override("h_separation", 8 if cramped else 10)
-		_market_rows.add_theme_constant_override("v_separation", 8 if cramped else 10)
+	if _market_rows is GridContainer:
+		var market_rows_grid := _market_rows as GridContainer
+		market_rows_grid.columns = int(profile.get("market_cards_columns", 1))
+		market_rows_grid.add_theme_constant_override("h_separation", 8 if cramped else 10)
+		market_rows_grid.add_theme_constant_override("v_separation", 8 if cramped else 10)
+	elif _market_rows is VBoxContainer:
+		var market_rows_vbox := _market_rows as VBoxContainer
+		market_rows_vbox.add_theme_constant_override("separation", 8 if cramped else 10)
 	if _home_charts_row != null:
 		_home_charts_row.custom_minimum_size = Vector2(0, float(profile.get("home_charts_min_height", 164.0)))
 	if _home_holdings_scroll != null:
@@ -1031,6 +1035,9 @@ func _resolve_monitor_content_size() -> Vector2:
 
 
 func _update_market_table() -> void:
+	if _market_rows == null:
+		push_warning("UIManager: MarketRows no disponible en la escena actual.")
+		return
 	_clear_container(_market_rows)
 	if _market_selection_controller != null:
 		_market_selection_controller.clear_market_rows()
@@ -1419,6 +1426,8 @@ func _ensure_selected_company_is_valid() -> void:
 
 
 func _clear_container(container: Node) -> void:
+	if container == null:
+		return
 	for child in container.get_children():
 		child.queue_free()
 
