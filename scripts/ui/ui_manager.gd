@@ -246,6 +246,8 @@ func _ready() -> void:
 		_app_market_button.pressed.connect(_on_market_section_pressed)
 	if _app_company_button != null:
 		_app_company_button.pressed.connect(_on_company_section_pressed)
+		_app_company_button.visible = false
+		_app_company_button.disabled = true
 	if _desk_end_day_button != null:
 		_desk_end_day_button.pressed.connect(_on_end_day_button_pressed)
 	_quantity_input.value_changed.connect(_on_quantity_value_changed)
@@ -279,7 +281,6 @@ func _ready() -> void:
 	if _market_scroll != null:
 		_market_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		_market_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	_build_market_preview_panel()
 	_setup_diegetic_layout()
 	_ui_feedback_controller = UI_FEEDBACK_CONTROLLER.new()
 	add_child(_ui_feedback_controller)
@@ -403,7 +404,6 @@ func refresh_all_ui(status_message: String = "") -> void:
 	_update_news_panel()
 	_update_market_table()
 	_update_selected_company_details()
-	_update_market_preview()
 	_update_home_dashboard()
 	_update_selection_context()
 	_update_trade_action_state()
@@ -894,14 +894,14 @@ func _normalize_app_section(section_id: String) -> String:
 	if section_id == APP_SECTION_HOME:
 		return APP_SECTION_HOME
 	if section_id == APP_SECTION_COMPANY:
-		return APP_SECTION_COMPANY
+		# "Empresa" queda absorbida por la experiencia de "Mercado".
+		return APP_SECTION_MARKET
 	return APP_SECTION_MARKET
 
 
 func _apply_app_section_visibility() -> void:
 	var show_home := _active_app_section == APP_SECTION_HOME
-	var show_market := _active_app_section == APP_SECTION_MARKET
-	var show_company := _active_app_section == APP_SECTION_COMPANY
+	var show_market_workspace := _active_app_section == APP_SECTION_MARKET
 
 	if _home_panel != null:
 		_home_panel.visible = show_home
@@ -913,11 +913,11 @@ func _apply_app_section_visibility() -> void:
 		_feedback_panel.visible = show_home and not _zone_contract_enabled
 
 	if _center_split != null:
-		_center_split.visible = show_market or show_company
+		_center_split.visible = show_market_workspace
 	if _market_panel != null:
-		_market_panel.visible = show_market
+		_market_panel.visible = show_market_workspace
 	if _details_panel != null:
-		_details_panel.visible = show_company
+		_details_panel.visible = show_market_workspace
 
 	_update_app_nav_buttons()
 	_apply_header_visibility_contract()
@@ -926,7 +926,9 @@ func _apply_app_section_visibility() -> void:
 func _update_app_nav_buttons() -> void:
 	_apply_app_nav_button_state(_app_home_button, "Home", _active_app_section == APP_SECTION_HOME)
 	_apply_app_nav_button_state(_app_market_button, "Mercado", _active_app_section == APP_SECTION_MARKET)
-	_apply_app_nav_button_state(_app_company_button, "Empresa", _active_app_section == APP_SECTION_COMPANY)
+	if _app_company_button != null:
+		_app_company_button.visible = false
+		_app_company_button.disabled = true
 
 
 func _apply_app_nav_button_state(button: Button, label: String, is_active: bool) -> void:
@@ -1260,7 +1262,7 @@ func _on_market_section_pressed() -> void:
 
 
 func _on_company_section_pressed() -> void:
-	_set_app_section(APP_SECTION_COMPANY, true)
+	_set_app_section(APP_SECTION_MARKET, true)
 	refresh_all_ui()
 
 
@@ -1285,7 +1287,7 @@ func _on_company_selected(ticker: String) -> void:
 func _on_company_info_requested(ticker: String) -> void:
 	_on_company_selected(ticker)
 	if _get_selected_ticker() == ticker:
-		_set_app_section(APP_SECTION_COMPANY, true)
+		_set_app_section(APP_SECTION_MARKET, true)
 		refresh_all_ui()
 
 
@@ -1488,7 +1490,6 @@ func _on_ui_resized() -> void:
 	var row_profile_changed := _apply_monitor_compaction()
 	if row_profile_changed and _run_manager != null and _market_manager != null and _player_portfolio != null:
 		_update_market_table()
-	_update_market_preview()
 	_apply_diegetic_layout()
 	if _tutorial_overlay_controller == null:
 		return
