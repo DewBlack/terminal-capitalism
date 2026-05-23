@@ -37,9 +37,9 @@ En entornos sin binario local, usar los resultados de CI y documentarlo en el re
 - La app interna debe usar variantes por seccion (`home`, `market`, `company`) sin romper navegabilidad.
 
 ### Breakpoints operativos internos
-- Perfil base: monitor >= `820x360`.
-- Perfil compacto: monitor por debajo de `820x360` o contrato diegetico activo.
-- Perfil tight: monitor por debajo de `760x332`.
+- Perfil base: monitor >= `430x300`.
+- Perfil compacto: monitor por debajo de `430x300`.
+- Perfil tight: monitor por debajo de `370x255`.
 
 En perfiles compacto/tight se permiten:
 - reduccion de min-width de filas
