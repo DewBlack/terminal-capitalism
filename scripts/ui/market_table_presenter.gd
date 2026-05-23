@@ -26,11 +26,12 @@ static func build_company_row_model(
 	market_tags_visible: int,
 	market_tags_max_chars: int
 ) -> Dictionary:
-	var _unused_tags_visible := market_tags_visible
-	var _unused_tags_max_chars := market_tags_max_chars
 	var is_selected := company.ticker == selected_ticker
 	var owned_value := float(owned_amount) * company.current_price
 	var row_bg_color := Color(0.16, 0.17, 0.20, 0.96) if row_index % 2 == 0 else Color(0.13, 0.14, 0.17, 0.96)
+	var primary_sector := company.sectors[0] if not company.sectors.is_empty() else "-"
+	var tags_text := UI_FORMAT_HELPER.compact_tag_line(company.tags, market_tags_visible)
+	tags_text = UI_FORMAT_HELPER.truncate_text(tags_text, market_tags_max_chars)
 
 	var change_color := Color(0.82, 0.84, 0.87, 1.0)
 	if company.last_daily_change > 0.0:
@@ -40,8 +41,10 @@ static func build_company_row_model(
 
 	var owned_value_text := UI_FORMAT_HELPER.money(owned_value)
 	var owned_text := "En cartera: x%d (%s)" % [owned_amount, owned_value_text]
-	if owned_amount <= 0:
-		owned_text = ""
+	var owned_color := Color(0.48, 0.60, 0.69, 0.92)
+	if owned_amount > 0:
+		owned_color = Color(0.67, 0.89, 0.73, 0.95)
+
 	return {
 		"ticker": company.ticker,
 		"name": company.name,
@@ -56,6 +59,8 @@ static func build_company_row_model(
 		"price_text": UI_FORMAT_HELPER.money(company.current_price),
 		"change_text": UI_FORMAT_HELPER.percent(company.last_daily_change),
 		"change_color": change_color,
+		"sector_text": "Sector: %s" % primary_sector,
+		"tags_text": "Tags: %s" % tags_text,
 		"owned_text": owned_text,
-		"owned_visible": owned_amount > 0
+		"owned_color": owned_color
 	}

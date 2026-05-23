@@ -22,6 +22,7 @@ static func build_company_row(
 	var price_font_size := _scaled_int(15, density_scale, 14, 26)
 	var change_font_size := _scaled_int(14, density_scale, 13, 24)
 	var name_font_size := _scaled_int(14, density_scale, 13, 24)
+	var meta_font_size := _scaled_int(12, density_scale, 11, 20)
 	var owned_font_size := _scaled_int(12, density_scale, 12, 20)
 	var card_padding_horizontal := _scaled_int(10, density_scale, 8, 18)
 	var card_padding_vertical := _scaled_int(8, density_scale, 6, 14)
@@ -106,30 +107,65 @@ static func build_company_row(
 	change_label.add_theme_color_override("font_color", row_model.get("change_color", UI_THEME_TOKENS.TEXT_TERTIARY))
 	top_row.add_child(change_label)
 
+	var info_vbox := VBoxContainer.new()
+	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	info_vbox.size_flags_stretch_ratio = 2.35 if density_scale < 1.25 else 2.8
+	info_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	info_vbox.add_theme_constant_override("separation", _scaled_int(3, density_scale, 2, 8))
+	row_vbox.add_child(info_vbox)
+
 	var name_label := Label.new()
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	name_label.size_flags_stretch_ratio = 1.15 if density_scale < 1.25 else 1.35
+	name_label.size_flags_stretch_ratio = 1.35
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	name_label.max_lines_visible = 4 if density_scale >= 1.35 else (3 if density_scale >= 1.15 else 2)
+	name_label.max_lines_visible = 3 if density_scale >= 1.15 else 2
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.text = str(row_model.get("name_text", company.name))
 	name_label.add_theme_font_size_override("font_size", name_font_size)
 	name_label.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_SECONDARY)
-	row_vbox.add_child(name_label)
+	info_vbox.add_child(name_label)
 
-	if bool(row_model.get("owned_visible", false)):
-		var owned_label := Label.new()
-		owned_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		owned_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		owned_label.size_flags_stretch_ratio = 0.9
-		owned_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		owned_label.text = str(row_model.get("owned_text", ""))
-		owned_label.add_theme_font_size_override("font_size", owned_font_size)
-		owned_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		owned_label.add_theme_color_override("font_color", Color(0.67, 0.89, 0.73, 0.95))
-		row_vbox.add_child(owned_label)
+	var sector_label := Label.new()
+	sector_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sector_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sector_label.size_flags_stretch_ratio = 0.95
+	sector_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sector_label.clip_text = true
+	sector_label.max_lines_visible = 1
+	sector_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	sector_label.text = str(row_model.get("sector_text", "Sector: -"))
+	sector_label.add_theme_font_size_override("font_size", meta_font_size)
+	sector_label.add_theme_color_override("font_color", Color(0.70, 0.80, 0.90, 0.90))
+	info_vbox.add_child(sector_label)
+
+	var tags_label := Label.new()
+	tags_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tags_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tags_label.size_flags_stretch_ratio = 1.05
+	tags_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tags_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tags_label.max_lines_visible = 2
+	tags_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tags_label.text = str(row_model.get("tags_text", "Tags: -"))
+	tags_label.add_theme_font_size_override("font_size", meta_font_size)
+	tags_label.add_theme_color_override("font_color", Color(0.60, 0.73, 0.86, 0.90))
+	info_vbox.add_child(tags_label)
+
+	var owned_label := Label.new()
+	owned_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	owned_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	owned_label.size_flags_stretch_ratio = 1.1
+	owned_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	owned_label.clip_text = true
+	owned_label.max_lines_visible = 1
+	owned_label.text = str(row_model.get("owned_text", "En cartera: x0 ($0.00)"))
+	owned_label.add_theme_font_size_override("font_size", owned_font_size)
+	owned_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	owned_label.add_theme_color_override("font_color", row_model.get("owned_color", Color(0.48, 0.60, 0.69, 0.92)))
+	row_vbox.add_child(owned_label)
 
 	return {
 		"row_card": row_card,
