@@ -19,15 +19,18 @@ static func build_company_row(
 	var density_scale := _resolve_density_scale(row_card_min_height)
 	var badge_side := _scaled_int(26, density_scale, 24, 44)
 	var ticker_font_size := _scaled_int(16, density_scale, 15, 28)
-	var price_font_size := _scaled_int(15, density_scale, 14, 26)
-	var change_font_size := _scaled_int(14, density_scale, 13, 24)
-	var name_font_size := _scaled_int(14, density_scale, 13, 24)
+	var price_font_size := _scaled_int(16, density_scale, 14, 27)
+	var change_font_size := _scaled_int(13, density_scale, 12, 23)
+	var name_font_size := _scaled_int(15, density_scale, 13, 25)
 	var meta_font_size := _scaled_int(12, density_scale, 11, 20)
-	var owned_font_size := _scaled_int(12, density_scale, 12, 20)
+	var owned_title_font_size := _scaled_int(11, density_scale, 10, 18)
+	var owned_qty_font_size := _scaled_int(16, density_scale, 14, 25)
+	var owned_value_font_size := _scaled_int(11, density_scale, 10, 18)
 	var card_padding_horizontal := _scaled_int(10, density_scale, 8, 18)
 	var card_padding_vertical := _scaled_int(8, density_scale, 6, 14)
-	var row_gap := _scaled_int(6, density_scale, 4, 12)
+	var row_gap := _scaled_int(5, density_scale, 4, 10)
 	var top_row_gap := _scaled_int(8, density_scale, 6, 14)
+	var body_gap := _scaled_int(6, density_scale, 4, 12)
 
 	var row_card := PanelContainer.new()
 	row_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -66,7 +69,7 @@ static func build_company_row(
 	var top_row := HBoxContainer.new()
 	top_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	top_row.size_flags_stretch_ratio = 1.1 if density_scale < 1.2 else 1.2
+	top_row.size_flags_stretch_ratio = 1.0 if density_scale < 1.2 else 1.1
 	top_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top_row.add_theme_constant_override("separation", top_row_gap)
 	top_row.custom_minimum_size = Vector2(0, _scaled_int(30, density_scale, 28, 52))
@@ -88,32 +91,56 @@ static func build_company_row(
 	)
 	top_row.add_child(ticker_label)
 
+	var quote_vbox := VBoxContainer.new()
+	quote_vbox.custom_minimum_size = Vector2(
+		maxf(86.0, (row_price_min_width + row_change_min_width) * density_scale * 0.92),
+		0
+	)
+	quote_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	quote_vbox.add_theme_constant_override("separation", _scaled_int(1, density_scale, 1, 4))
+	top_row.add_child(quote_vbox)
+
 	var price_label := Label.new()
-	price_label.custom_minimum_size = Vector2(maxf(62.0, row_price_min_width * density_scale), 0)
+	price_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	price_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	price_label.text = str(row_model.get("price_text", "$0.00"))
 	price_label.add_theme_font_size_override("font_size", price_font_size)
 	price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	price_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	top_row.add_child(price_label)
+	quote_vbox.add_child(price_label)
 
 	var change_label := Label.new()
-	change_label.custom_minimum_size = Vector2(maxf(60.0, row_change_min_width * density_scale), 0)
+	change_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	change_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	change_label.text = str(row_model.get("change_text", "+0.00%"))
 	change_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	change_label.add_theme_font_size_override("font_size", change_font_size)
 	change_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	change_label.add_theme_color_override("font_color", row_model.get("change_color", UI_THEME_TOKENS.TEXT_TERTIARY))
-	top_row.add_child(change_label)
+	quote_vbox.add_child(change_label)
+
+	var body_row := HBoxContainer.new()
+	body_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body_row.size_flags_stretch_ratio = 2.45 if density_scale < 1.25 else 2.95
+	body_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body_row.add_theme_constant_override("separation", body_gap)
+	row_vbox.add_child(body_row)
+
+	var info_panel := PanelContainer.new()
+	info_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	info_panel.size_flags_stretch_ratio = 2.2
+	info_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	info_panel.add_theme_stylebox_override("panel", _build_band_style(Color(0.11, 0.15, 0.21, 0.58), density_scale, 7))
+	body_row.add_child(info_panel)
 
 	var info_vbox := VBoxContainer.new()
 	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	info_vbox.size_flags_stretch_ratio = 2.35 if density_scale < 1.25 else 2.8
 	info_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	info_vbox.add_theme_constant_override("separation", _scaled_int(3, density_scale, 2, 8))
-	row_vbox.add_child(info_vbox)
+	info_vbox.add_theme_constant_override("separation", _scaled_int(2, density_scale, 2, 6))
+	info_panel.add_child(info_vbox)
 
 	var name_label := Label.new()
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -121,8 +148,8 @@ static func build_company_row(
 	name_label.size_flags_stretch_ratio = 1.35
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	name_label.max_lines_visible = 3 if density_scale >= 1.15 else 2
-	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.max_lines_visible = 2
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	name_label.text = str(row_model.get("name_text", company.name))
 	name_label.add_theme_font_size_override("font_size", name_font_size)
 	name_label.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_SECONDARY)
@@ -130,8 +157,6 @@ static func build_company_row(
 
 	var sector_label := Label.new()
 	sector_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sector_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	sector_label.size_flags_stretch_ratio = 0.95
 	sector_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sector_label.clip_text = true
 	sector_label.max_lines_visible = 1
@@ -144,28 +169,64 @@ static func build_company_row(
 	var tags_label := Label.new()
 	tags_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tags_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	tags_label.size_flags_stretch_ratio = 1.05
+	tags_label.size_flags_stretch_ratio = 1.0
 	tags_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tags_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tags_label.max_lines_visible = 2
-	tags_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tags_label.max_lines_visible = 3 if density_scale >= 1.2 else 2
+	tags_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	tags_label.text = str(row_model.get("tags_text", "Tags: -"))
 	tags_label.add_theme_font_size_override("font_size", meta_font_size)
 	tags_label.add_theme_color_override("font_color", Color(0.60, 0.73, 0.86, 0.90))
 	info_vbox.add_child(tags_label)
 
-	var owned_label := Label.new()
-	owned_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	owned_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	owned_label.size_flags_stretch_ratio = 1.1
-	owned_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	owned_label.clip_text = true
-	owned_label.max_lines_visible = 1
-	owned_label.text = str(row_model.get("owned_text", "En cartera: x0 ($0.00)"))
-	owned_label.add_theme_font_size_override("font_size", owned_font_size)
-	owned_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	owned_label.add_theme_color_override("font_color", row_model.get("owned_color", Color(0.48, 0.60, 0.69, 0.92)))
-	row_vbox.add_child(owned_label)
+	var owned_panel := PanelContainer.new()
+	owned_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	owned_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	owned_panel.size_flags_stretch_ratio = 1.25 if density_scale < 1.25 else 1.4
+	owned_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	owned_panel.add_theme_stylebox_override(
+		"panel",
+		_build_band_style(row_model.get("owned_panel_color", Color(0.16, 0.18, 0.22, 0.90)), density_scale, 7)
+	)
+	body_row.add_child(owned_panel)
+
+	var owned_vbox := VBoxContainer.new()
+	owned_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	owned_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	owned_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	owned_vbox.add_theme_constant_override("separation", _scaled_int(1, density_scale, 1, 3))
+	owned_panel.add_child(owned_vbox)
+
+	var owned_title_label := Label.new()
+	owned_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	owned_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	owned_title_label.text = "En cartera"
+	owned_title_label.add_theme_font_size_override("font_size", owned_title_font_size)
+	owned_title_label.add_theme_color_override("font_color", Color(0.73, 0.82, 0.92, 0.92))
+	owned_vbox.add_child(owned_title_label)
+
+	var owned_qty_label := Label.new()
+	owned_qty_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	owned_qty_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	owned_qty_label.size_flags_stretch_ratio = 1.0
+	owned_qty_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	owned_qty_label.text = str(row_model.get("owned_qty_text", "x0"))
+	owned_qty_label.add_theme_font_size_override("font_size", owned_qty_font_size)
+	owned_qty_label.add_theme_color_override("font_color", row_model.get("owned_color", Color(0.48, 0.60, 0.69, 0.92)))
+	owned_qty_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	owned_qty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	owned_vbox.add_child(owned_qty_label)
+
+	var owned_value_label := Label.new()
+	owned_value_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	owned_value_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	owned_value_label.clip_text = true
+	owned_value_label.max_lines_visible = 1
+	owned_value_label.text = str(row_model.get("owned_value_line_text", "Valor $0.00"))
+	owned_value_label.add_theme_font_size_override("font_size", owned_value_font_size)
+	owned_value_label.add_theme_color_override("font_color", row_model.get("owned_color", Color(0.48, 0.60, 0.69, 0.92)))
+	owned_value_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	owned_vbox.add_child(owned_value_label)
 
 	return {
 		"row_card": row_card,
@@ -196,6 +257,28 @@ static func _build_company_logo_badge(company: Company, side_size: int, density_
 	text_label.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_ON_ACCENT)
 	badge.add_child(text_label)
 	return badge
+
+
+static func _build_band_style(bg_color: Color, density_scale: float, corner_radius: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg_color
+	var safe_radius := clampi(corner_radius, 4, 12)
+	style.corner_radius_top_left = safe_radius
+	style.corner_radius_top_right = safe_radius
+	style.corner_radius_bottom_left = safe_radius
+	style.corner_radius_bottom_right = safe_radius
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.border_color = Color(0.29, 0.36, 0.46, 0.42)
+	var margin_x := float(_scaled_int(7, density_scale, 6, 14))
+	var margin_y := float(_scaled_int(5, density_scale, 4, 11))
+	style.content_margin_left = margin_x
+	style.content_margin_right = margin_x
+	style.content_margin_top = margin_y
+	style.content_margin_bottom = margin_y
+	return style
 
 
 static func _resolve_density_scale(row_card_min_height: float) -> float:

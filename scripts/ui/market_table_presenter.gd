@@ -41,9 +41,13 @@ static func build_company_row_model(
 
 	var owned_value_text := UI_FORMAT_HELPER.money(owned_value)
 	var owned_text := "En cartera: x%d (%s)" % [owned_amount, owned_value_text]
+	var owned_qty_text := "x%d" % owned_amount
+	var owned_value_line_text := "Valor %s" % owned_value_text
 	var owned_color := Color(0.48, 0.60, 0.69, 0.92)
+	var owned_panel_color := Color(0.16, 0.18, 0.22, 0.90)
 	if owned_amount > 0:
 		owned_color = Color(0.67, 0.89, 0.73, 0.95)
+		owned_panel_color = Color(0.16, 0.24, 0.19, 0.92)
 
 	return {
 		"ticker": company.ticker,
@@ -62,5 +66,8 @@ static func build_company_row_model(
 		"sector_text": "Sector: %s" % primary_sector,
 		"tags_text": "Tags: %s" % tags_text,
 		"owned_text": owned_text,
-		"owned_color": owned_color
+		"owned_color": owned_color,
+		"owned_qty_text": owned_qty_text,
+		"owned_value_line_text": owned_value_line_text,
+		"owned_panel_color": owned_panel_color
 	}
