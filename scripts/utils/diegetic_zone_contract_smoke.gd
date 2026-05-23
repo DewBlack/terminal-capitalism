@@ -279,6 +279,10 @@ func _assert_market_profile_applied(
 		failures.append("Monitor-first: safe rect invalido en %s para validar compaction." % context)
 		return
 	var profile: Dictionary = contract.call("build_profile", safe_rect_size, "market", zone_contract_enabled)
+	if zone_contract_enabled and not bool(profile.get("compact", false)):
+		failures.append(
+			"Monitor-first: perfil market debe forzar compact cuando zone contract esta habilitado (%s)." % context
+		)
 	var expected_qty_label_visible := not bool(profile.get("cramped", false))
 	if quantity_label.visible != expected_qty_label_visible:
 		failures.append(

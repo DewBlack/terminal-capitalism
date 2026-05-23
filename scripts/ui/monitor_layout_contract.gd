@@ -12,11 +12,12 @@ const BREAKPOINT_TIGHT_HEIGHT := 255.0
 
 
 func build_profile(content_size: Vector2, section_id: String, zone_contract_enabled: bool) -> Dictionary:
-	var _unused_zone_contract := zone_contract_enabled
 	var safe_size := Vector2(maxf(1.0, content_size.x), maxf(1.0, content_size.y))
 	var tight := safe_size.x < BREAKPOINT_BALANCED_WIDTH or safe_size.y < BREAKPOINT_BALANCED_HEIGHT
 	var cramped := safe_size.x < BREAKPOINT_TIGHT_WIDTH or safe_size.y < BREAKPOINT_TIGHT_HEIGHT
-	var compact := tight
+	# Con contrato diegetico activo mantenemos perfil compacto para proteger
+	# el presupuesto de espacio del monitor aunque el viewport sea grande.
+	var compact := tight or zone_contract_enabled
 
 	var profile := {
 		"compact": compact,
