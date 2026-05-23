@@ -10,9 +10,18 @@ const INVOICE_RUNTIME_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime")
 const CALENDAR_ZONE_PATH := NodePath("DeskDocs/CalendarZone")
 const CALENDAR_RUNTIME_PATH := NodePath("DeskDocs/CalendarZone/CalendarRuntime")
 const INVOICE_CRITICAL_DOC_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel")
-const INVOICE_DEBT_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/DebtRiskLabel")
-const INVOICE_PREVIEW_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/InvoicePreviewLabel")
-const INVOICE_EVENT_LOG_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/EventLogScroll/EventLogLabel")
+const INVOICE_DEBT_PATH := NodePath(
+	"DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/InvoiceDocumentPanel/DocumentMargin/DocumentVBox/DocumentSlots/DebtSlotPanel/SlotMargin/SlotVBox/DebtRiskLabel"
+)
+const INVOICE_PREVIEW_PATH := NodePath(
+	"DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/InvoiceDocumentPanel/DocumentMargin/DocumentVBox/DocumentSlots/InvoiceSlotPanel/SlotMargin/SlotVBox/InvoicePreviewLabel"
+)
+const INVOICE_ALERTS_PATH := NodePath(
+	"DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/InvoiceDocumentPanel/DocumentMargin/DocumentVBox/DocumentSlots/AlertsSlotPanel/SlotMargin/SlotVBox/AlertsLabel"
+)
+const INVOICE_EVENT_LOG_PATH := NodePath(
+	"DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/InvoiceDocumentPanel/DocumentMargin/DocumentVBox/DocumentSlots/EventsSlotPanel/SlotMargin/SlotVBox/EventLogScroll/EventLogLabel"
+)
 const DAY_LABEL_PATH := NodePath("MainMargin/MainVBox/HeaderBar/DayLabel")
 const MONITOR_OVERLAY_PATH := NodePath("MonitorOverlay")
 const MAIN_MARGIN_PATH := NodePath("MainMargin")
@@ -54,6 +63,7 @@ func _run_smoke() -> void:
 	var critical_document_panel := ui.get_node_or_null(INVOICE_CRITICAL_DOC_PATH) as PanelContainer
 	var debt_label := ui.get_node_or_null(INVOICE_DEBT_PATH) as Label
 	var invoice_label := ui.get_node_or_null(INVOICE_PREVIEW_PATH) as Label
+	var alerts_label := ui.get_node_or_null(INVOICE_ALERTS_PATH) as Label
 	var event_log_label := ui.get_node_or_null(INVOICE_EVENT_LOG_PATH) as Label
 	var day_label := ui.get_node_or_null(DAY_LABEL_PATH) as Label
 	var monitor_end_day_button := ui.get_node_or_null(MONITOR_END_DAY_BUTTON_PATH) as Button
@@ -80,6 +90,8 @@ func _run_smoke() -> void:
 		failures.append("No se encontro DebtRiskLabel en zona de factura.")
 	if invoice_label == null:
 		failures.append("No se encontro InvoicePreviewLabel en zona de factura.")
+	if alerts_label == null:
+		failures.append("No se encontro AlertsLabel en zona de factura.")
 	if event_log_label == null:
 		failures.append("No se encontro EventLogLabel en documento diegetico.")
 	if day_label == null:

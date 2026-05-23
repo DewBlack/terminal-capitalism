@@ -13,8 +13,13 @@ var _status_label: Label = null
 var _debt_risk_label: Label = null
 var _invoice_preview_label: Label = null
 var _event_log_label: Label = null
+var _alerts_label: Label = null
 var _toast_panel: PanelContainer = null
 var _toast_label: Label = null
+var _debt_slot_panel: PanelContainer = null
+var _invoice_slot_panel: PanelContainer = null
+var _alerts_slot_panel: PanelContainer = null
+var _event_slot_panel: PanelContainer = null
 
 var _event_log_entries: Array[String] = []
 var _debt_feedback_snapshot: Dictionary = {}
@@ -29,14 +34,24 @@ func setup(
 	invoice_preview_label: Label,
 	event_log_label: Label,
 	toast_panel: PanelContainer,
-	toast_label: Label
+	toast_label: Label,
+	debt_slot_panel: PanelContainer = null,
+	invoice_slot_panel: PanelContainer = null,
+	alerts_slot_panel: PanelContainer = null,
+	alerts_label: Label = null,
+	event_slot_panel: PanelContainer = null
 ) -> void:
 	_status_label = status_label
 	_debt_risk_label = debt_risk_label
 	_invoice_preview_label = invoice_preview_label
 	_event_log_label = event_log_label
+	_alerts_label = alerts_label
 	_toast_panel = toast_panel
 	_toast_label = toast_label
+	_debt_slot_panel = debt_slot_panel
+	_invoice_slot_panel = invoice_slot_panel
+	_alerts_slot_panel = alerts_slot_panel
+	_event_slot_panel = event_slot_panel
 	if _toast_panel != null:
 		_toast_panel.visible = false
 	_setup_toast_timer()
@@ -91,15 +106,28 @@ func _update_debt_risk_panel(player_portfolio: PlayerPortfolio) -> void:
 
 
 func _apply_debt_feedback_model(debt_model: Dictionary) -> void:
-	if _debt_risk_label == null or _invoice_preview_label == null:
-		return
-	_debt_risk_label.text = str(debt_model.get("risk_text", "Sin datos de deuda."))
-	_invoice_preview_label.text = str(debt_model.get("invoice_text", "Sin datos de factura semanal."))
-	_debt_risk_label.remove_theme_color_override("font_color")
-	_debt_risk_label.add_theme_color_override(
-		"font_color",
-		debt_model.get("risk_color", Color(0.73, 0.93, 0.76))
-	)
+	if _debt_risk_label != null:
+		_debt_risk_label.text = str(debt_model.get("risk_text", "Sin datos de deuda."))
+		_debt_risk_label.remove_theme_color_override("font_color")
+		_debt_risk_label.add_theme_color_override(
+			"font_color",
+			debt_model.get("risk_color", Color(0.18, 0.31, 0.21))
+		)
+	if _invoice_preview_label != null:
+		_invoice_preview_label.text = str(debt_model.get("invoice_text", "Sin datos de factura semanal."))
+		_invoice_preview_label.remove_theme_color_override("font_color")
+		_invoice_preview_label.add_theme_color_override(
+			"font_color",
+			debt_model.get("invoice_color", Color(0.18, 0.31, 0.21))
+		)
+	if _alerts_label != null:
+		_alerts_label.text = str(debt_model.get("alerts_text", "Sin alertas operativas."))
+		_alerts_label.remove_theme_color_override("font_color")
+		_alerts_label.add_theme_color_override(
+			"font_color",
+			debt_model.get("alerts_color", Color(0.18, 0.31, 0.21))
+		)
+	_apply_document_slot_styles(debt_model)
 
 
 func _update_event_log_panel() -> void:
@@ -108,6 +136,9 @@ func _update_event_log_panel() -> void:
 	var event_log_model := EVENT_LOG_PRESENTER.build_model(_event_log_entries, EVENT_LOG_VISIBLE_MAX)
 	_event_log_label.text = str(event_log_model.get("text", "Sin eventos importantes todavia."))
 	_event_log_label.tooltip_text = str(event_log_model.get("tooltip", ""))
+	_event_log_label.remove_theme_color_override("font_color")
+	_event_log_label.add_theme_color_override("font_color", event_log_model.get("color", Color(0.18, 0.31, 0.21)))
+	_apply_slot_state_style(_event_slot_panel, str(event_log_model.get("state", "ok")))
 
 
 func _apply_status_model(status_model: Dictionary) -> void:
@@ -171,3 +202,46 @@ func _on_toast_timeout() -> void:
 	if _toast_panel != null:
 		_toast_panel.visible = false
 	_show_next_runtime_alert()
+
+
+func _apply_document_slot_styles(debt_model: Dictionary) -> void:
+	_apply_slot_state_style(_debt_slot_panel, str(debt_model.get("risk_state", "ok")))
+	_apply_slot_state_style(_invoice_slot_panel, str(debt_model.get("invoice_state", "ok")))
+	_apply_slot_state_style(_alerts_slot_panel, str(debt_model.get("alerts_state", "ok")))
+
+
+func _apply_slot_state_style(slot_panel: PanelContainer, state: String) -> void:
+	if slot_panel == null:
+		return
+	var palette := _slot_palette_for_state(state)
+	var style := StyleBoxFlat.new()
+	style.bg_color = palette.get("background", Color(0.93, 0.94, 0.89, 0.82))
+	style.border_color = palette.get("border", Color(0.45, 0.49, 0.44, 0.75))
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	slot_panel.add_theme_stylebox_override("panel", style)
+
+
+func _slot_palette_for_state(state: String) -> Dictionary:
+	match state:
+		"critical":
+			return {
+				"background": Color(0.99, 0.86, 0.82, 0.94),
+				"border": Color(0.74, 0.21, 0.16, 0.90)
+			}
+		"warning":
+			return {
+				"background": Color(0.99, 0.94, 0.79, 0.94),
+				"border": Color(0.74, 0.52, 0.14, 0.90)
+			}
+		_:
+			return {
+				"background": Color(0.88, 0.95, 0.87, 0.90),
+				"border": Color(0.31, 0.49, 0.34, 0.82)
+			}

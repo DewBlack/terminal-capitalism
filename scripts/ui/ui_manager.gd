@@ -104,6 +104,11 @@ var _desk_end_day_button: Button = null
 var _invoice_runtime_debt_risk_label: Label = null
 var _invoice_runtime_invoice_label: Label = null
 var _invoice_runtime_event_log_label: Label = null
+var _invoice_runtime_alerts_label: Label = null
+var _invoice_runtime_debt_slot_panel: PanelContainer = null
+var _invoice_runtime_invoice_slot_panel: PanelContainer = null
+var _invoice_runtime_alerts_slot_panel: PanelContainer = null
+var _invoice_runtime_events_slot_panel: PanelContainer = null
 var _invoice_runtime_cash_ledger_label: Label = null
 var _invoice_runtime_debt_ledger_label: Label = null
 var _invoice_runtime_weekly_panel: PanelContainer = null
@@ -284,7 +289,12 @@ func _ready() -> void:
 		_invoice_preview_label,
 		_event_log_label,
 		_toast_panel,
-		_toast_label
+		_toast_label,
+		_invoice_runtime_debt_slot_panel,
+		_invoice_runtime_invoice_slot_panel,
+		_invoice_runtime_alerts_slot_panel,
+		_invoice_runtime_alerts_label,
+		_invoice_runtime_events_slot_panel
 	)
 	_trade_action_controller = UI_TRADE_ACTION_CONTROLLER.new()
 	_trade_action_controller.setup(
@@ -2040,40 +2050,93 @@ func _build_invoice_runtime_zone() -> void:
 		critical_document_margin.add_child(critical_document_vbox)
 		critical_document_panel.add_child(critical_document_margin)
 
-		var debt_risk_label := Label.new()
-		debt_risk_label.name = "DebtRiskLabel"
-		_configure_text_slot_label(debt_risk_label, 12, 3)
-		debt_risk_label.text = "Deuda actual, limite y margen."
+		var document_panel := PanelContainer.new()
+		document_panel.name = "InvoiceDocumentPanel"
+		document_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		document_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		document_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		document_panel.add_theme_stylebox_override("panel", _build_invoice_document_sheet_style())
 
-		var invoice_label := Label.new()
-		invoice_label.name = "InvoicePreviewLabel"
-		_configure_text_slot_label(invoice_label, 12, 3)
-		invoice_label.text = "Factura semanal estimada."
+		var document_margin := MarginContainer.new()
+		document_margin.name = "DocumentMargin"
+		document_margin.add_theme_constant_override("margin_left", 8)
+		document_margin.add_theme_constant_override("margin_top", 8)
+		document_margin.add_theme_constant_override("margin_right", 8)
+		document_margin.add_theme_constant_override("margin_bottom", 8)
 
-		var event_title := Label.new()
-		event_title.name = "EventDocTitle"
-		event_title.text = "Documento de Eventos"
+		var document_vbox := VBoxContainer.new()
+		document_vbox.name = "DocumentVBox"
+		document_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		document_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		document_vbox.add_theme_constant_override("separation", 6)
 
-		var event_scroll := ScrollContainer.new()
-		event_scroll.name = "EventLogScroll"
-		event_scroll.custom_minimum_size = Vector2(0, 56)
-		event_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		event_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		var document_title := Label.new()
+		document_title.name = "DocumentTitle"
+		document_title.add_theme_font_size_override("font_size", 14)
+		document_title.text = "Documento Operativo"
 
-		var event_log_label := Label.new()
-		event_log_label.name = "EventLogLabel"
-		event_log_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_configure_text_slot_label(event_log_label, 12, 8)
-		event_log_label.text = "Sin eventos importantes todavia."
+		var document_subtitle := Label.new()
+		document_subtitle.name = "DocumentSubtitle"
+		_configure_text_slot_label(document_subtitle, 11, 1)
+		document_subtitle.text = "Slots auditables: resumen, deuda, alertas y eventos."
 
-		event_scroll.add_child(event_log_label)
+		var slots_vbox := VBoxContainer.new()
+		slots_vbox.name = "DocumentSlots"
+		slots_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slots_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		slots_vbox.add_theme_constant_override("separation", 5)
+
+		var debt_slot := _create_invoice_document_slot(
+			"DebtSlotPanel",
+			"Riesgo de deuda",
+			"DebtRiskLabel",
+			12,
+			3,
+			"Deuda actual, limite y margen."
+		)
+		var debt_slot_panel := debt_slot.get("panel") as PanelContainer
+
+		var invoice_slot := _create_invoice_document_slot(
+			"InvoiceSlotPanel",
+			"Factura semanal",
+			"InvoicePreviewLabel",
+			12,
+			3,
+			"Factura semanal estimada."
+		)
+		var invoice_slot_panel := invoice_slot.get("panel") as PanelContainer
+
+		var alerts_slot := _create_invoice_document_slot(
+			"AlertsSlotPanel",
+			"Alertas",
+			"AlertsLabel",
+			12,
+			3,
+			"Sin alertas operativas."
+		)
+		var alerts_slot_panel := alerts_slot.get("panel") as PanelContainer
+
+		var events_slot := _create_invoice_event_slot()
+		var events_slot_panel := events_slot.get("panel") as PanelContainer
+
+		if debt_slot_panel != null:
+			slots_vbox.add_child(debt_slot_panel)
+		if invoice_slot_panel != null:
+			slots_vbox.add_child(invoice_slot_panel)
+		if alerts_slot_panel != null:
+			slots_vbox.add_child(alerts_slot_panel)
+		if events_slot_panel != null:
+			slots_vbox.add_child(events_slot_panel)
+
+		document_vbox.add_child(document_title)
+		document_vbox.add_child(document_subtitle)
+		document_vbox.add_child(slots_vbox)
+		document_margin.add_child(document_vbox)
+		document_panel.add_child(document_margin)
 		invoice_vbox.add_child(ledger_row)
 		invoice_vbox.add_child(weekly_invoice_panel)
 		invoice_vbox.add_child(critical_document_panel)
-		invoice_vbox.add_child(debt_risk_label)
-		invoice_vbox.add_child(invoice_label)
-		invoice_vbox.add_child(event_title)
-		invoice_vbox.add_child(event_scroll)
+		invoice_vbox.add_child(document_panel)
 		invoice_runtime_margin.add_child(invoice_vbox)
 		_invoice_zone.add_child(invoice_runtime_margin)
 	_invoice_runtime = invoice_runtime_margin
@@ -2093,9 +2156,30 @@ func _build_invoice_runtime_zone() -> void:
 	_invoice_runtime_critical_body = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalBodyLabel") as Label
 	_invoice_runtime_critical_footer = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalFooterLabel") as Label
 	_invoice_runtime_critical_continue_button = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalContinueButton") as Button
-	_invoice_runtime_debt_risk_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/DebtRiskLabel") as Label
-	_invoice_runtime_invoice_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/InvoicePreviewLabel") as Label
-	_invoice_runtime_event_log_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/EventLogScroll/EventLogLabel") as Label
+	_invoice_runtime_debt_slot_panel = _invoice_zone.get_node_or_null(
+		"InvoiceRuntime/InvoiceVBox/InvoiceDocumentPanel/DocumentMargin/DocumentVBox/DocumentSlots/DebtSlotPanel"
+	) as PanelContainer
+	_invoice_runtime_invoice_slot_panel = _invoice_zone.get_node_or_null(
+		"InvoiceRuntime/InvoiceVBox/InvoiceDocumentPanel/DocumentMargin/DocumentVBox/DocumentSlots/InvoiceSlotPanel"
+	) as PanelContainer
+	_invoice_runtime_alerts_slot_panel = _invoice_zone.get_node_or_null(
+		"InvoiceRuntime/InvoiceVBox/InvoiceDocumentPanel/DocumentMargin/DocumentVBox/DocumentSlots/AlertsSlotPanel"
+	) as PanelContainer
+	_invoice_runtime_events_slot_panel = _invoice_zone.get_node_or_null(
+		"InvoiceRuntime/InvoiceVBox/InvoiceDocumentPanel/DocumentMargin/DocumentVBox/DocumentSlots/EventsSlotPanel"
+	) as PanelContainer
+	_invoice_runtime_debt_risk_label = _invoice_zone.get_node_or_null(
+		"InvoiceRuntime/InvoiceVBox/InvoiceDocumentPanel/DocumentMargin/DocumentVBox/DocumentSlots/DebtSlotPanel/SlotMargin/SlotVBox/DebtRiskLabel"
+	) as Label
+	_invoice_runtime_invoice_label = _invoice_zone.get_node_or_null(
+		"InvoiceRuntime/InvoiceVBox/InvoiceDocumentPanel/DocumentMargin/DocumentVBox/DocumentSlots/InvoiceSlotPanel/SlotMargin/SlotVBox/InvoicePreviewLabel"
+	) as Label
+	_invoice_runtime_alerts_label = _invoice_zone.get_node_or_null(
+		"InvoiceRuntime/InvoiceVBox/InvoiceDocumentPanel/DocumentMargin/DocumentVBox/DocumentSlots/AlertsSlotPanel/SlotMargin/SlotVBox/AlertsLabel"
+	) as Label
+	_invoice_runtime_event_log_label = _invoice_zone.get_node_or_null(
+		"InvoiceRuntime/InvoiceVBox/InvoiceDocumentPanel/DocumentMargin/DocumentVBox/DocumentSlots/EventsSlotPanel/SlotMargin/SlotVBox/EventLogScroll/EventLogLabel"
+	) as Label
 
 
 func _build_calendar_runtime_zone() -> void:
@@ -2174,6 +2258,135 @@ func _configure_text_slot_label(label: Label, font_size: int, max_lines: int) ->
 	label.clip_text = true
 	label.max_lines_visible = maxi(1, max_lines)
 	label.add_theme_font_size_override("font_size", font_size)
+
+
+func _build_invoice_document_sheet_style() -> StyleBoxFlat:
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.96, 0.96, 0.92, 0.94)
+	panel_style.border_color = Color(0.47, 0.44, 0.36, 0.86)
+	panel_style.border_width_left = 1
+	panel_style.border_width_top = 1
+	panel_style.border_width_right = 1
+	panel_style.border_width_bottom = 1
+	panel_style.corner_radius_top_left = 5
+	panel_style.corner_radius_top_right = 5
+	panel_style.corner_radius_bottom_left = 5
+	panel_style.corner_radius_bottom_right = 5
+	return panel_style
+
+
+func _build_invoice_slot_panel_style() -> StyleBoxFlat:
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.88, 0.95, 0.87, 0.90)
+	panel_style.border_color = Color(0.31, 0.49, 0.34, 0.82)
+	panel_style.border_width_left = 1
+	panel_style.border_width_top = 1
+	panel_style.border_width_right = 1
+	panel_style.border_width_bottom = 1
+	panel_style.corner_radius_top_left = 4
+	panel_style.corner_radius_top_right = 4
+	panel_style.corner_radius_bottom_left = 4
+	panel_style.corner_radius_bottom_right = 4
+	return panel_style
+
+
+func _create_invoice_document_slot(
+	panel_name: String,
+	title_text: String,
+	body_label_name: String,
+	body_font_size: int,
+	max_lines: int,
+	placeholder_text: String
+) -> Dictionary:
+	var slot_panel := PanelContainer.new()
+	slot_panel.name = panel_name
+	slot_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slot_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot_panel.add_theme_stylebox_override("panel", _build_invoice_slot_panel_style())
+
+	var slot_margin := MarginContainer.new()
+	slot_margin.name = "SlotMargin"
+	slot_margin.add_theme_constant_override("margin_left", 6)
+	slot_margin.add_theme_constant_override("margin_top", 5)
+	slot_margin.add_theme_constant_override("margin_right", 6)
+	slot_margin.add_theme_constant_override("margin_bottom", 5)
+
+	var slot_vbox := VBoxContainer.new()
+	slot_vbox.name = "SlotVBox"
+	slot_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slot_vbox.add_theme_constant_override("separation", 2)
+
+	var slot_title := Label.new()
+	slot_title.name = "SlotTitle"
+	slot_title.add_theme_font_size_override("font_size", 10)
+	slot_title.text = title_text.to_upper()
+
+	var body_label := Label.new()
+	body_label.name = body_label_name
+	body_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_configure_text_slot_label(body_label, body_font_size, max_lines)
+	body_label.text = placeholder_text
+
+	slot_vbox.add_child(slot_title)
+	slot_vbox.add_child(body_label)
+	slot_margin.add_child(slot_vbox)
+	slot_panel.add_child(slot_margin)
+
+	return {
+		"panel": slot_panel,
+		"body_label": body_label
+	}
+
+
+func _create_invoice_event_slot() -> Dictionary:
+	var slot_panel := PanelContainer.new()
+	slot_panel.name = "EventsSlotPanel"
+	slot_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slot_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	slot_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot_panel.add_theme_stylebox_override("panel", _build_invoice_slot_panel_style())
+
+	var slot_margin := MarginContainer.new()
+	slot_margin.name = "SlotMargin"
+	slot_margin.add_theme_constant_override("margin_left", 6)
+	slot_margin.add_theme_constant_override("margin_top", 5)
+	slot_margin.add_theme_constant_override("margin_right", 6)
+	slot_margin.add_theme_constant_override("margin_bottom", 5)
+
+	var slot_vbox := VBoxContainer.new()
+	slot_vbox.name = "SlotVBox"
+	slot_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slot_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	slot_vbox.add_theme_constant_override("separation", 2)
+
+	var slot_title := Label.new()
+	slot_title.name = "SlotTitle"
+	slot_title.add_theme_font_size_override("font_size", 10)
+	slot_title.text = "EVENTOS RECIENTES"
+
+	var event_scroll := ScrollContainer.new()
+	event_scroll.name = "EventLogScroll"
+	event_scroll.custom_minimum_size = Vector2(0, 64)
+	event_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	event_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	event_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+
+	var event_log_label := Label.new()
+	event_log_label.name = "EventLogLabel"
+	event_log_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_configure_text_slot_label(event_log_label, 12, 6)
+	event_log_label.text = "Sin eventos importantes todavia."
+	event_scroll.add_child(event_log_label)
+
+	slot_vbox.add_child(slot_title)
+	slot_vbox.add_child(event_scroll)
+	slot_margin.add_child(slot_vbox)
+	slot_panel.add_child(slot_margin)
+
+	return {
+		"panel": slot_panel,
+		"body_label": event_log_label
+	}
 
 
 func _resolve_content_targets() -> void:
