@@ -36,6 +36,7 @@ const TUTORIAL_TARGET_RECT_RESOLVER := preload("res://scripts/ui/tutorial_target
 const UI_THEME_TOKENS := preload("res://scripts/ui/ui_theme_tokens.gd")
 const DIEGETIC_DESK_LAYOUT := preload("res://scripts/ui/diegetic_desk_layout.gd")
 const DIEGETIC_ZONE_POLICY := preload("res://scripts/ui/diegetic_zone_policy.gd")
+const MONITOR_LAYOUT_CONTRACT := preload("res://scripts/ui/monitor_layout_contract.gd")
 const CRT_MONITOR_SHADER := preload("res://shaders/crt_monitor.gdshader")
 const WEEK_LABEL_MAX_CHARS := 180
 const MOVEMENT_REASONS_MAX_ITEMS := 3
@@ -82,6 +83,7 @@ var _tutorial_overlay_controller = null
 var _tutorial_target_rect_resolver = null
 var _diegetic_desk_layout = null
 var _zone_policy = null
+var _monitor_layout_contract = null
 var _tutorial_state: Dictionary = {"active": false}
 var _newspaper_runtime: Control = null
 var _newspaper_runtime_view: Node = null
@@ -123,6 +125,14 @@ var _zone_contract_enabled: bool = false
 var _zone_contract_active: bool = false
 var _calendar_contract_active: bool = false
 var _crt_shader_material: ShaderMaterial = null
+var _row_name_min_width_runtime: float = ROW_NAME_MIN_WIDTH
+var _row_price_min_width_runtime: float = ROW_PRICE_MIN_WIDTH
+var _row_change_min_width_runtime: float = ROW_CHANGE_MIN_WIDTH
+var _market_card_min_height_runtime: float = 108.0
+var _market_preview_min_height_runtime: float = 124.0
+var _market_preview_panel: PanelContainer = null
+var _market_preview_title: Label = null
+var _market_preview_chart: PriceChart = null
 
 @export_enum("low", "medium", "high") var crt_profile: String = UI_THEME_TOKENS.CRT_PROFILE_FALLBACK
 
@@ -134,6 +144,7 @@ var _crt_shader_material: ShaderMaterial = null
 @onready var _net_worth_label: Label = $MainMargin/MainVBox/HeaderBar/NetWorthLabel
 @onready var _upgrade_label: Label = $MainMargin/MainVBox/HeaderBar/UpgradeLabel
 @onready var _header_bar: GridContainer = $MainMargin/MainVBox/HeaderBar
+@onready var _app_nav_bar: HBoxContainer = get_node_or_null("MainMargin/MainVBox/AppNavBar") as HBoxContainer
 @onready var _app_home_button: Button = get_node_or_null("MainMargin/MainVBox/AppNavBar/HomeButton") as Button
 @onready var _app_market_button: Button = get_node_or_null("MainMargin/MainVBox/AppNavBar/MarketButton") as Button
 @onready var _app_company_button: Button = get_node_or_null("MainMargin/MainVBox/AppNavBar/CompanyButton") as Button
@@ -141,20 +152,23 @@ var _crt_shader_material: ShaderMaterial = null
 @onready var _center_split: HBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit
 @onready var _home_panel: PanelContainer = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel") as PanelContainer
 @onready var _home_summary_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeSummaryLabel") as Label
+@onready var _home_charts_row: HBoxContainer = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow") as HBoxContainer
 @onready var _home_pie_chart: Control = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomePiePanel/HomePieMargin/HomePieVBox/HomePieChart") as Control
 @onready var _home_pie_legend_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomePiePanel/HomePieMargin/HomePieVBox/HomePieLegendLabel") as Label
 @onready var _home_trend_chart: PriceChart = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomeTrendPanel/HomeTrendMargin/HomeTrendVBox/HomeTrendChart") as PriceChart
 @onready var _home_trend_delta_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeChartsRow/HomeTrendPanel/HomeTrendMargin/HomeTrendVBox/HomeTrendDeltaLabel") as Label
 @onready var _home_pulse_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomePulseLabel") as Label
+@onready var _home_holdings_scroll: ScrollContainer = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeHoldingsScroll") as ScrollContainer
 @onready var _home_holdings_label: Label = get_node_or_null("MainMargin/MainVBox/BodySplit/HomePanel/HomeMargin/HomeVBox/HomeHoldingsScroll/HomeHoldingsLabel") as Label
 @onready var _market_title: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketTitle
 @onready var _market_header: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketHeader
+@onready var _market_scroll: ScrollContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketScroll
 @onready var _details_title: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/DetailsTitle
 
 @onready var _news_title: Label = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsTopRow/NewsTitle
 @onready var _news_history_button: Button = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsTopRow/NewsHistoryButton
 @onready var _news_content: VBoxContainer = $MainMargin/MainVBox/BodySplit/NewsPanel/NewsVBox/NewsScroll/NewsContent
-@onready var _market_rows: VBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketScroll/MarketRows
+@onready var _market_rows: Container = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketScroll/MarketRows as Container
 @onready var _company_details_label: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/CompanyDetailsScroll/CompanyDetailsLabel
 @onready var _movement_reasons_label: Label = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox/ReasonsScroll/MovementReasonsLabel
 @onready var _details_vbox: VBoxContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel/DetailsVBox
@@ -173,6 +187,7 @@ var _crt_shader_material: ShaderMaterial = null
 @onready var _end_day_button: Button = $MainMargin/MainVBox/BottomPanel/BottomBar/EndDayButton
 @onready var _selection_label: Label = $MainMargin/MainVBox/BottomPanel/BottomBar/SelectionLabel
 @onready var _status_label: Label = $MainMargin/MainVBox/BottomPanel/BottomBar/StatusLabel
+@onready var _quantity_label: Label = $MainMargin/MainVBox/BottomPanel/BottomBar/QtyLabel
 @onready var _bottom_bar: HBoxContainer = $MainMargin/MainVBox/BottomPanel/BottomBar
 @onready var _news_panel: PanelContainer = $MainMargin/MainVBox/BodySplit/NewsPanel
 @onready var _market_panel: PanelContainer = $MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel
@@ -216,6 +231,7 @@ func _ready() -> void:
 	_build_diegetic_runtime_zones()
 	_resolve_content_targets()
 	_zone_policy = DIEGETIC_ZONE_POLICY.new()
+	_monitor_layout_contract = MONITOR_LAYOUT_CONTRACT.new()
 	_buy_button.pressed.connect(_on_buy_button_pressed)
 	_sell_button.pressed.connect(_on_sell_button_pressed)
 	_end_day_button.pressed.connect(_on_end_day_button_pressed)
@@ -255,6 +271,10 @@ func _ready() -> void:
 	_apply_diegetic_shell_styles()
 	_apply_diegetic_artwork()
 	_apply_crt_monitor_skin()
+	if _market_scroll != null:
+		_market_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		_market_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_build_market_preview_panel()
 	_setup_diegetic_layout()
 	_ui_feedback_controller = UI_FEEDBACK_CONTROLLER.new()
 	add_child(_ui_feedback_controller)
@@ -367,11 +387,13 @@ func refresh_all_ui(status_message: String = "") -> void:
 	if not status_message.is_empty():
 		_last_status_message = status_message
 	_apply_zone_contract()
+	_apply_monitor_compaction()
 	_ensure_selected_company_is_valid()
 	_update_header()
 	_update_news_panel()
 	_update_market_table()
 	_update_selected_company_details()
+	_update_market_preview()
 	_update_home_dashboard()
 	_update_selection_context()
 	_update_trade_action_state()
@@ -381,7 +403,6 @@ func refresh_all_ui(status_message: String = "") -> void:
 		_ui_feedback_controller.apply_status_text(_last_status_message)
 	_apply_tutorial_visual_state()
 	_apply_app_section_visibility()
-	_apply_monitor_compaction()
 	_apply_diegetic_layout()
 	_update_desk_props_alert_state()
 
@@ -821,6 +842,11 @@ func _update_finance_ledger_view(cash_value: float, debt_value: float, debt_limi
 
 
 func _apply_header_visibility_contract() -> void:
+	var show_monitor_header := not _calendar_contract_active
+	if _header_bar != null:
+		_header_bar.visible = show_monitor_header
+	if not show_monitor_header:
+		return
 	var use_diegetic_day_and_finance := _calendar_contract_active
 	if _day_label != null:
 		_day_label.visible = not use_diegetic_day_and_finance
@@ -884,6 +910,7 @@ func _apply_app_section_visibility() -> void:
 		_details_panel.visible = show_company
 
 	_update_app_nav_buttons()
+	_apply_header_visibility_contract()
 
 
 func _update_app_nav_buttons() -> void:
@@ -899,48 +926,131 @@ func _apply_app_nav_button_state(button: Button, label: String, is_active: bool)
 	button.text = "[%s]" % label if is_active else label
 
 
-func _apply_monitor_compaction() -> void:
-	var compact := _zone_contract_enabled
+func _apply_monitor_compaction() -> bool:
+	var previous_row_name_width := _row_name_min_width_runtime
+	var previous_row_price_width := _row_price_min_width_runtime
+	var previous_row_change_width := _row_change_min_width_runtime
+	var previous_market_card_min_height := _market_card_min_height_runtime
+	var profile: Dictionary = {}
+	if _monitor_layout_contract != null:
+		profile = _monitor_layout_contract.build_profile(
+			_resolve_monitor_content_size(),
+			_active_app_section,
+			_zone_contract_enabled
+		)
+
+	var compact := bool(profile.get("compact", false))
+	var cramped := bool(profile.get("cramped", false))
+	var show_quick_quantity_buttons := bool(profile.get("show_quick_quantity_buttons", not compact))
+	var show_status_label := bool(profile.get("show_status_label", not compact))
+	var show_selection_label := bool(profile.get("show_selection_label", true))
+	var use_compact_button_labels := str(profile.get("button_label_mode", "full")) == "compact"
+
 	if _quantity_plus_ten_button != null:
-		_quantity_plus_ten_button.visible = not compact
+		_quantity_plus_ten_button.visible = show_quick_quantity_buttons
 	if _quantity_plus_twenty_five_button != null:
-		_quantity_plus_twenty_five_button.visible = not compact
+		_quantity_plus_twenty_five_button.visible = show_quick_quantity_buttons
 	if _quantity_max_button != null:
-		_quantity_max_button.visible = not compact
+		_quantity_max_button.visible = show_quick_quantity_buttons
 	if _status_label != null:
-		_status_label.visible = not compact
+		_status_label.visible = show_status_label
+	if _quantity_label != null:
+		_quantity_label.visible = not cramped
 	if _selection_label != null:
-		_selection_label.custom_minimum_size = Vector2(96, 0) if compact else Vector2(150, 0)
+		_selection_label.visible = show_selection_label
+		_selection_label.custom_minimum_size = Vector2(float(profile.get("selection_min_width", 96.0 if compact else 150.0)), 0)
 	if _quantity_input != null:
-		_quantity_input.custom_minimum_size = Vector2(66, 0) if compact else Vector2.ZERO
+		_quantity_input.custom_minimum_size = Vector2(float(profile.get("quantity_min_width", 66.0 if compact else 82.0)), 0)
 	if _bottom_bar != null:
-		_bottom_bar.add_theme_constant_override("separation", 4 if compact else 8)
+		_bottom_bar.add_theme_constant_override("separation", int(profile.get("bottom_bar_separation", 4 if compact else 8)))
+	if _app_nav_bar != null:
+		_app_nav_bar.add_theme_constant_override("separation", int(profile.get("app_nav_separation", 4 if compact else 6)))
+	if _app_home_button != null:
+		_app_home_button.custom_minimum_size = Vector2(float(profile.get("home_nav_min_width", 80.0)), 0)
+	if _app_market_button != null:
+		_app_market_button.custom_minimum_size = Vector2(float(profile.get("market_nav_min_width", 90.0)), 0)
+	if _app_company_button != null:
+		_app_company_button.custom_minimum_size = Vector2(float(profile.get("company_nav_min_width", 90.0)), 0)
 	if _buy_button != null:
-		_buy_button.text = BUY_LABEL_COMPACT if compact else BUY_LABEL_FULL
+		_buy_button.text = BUY_LABEL_COMPACT if use_compact_button_labels else BUY_LABEL_FULL
 		_buy_button.tooltip_text = "Comprar acciones."
+		_buy_button.custom_minimum_size = Vector2(float(profile.get("trade_button_min_width", 96.0)), 0)
 	if _sell_button != null:
-		_sell_button.text = SELL_LABEL_COMPACT if compact else SELL_LABEL_FULL
+		_sell_button.text = SELL_LABEL_COMPACT if use_compact_button_labels else SELL_LABEL_FULL
 		_sell_button.tooltip_text = "Vender acciones."
+		_sell_button.custom_minimum_size = Vector2(float(profile.get("trade_button_min_width", 96.0)), 0)
 	if _end_day_button != null:
-		_end_day_button.text = END_DAY_LABEL_COMPACT if compact else END_DAY_LABEL_FULL
+		_end_day_button.text = END_DAY_LABEL_COMPACT if use_compact_button_labels else END_DAY_LABEL_FULL
 		_end_day_button.tooltip_text = "Cierra el dia y procesa precios/noticias."
-	if _market_panel != null and compact:
-		_market_panel.custom_minimum_size = Vector2(300, 0)
-	if _details_panel != null and compact:
-		_details_panel.custom_minimum_size = Vector2(300, 0)
+		_end_day_button.custom_minimum_size = Vector2(float(profile.get("end_day_button_min_width", 92.0)), 0)
+	if _market_panel != null:
+		_market_panel.custom_minimum_size = Vector2(float(profile.get("market_panel_min_width", 300.0)), 0)
+	if _details_panel != null:
+		_details_panel.custom_minimum_size = Vector2(float(profile.get("details_panel_min_width", 300.0)), 0)
+	if _market_rows is GridContainer:
+		var market_rows_grid := _market_rows as GridContainer
+		market_rows_grid.columns = int(profile.get("market_cards_columns", 1))
+		market_rows_grid.add_theme_constant_override("h_separation", 8 if cramped else 10)
+		market_rows_grid.add_theme_constant_override("v_separation", 8 if cramped else 10)
+	elif _market_rows is VBoxContainer:
+		var market_rows_vbox := _market_rows as VBoxContainer
+		market_rows_vbox.add_theme_constant_override("separation", 8 if cramped else 10)
+	if _home_charts_row != null:
+		_home_charts_row.custom_minimum_size = Vector2(0, float(profile.get("home_charts_min_height", 164.0)))
+	if _home_holdings_scroll != null:
+		_home_holdings_scroll.custom_minimum_size = Vector2(0, float(profile.get("home_holdings_min_height", 90.0)))
+	if _home_holdings_label != null:
+		_home_holdings_label.max_lines_visible = int(profile.get("home_holdings_max_lines", 9))
+	if _market_header != null:
+		var header_max_lines := int(profile.get("market_header_max_lines", 1))
+		_market_header.max_lines_visible = maxi(1, header_max_lines)
+		_market_header.clip_text = header_max_lines <= 1
+		_market_header.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if header_max_lines > 1 else TextServer.AUTOWRAP_OFF
+		_market_header.visible = false
+
+	_row_name_min_width_runtime = float(profile.get("row_name_min_width", ROW_NAME_MIN_WIDTH))
+	_row_price_min_width_runtime = float(profile.get("row_price_min_width", ROW_PRICE_MIN_WIDTH))
+	_row_change_min_width_runtime = float(profile.get("row_change_min_width", ROW_CHANGE_MIN_WIDTH))
+	_market_card_min_height_runtime = float(profile.get("market_card_min_height", 108.0))
+	_market_preview_min_height_runtime = float(profile.get("market_preview_min_height", 124.0))
+	if _market_preview_panel != null:
+		_market_preview_panel.custom_minimum_size = Vector2(0, _market_preview_min_height_runtime)
+	return not is_equal_approx(previous_row_name_width, _row_name_min_width_runtime) \
+		or not is_equal_approx(previous_row_price_width, _row_price_min_width_runtime) \
+		or not is_equal_approx(previous_row_change_width, _row_change_min_width_runtime) \
+		or not is_equal_approx(previous_market_card_min_height, _market_card_min_height_runtime)
+
+
+func _resolve_monitor_content_size() -> Vector2:
+	# Usa el tamaño escalado real del safe rect CRT para breakpoints.
+	# _main_margin.size es el canvas interno sin escalar y puede ocultar condiciones tight/cramped.
+	if _monitor_overlay != null and _monitor_overlay.size.x > 1.0 and _monitor_overlay.size.y > 1.0:
+		return _monitor_overlay.size
+	if _diegetic_desk_layout != null and _diegetic_desk_layout.has_method("get_last_layout_snapshot"):
+		var layout_snapshot: Dictionary = _diegetic_desk_layout.call("get_last_layout_snapshot")
+		var safe_rect_size: Vector2 = layout_snapshot.get("safe_rect_size", Vector2.ZERO)
+		if safe_rect_size.x > 1.0 and safe_rect_size.y > 1.0:
+			return safe_rect_size
+	if _main_margin != null and _main_margin.size.x > 1.0 and _main_margin.size.y > 1.0:
+		return _main_margin.size
+	return size
 
 
 func _update_market_table() -> void:
+	if _market_rows == null:
+		push_warning("UIManager: MarketRows no disponible en la escena actual.")
+		return
 	_clear_container(_market_rows)
 	if _market_selection_controller != null:
 		_market_selection_controller.clear_market_rows()
 	var companies := _market_manager.get_sorted_active_companies()
 	var header_model := MARKET_TABLE_PRESENTER.build_table_header(companies.size(), HOTKEYS_HINT)
 	_market_title.text = str(header_model.get("title", "Mercado"))
-	_market_header.text = "%s | Pulsa Info para abrir ficha." % str(header_model.get("header", "Selecciona una empresa para operar."))
+	_market_header.text = str(header_model.get("header", "Tarjetas de empresas"))
 	_market_header.tooltip_text = str(header_model.get("header_tooltip", HOTKEYS_HINT))
 	if companies.is_empty():
 		var empty_label := Label.new()
+		empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		empty_label.text = MARKET_TABLE_PRESENTER.build_empty_state_text()
 		_market_rows.add_child(empty_label)
 		return
@@ -961,15 +1071,16 @@ func _update_market_table() -> void:
 		var row_view := MARKET_ROW_FACTORY.build_company_row(
 			row_model,
 			company,
-			ROW_NAME_MIN_WIDTH,
-			ROW_PRICE_MIN_WIDTH,
-			ROW_CHANGE_MIN_WIDTH,
+			_row_name_min_width_runtime,
+			_row_price_min_width_runtime,
+			_row_change_min_width_runtime,
 			_on_company_selected,
 			_on_company_info_requested
 		)
 		var row_card := row_view.get("row_card", null) as Control
 		if row_card == null:
 			continue
+		row_card.custom_minimum_size.y = _market_card_min_height_runtime
 		var interactive_controls_variant: Variant = row_view.get("interactive_controls", [])
 		if interactive_controls_variant is Array:
 			for interactive_control in interactive_controls_variant:
@@ -1027,6 +1138,30 @@ func _update_selected_company_details() -> void:
 		trade_markers,
 		UI_THEME_TOKENS.SURFACE_LOGO_FALLBACK
 	)
+
+
+func _update_market_preview() -> void:
+	if _market_preview_panel == null or _market_preview_chart == null:
+		return
+	if _market_manager == null:
+		_market_preview_panel.visible = false
+		return
+	_ensure_selected_company_is_valid()
+	var company := _market_manager.get_company_by_ticker(_get_selected_ticker())
+	if company == null:
+		_market_preview_panel.visible = false
+		return
+	_market_preview_panel.visible = true
+	if _market_preview_title != null:
+		_market_preview_title.text = "Vista rapida %s | %s" % [company.ticker, company.name]
+	var price_history: Array[float] = company.price_history.duplicate()
+	if price_history.size() < 2:
+		price_history = [company.current_price, company.current_price]
+	_market_preview_chart.set_price_history(price_history)
+	var trade_markers: Array[Dictionary] = []
+	if _player_portfolio != null:
+		trade_markers = _player_portfolio.get_trade_markers_for_ticker(company.ticker)
+	_market_preview_chart.set_trade_markers(trade_markers)
 
 
 func _on_buy_button_pressed() -> void:
@@ -1293,6 +1428,8 @@ func _ensure_selected_company_is_valid() -> void:
 
 
 func _clear_container(container: Node) -> void:
+	if container == null:
+		return
 	for child in container.get_children():
 		child.queue_free()
 
@@ -1337,6 +1474,11 @@ func _are_actions_locked() -> bool:
 
 func _on_ui_resized() -> void:
 	_apply_zone_contract()
+	_apply_diegetic_layout()
+	var row_profile_changed := _apply_monitor_compaction()
+	if row_profile_changed and _run_manager != null and _market_manager != null and _player_portfolio != null:
+		_update_market_table()
+	_update_market_preview()
 	_apply_diegetic_layout()
 	if _tutorial_overlay_controller == null:
 		return
@@ -1626,6 +1768,72 @@ func _apply_action_hints() -> void:
 		_market_header,
 		HOTKEYS_HINT
 	)
+
+
+func _build_market_preview_panel() -> void:
+	if _market_scroll == null:
+		return
+	var market_vbox := _market_scroll.get_parent() as VBoxContainer
+	if market_vbox == null:
+		return
+	var existing_panel := market_vbox.get_node_or_null("MarketPreviewPanel") as PanelContainer
+	if existing_panel == null:
+		existing_panel = PanelContainer.new()
+		existing_panel.name = "MarketPreviewPanel"
+		existing_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		existing_panel.custom_minimum_size = Vector2(0, _market_preview_min_height_runtime)
+
+		var panel_style := StyleBoxFlat.new()
+		panel_style.bg_color = Color(0.07, 0.09, 0.13, 0.88)
+		panel_style.border_color = Color(0.28, 0.39, 0.50, 0.74)
+		panel_style.border_width_left = 1
+		panel_style.border_width_top = 1
+		panel_style.border_width_right = 1
+		panel_style.border_width_bottom = 1
+		panel_style.corner_radius_top_left = 8
+		panel_style.corner_radius_top_right = 8
+		panel_style.corner_radius_bottom_left = 8
+		panel_style.corner_radius_bottom_right = 8
+		panel_style.content_margin_left = 8
+		panel_style.content_margin_top = 6
+		panel_style.content_margin_right = 8
+		panel_style.content_margin_bottom = 8
+		existing_panel.add_theme_stylebox_override("panel", panel_style)
+
+		var preview_vbox := VBoxContainer.new()
+		preview_vbox.name = "PreviewVBox"
+		preview_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		preview_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		preview_vbox.add_theme_constant_override("separation", 4)
+
+		var preview_title := Label.new()
+		preview_title.name = "PreviewTitle"
+		preview_title.text = "Vista rapida"
+		preview_title.clip_text = true
+		preview_title.max_lines_visible = 1
+		preview_title.add_theme_font_size_override("font_size", 13)
+		preview_title.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_SECONDARY)
+		preview_vbox.add_child(preview_title)
+
+		var preview_chart := PriceChart.new()
+		preview_chart.name = "PreviewChart"
+		preview_chart.custom_minimum_size = Vector2(0, 88)
+		preview_chart.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		preview_chart.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		preview_vbox.add_child(preview_chart)
+
+		existing_panel.add_child(preview_vbox)
+		market_vbox.add_child(existing_panel)
+		var scroll_index := market_vbox.get_children().find(_market_scroll)
+		if scroll_index > 0:
+			market_vbox.move_child(existing_panel, scroll_index)
+
+	_market_preview_panel = existing_panel
+	_market_preview_panel.visible = false
+	_market_preview_title = _market_preview_panel.get_node_or_null("PreviewVBox/PreviewTitle") as Label
+	_market_preview_chart = _market_preview_panel.get_node_or_null("PreviewVBox/PreviewChart") as PriceChart
+	if _market_preview_chart != null:
+		_market_preview_chart.apply_crt_profile(crt_profile)
 
 
 func _build_diegetic_runtime_zones() -> void:
@@ -2102,6 +2310,8 @@ func _apply_crt_profile_to_chart() -> void:
 		_price_chart.call("apply_crt_profile", crt_profile)
 	if _home_trend_chart != null and _home_trend_chart.has_method("apply_crt_profile"):
 		_home_trend_chart.call("apply_crt_profile", crt_profile)
+	if _market_preview_chart != null and _market_preview_chart.has_method("apply_crt_profile"):
+		_market_preview_chart.call("apply_crt_profile", crt_profile)
 
 
 func _apply_diegetic_artwork() -> void:
@@ -2152,6 +2362,19 @@ func _assign_png_texture(target: TextureRect, png_path: String) -> bool:
 func _apply_diegetic_layout() -> void:
 	if _diegetic_desk_layout != null:
 		_diegetic_desk_layout.apply_layout()
+
+
+func get_monitor_layout_debug_snapshot() -> Dictionary:
+	var snapshot: Dictionary = {}
+	if _diegetic_desk_layout != null and _diegetic_desk_layout.has_method("get_last_layout_snapshot"):
+		snapshot = _diegetic_desk_layout.call("get_last_layout_snapshot")
+	if _main_margin != null:
+		snapshot["content_min_size"] = _main_margin.get_combined_minimum_size()
+	else:
+		snapshot["content_min_size"] = Vector2.ZERO
+	snapshot["active_section"] = _active_app_section
+	snapshot["zone_contract_enabled"] = _zone_contract_enabled
+	return snapshot
 
 
 func _update_desk_props_alert_state() -> void:

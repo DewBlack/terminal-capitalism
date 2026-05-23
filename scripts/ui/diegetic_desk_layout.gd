@@ -3,9 +3,10 @@ extends RefCounted
 
 const REFERENCE_VIEWPORT := Vector2(1920.0, 1080.0)
 
-# Safe area de pantalla CRT (basado en ajuste manual desktop)
-const MONITOR_SAFE_RECT_REF := Rect2(Vector2(707.0, 131.0), Vector2(863.0, 371.0))
-const MONITOR_FRAME_RECT_REF := Rect2(Vector2(660.0, 131.0), Vector2(957.0, 371.0))
+# Safe area CRT recalibrada contra art/placeholder/desk/desk_base_bg_v1.png.
+# Mantiene el contenido operativo dentro de la pantalla dibujada del monitor.
+const MONITOR_SAFE_RECT_REF := Rect2(Vector2(718.0, 132.0), Vector2(470.0, 360.0))
+const MONITOR_FRAME_RECT_REF := Rect2(Vector2(684.0, 108.0), Vector2(536.0, 402.0))
 
 # Zonas diegeticas alrededor del monitor (desktop)
 const NEWSPAPER_RECT_REF := Rect2(Vector2(225.0, 665.0), Vector2(470.0, 380.0))
@@ -13,7 +14,7 @@ const INVOICE_RECT_REF := Rect2(Vector2(1260.0, 700.0), Vector2(360.0, 320.0))
 const CALENDAR_RECT_REF := Rect2(Vector2(1340.0, 18.0), Vector2(255.0, 165.0))
 const END_DAY_RECT_REF := Rect2(Vector2(815.0, 978.0), Vector2(290.0, 46.0))
 
-const MIN_CONTENT_SCALE := 0.48
+const MIN_CONTENT_SCALE := 0.45
 const MIN_DOC_SIZE := Vector2(240.0, 210.0)
 const MIN_CALENDAR_SIZE := Vector2(180.0, 120.0)
 const MIN_END_DAY_SIZE := Vector2(230.0, 42.0)
@@ -26,6 +27,10 @@ var _news_zone: Control
 var _invoice_zone: Control
 var _calendar_zone: Control
 var _desk_end_day_button: Control
+var _last_safe_rect := Rect2()
+var _last_content_size := Vector2.ZERO
+var _last_content_scale := 1.0
+var _last_viewport_size := Vector2.ZERO
 
 
 func setup(
@@ -58,12 +63,15 @@ func apply_layout() -> void:
 		return
 
 	var transform := _resolve_reference_transform(viewport_size)
-	var base_scale: float = float(transform.get("scale", 1.0))
 
 	var frame_rect := _map_rect_from_reference(MONITOR_FRAME_RECT_REF, transform)
 	var safe_rect := _map_rect_from_reference(MONITOR_SAFE_RECT_REF, transform)
-	var content_scale := _resolve_content_scale(safe_rect.size, base_scale)
+	var content_scale := _resolve_content_scale(safe_rect.size)
 	var content_size := safe_rect.size / maxf(0.01, content_scale)
+	_last_safe_rect = safe_rect
+	_last_content_size = content_size
+	_last_content_scale = content_scale
+	_last_viewport_size = viewport_size
 
 	if _monitor_frame != null:
 		_apply_rect(_monitor_frame, frame_rect)
@@ -85,6 +93,17 @@ func apply_layout() -> void:
 	_apply_rect_with_min_size(_desk_end_day_button, end_day_rect, MIN_END_DAY_SIZE)
 
 
+func get_last_layout_snapshot() -> Dictionary:
+	return {
+		"viewport_size": _last_viewport_size,
+		"safe_rect": _last_safe_rect,
+		"safe_rect_size": _last_safe_rect.size,
+		"content_size": _last_content_size,
+		"content_scale": _last_content_scale,
+		"scaled_content_size": _last_content_size * _last_content_scale
+	}
+
+
 func _resolve_reference_transform(viewport_size: Vector2) -> Dictionary:
 	var scale_x: float = viewport_size.x / REFERENCE_VIEWPORT.x
 	var scale_y: float = viewport_size.y / REFERENCE_VIEWPORT.y
@@ -101,23 +120,20 @@ func _resolve_reference_transform(viewport_size: Vector2) -> Dictionary:
 	}
 
 
-func _resolve_content_scale(safe_rect_size: Vector2, base_scale: float) -> float:
-	var min_size := _resolve_content_min_size(base_scale)
+func _resolve_content_scale(safe_rect_size: Vector2) -> float:
+	var min_size := _resolve_content_min_size()
 	var scale_x: float = safe_rect_size.x / maxf(1.0, min_size.x)
 	var scale_y: float = safe_rect_size.y / maxf(1.0, min_size.y)
 	return maxf(MIN_CONTENT_SCALE, minf(1.0, minf(scale_x, scale_y)))
 
 
-func _resolve_content_min_size(base_scale: float) -> Vector2:
+func _resolve_content_min_size() -> Vector2:
 	var min_width: float = MONITOR_SAFE_RECT_REF.size.x
 	var min_height: float = MONITOR_SAFE_RECT_REF.size.y
 	if _monitor_content != null:
 		var combined_min_size: Vector2 = _monitor_content.get_combined_minimum_size()
 		min_width = maxf(min_width, combined_min_size.x)
 		min_height = maxf(min_height, combined_min_size.y)
-	# Evita explosiones por minimum size grande en nodos internos.
-	min_width = minf(min_width, MONITOR_SAFE_RECT_REF.size.x * (1.0 / maxf(0.72, base_scale)))
-	min_height = minf(min_height, MONITOR_SAFE_RECT_REF.size.y * (1.0 / maxf(0.72, base_scale)))
 	return Vector2(min_width, min_height)
 
 

@@ -471,11 +471,14 @@ text = "Empresas activas"
 [node name="MarketScroll" type="ScrollContainer" parent="MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox"]
 layout_mode = 2
 size_flags_vertical = 3
+horizontal_scroll_mode = 0
 
-[node name="MarketRows" type="VBoxContainer" parent="MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketScroll"]
+[node name="MarketRows" type="GridContainer" parent="MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel/MarketVBox/MarketScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 4
+columns = 1
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
 
 [node name="DetailsPanel" type="PanelContainer" parent="MainMargin/MainVBox/BodySplit/CenterSplit"]
 custom_minimum_size = Vector2(300, 0)

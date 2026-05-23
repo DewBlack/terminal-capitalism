@@ -1,6 +1,7 @@
 extends SceneTree
 
 const GAME_SCREEN_VISUAL_WIP := preload("res://scenes/game/game_screen_visual_wip.tscn")
+const MONITOR_LAYOUT_CONTRACT := preload("res://scripts/ui/monitor_layout_contract.gd")
 const NEWS_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/NewsPanel")
 const FEEDBACK_PANEL_PATH := NodePath("MainMargin/MainVBox/FeedbackPanel")
 const NEWSPAPER_RUNTIME_PATH := NodePath("DeskDocs/NewspaperZone/NewsRuntime")
@@ -13,6 +14,15 @@ const INVOICE_DEBT_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/Invoice
 const INVOICE_PREVIEW_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/InvoicePreviewLabel")
 const INVOICE_EVENT_LOG_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/EventLogScroll/EventLogLabel")
 const DAY_LABEL_PATH := NodePath("MainMargin/MainVBox/HeaderBar/DayLabel")
+const MONITOR_OVERLAY_PATH := NodePath("MonitorOverlay")
+const MAIN_MARGIN_PATH := NodePath("MainMargin")
+const HEADER_BAR_PATH := NodePath("MainMargin/MainVBox/HeaderBar")
+const BODY_SPLIT_PATH := NodePath("MainMargin/MainVBox/BodySplit")
+const BOTTOM_PANEL_PATH := NodePath("MainMargin/MainVBox/BottomPanel")
+const HOME_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/HomePanel")
+const MARKET_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/CenterSplit/MarketPanel")
+const DETAILS_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/CenterSplit/DetailsPanel")
+const QTY_PLUS_TEN_PATH := NodePath("MainMargin/MainVBox/BottomPanel/BottomBar/QuantityPlusTenButton")
 const MONITOR_END_DAY_BUTTON_PATH := NodePath("MainMargin/MainVBox/BottomPanel/BottomBar/EndDayButton")
 const DESK_END_DAY_BUTTON_PATH := NodePath("DeskEndDayButton")
 const TUTORIAL_FOCUS_FRAME_PATH := NodePath("TutorialOverlay/FocusFrame")
@@ -100,6 +110,9 @@ func _run_smoke() -> void:
 	if monitor_end_day_button != null and _is_visible_in_tree(monitor_end_day_button):
 		failures.append("EndDayButton de monitor sigue visible pese a control diegetico activo.")
 
+	await _validate_compaction_reacts_to_resize(ui, failures)
+	await _validate_monitor_first_layout(ui, failures)
+
 	if desk_end_day_button != null and tutorial_focus_frame != null:
 		ui.set_tutorial_state({
 			"active": true,
@@ -170,3 +183,253 @@ func _run_smoke() -> void:
 
 func _is_visible_in_tree(control: Control) -> bool:
 	return control != null and control.is_visible_in_tree()
+
+
+func _validate_compaction_reacts_to_resize(ui: UIManager, failures: Array[String]) -> void:
+	var qty_plus_ten := ui.get_node_or_null(QTY_PLUS_TEN_PATH) as Button
+	var quantity_label := ui.get_node_or_null(NodePath("MainMargin/MainVBox/BottomPanel/BottomBar/QtyLabel")) as Label
+	var market_panel := ui.get_node_or_null(MARKET_PANEL_PATH) as PanelContainer
+	if qty_plus_ten == null or quantity_label == null or market_panel == null:
+		failures.append("Monitor-first: faltan nodos para validar compaction reactivo a resize.")
+		return
+
+	var contract := MONITOR_LAYOUT_CONTRACT.new()
+	await _resize_root_and_wait(Vector2i(1920, 1080))
+	ui.call("_set_app_section", "market", true)
+	await _pulse_resize_for_section(Vector2i(1920, 1080))
+	var snapshot_1920 := _read_monitor_snapshot(ui, failures, "1920x1080")
+	if snapshot_1920.is_empty():
+		return
+	_assert_market_profile_applied(
+		contract,
+		snapshot_1920,
+		quantity_label,
+		qty_plus_ten,
+		market_panel,
+		"1920x1080",
+		failures
+	)
+
+	await _resize_root_and_wait(Vector2i(1366, 768))
+	var snapshot_1366 := _read_monitor_snapshot(ui, failures, "1366x768")
+	if snapshot_1366.is_empty():
+		return
+	_assert_market_profile_applied(
+		contract,
+		snapshot_1366,
+		quantity_label,
+		qty_plus_ten,
+		market_panel,
+		"1366x768",
+		failures
+	)
+	var safe_1920: Vector2 = snapshot_1920.get("safe_rect_size", Vector2.ZERO)
+	var safe_1366: Vector2 = snapshot_1366.get("safe_rect_size", Vector2.ZERO)
+	if safe_1366.x >= safe_1920.x - 0.5 or safe_1366.y >= safe_1920.y - 0.5:
+		failures.append(
+			"Monitor-first: resize a 1366x768 no actualizo safe rect como se esperaba (%s -> %s)." % [
+				str(safe_1920),
+				str(safe_1366)
+			]
+		)
+
+	await _resize_root_and_wait(Vector2i(1920, 1080))
+	var snapshot_restored := _read_monitor_snapshot(ui, failures, "1920x1080-restored")
+	if snapshot_restored.is_empty():
+		return
+	_assert_market_profile_applied(
+		contract,
+		snapshot_restored,
+		quantity_label,
+		qty_plus_ten,
+		market_panel,
+		"1920x1080-restored",
+		failures
+	)
+	var safe_restored: Vector2 = snapshot_restored.get("safe_rect_size", Vector2.ZERO)
+	if safe_restored.distance_to(safe_1920) > 1.0:
+		failures.append(
+			"Monitor-first: al volver a 1920x1080 no se restauro safe rect (%s vs %s)." % [
+				str(safe_1920),
+				str(safe_restored)
+			]
+		)
+
+
+func _read_monitor_snapshot(ui: UIManager, failures: Array[String], context: String) -> Dictionary:
+	var snapshot_variant: Variant = ui.call("get_monitor_layout_debug_snapshot")
+	if not (snapshot_variant is Dictionary):
+		failures.append("Monitor-first: snapshot de layout no disponible en %s." % context)
+		return {}
+	return snapshot_variant as Dictionary
+
+
+func _assert_market_profile_applied(
+	contract: RefCounted,
+	snapshot: Dictionary,
+	quantity_label: Label,
+	qty_plus_ten: Button,
+	market_panel: PanelContainer,
+	context: String,
+	failures: Array[String]
+) -> void:
+	var safe_rect_size: Vector2 = snapshot.get("safe_rect_size", Vector2.ZERO)
+	var zone_contract_enabled := bool(snapshot.get("zone_contract_enabled", false))
+	if safe_rect_size.x < 1.0 or safe_rect_size.y < 1.0:
+		failures.append("Monitor-first: safe rect invalido en %s para validar compaction." % context)
+		return
+	var profile: Dictionary = contract.call("build_profile", safe_rect_size, "market", zone_contract_enabled)
+	if zone_contract_enabled and not bool(profile.get("compact", false)):
+		failures.append(
+			"Monitor-first: perfil market debe forzar compact cuando zone contract esta habilitado (%s)." % context
+		)
+	var expected_qty_label_visible := not bool(profile.get("cramped", false))
+	if quantity_label.visible != expected_qty_label_visible:
+		failures.append(
+			"Monitor-first: QtyLabel desalineado con perfil en %s (visible=%s expected=%s)." % [
+				context,
+				str(quantity_label.visible),
+				str(expected_qty_label_visible)
+			]
+		)
+	var expected_quick_buttons_visible := bool(profile.get("show_quick_quantity_buttons", true))
+	if qty_plus_ten.visible != expected_quick_buttons_visible:
+		failures.append(
+			"Monitor-first: quick quantity buttons desalineados en %s (visible=%s expected=%s)." % [
+				context,
+				str(qty_plus_ten.visible),
+				str(expected_quick_buttons_visible)
+			]
+		)
+	var expected_market_min_width := float(profile.get("market_panel_min_width", 300.0))
+	if absf(market_panel.custom_minimum_size.x - expected_market_min_width) > 0.6:
+		failures.append(
+			"Monitor-first: min-width de MarketPanel desalineado en %s (actual=%.2f expected=%.2f)." % [
+				context,
+				market_panel.custom_minimum_size.x,
+				expected_market_min_width
+			]
+		)
+
+
+func _validate_monitor_first_layout(ui: UIManager, failures: Array[String]) -> void:
+	var viewport_sizes := [
+		Vector2i(1920, 1080),
+		Vector2i(1366, 768)
+	]
+	var sections := ["home", "market", "company"]
+	for viewport_size in viewport_sizes:
+		await _resize_root_and_wait(viewport_size)
+		for section_id in sections:
+			ui.call("_set_app_section", section_id, true)
+			await _pulse_resize_for_section(viewport_size)
+			_assert_section_inside_monitor(ui, section_id, viewport_size, failures)
+
+
+func _assert_section_inside_monitor(
+	ui: UIManager,
+	section_id: String,
+	viewport_size: Vector2i,
+	failures: Array[String]
+) -> void:
+	var monitor_overlay := ui.get_node_or_null(MONITOR_OVERLAY_PATH) as Control
+	if monitor_overlay == null:
+		failures.append("Monitor-first: falta MonitorOverlay para validar overflow.")
+		return
+	var snapshot_variant: Variant = ui.call("get_monitor_layout_debug_snapshot")
+	if not (snapshot_variant is Dictionary):
+		failures.append("Monitor-first: snapshot de layout no disponible.")
+		return
+	var snapshot := snapshot_variant as Dictionary
+	var safe_rect_size: Vector2 = snapshot.get("safe_rect_size", Vector2.ZERO)
+	var content_size: Vector2 = snapshot.get("content_size", Vector2.ZERO)
+	var content_min_size: Vector2 = snapshot.get("content_min_size", Vector2.ZERO)
+	if safe_rect_size.x < 1.0 or safe_rect_size.y < 1.0:
+		failures.append("Monitor-first: safe rect invalido en %s section=%s" % [str(viewport_size), section_id])
+		return
+
+	if content_min_size.x > content_size.x + 0.6 or content_min_size.y > content_size.y + 0.6:
+		failures.append(
+			"Monitor-first: minimo interno excede content_size en %s section=%s min=%s content=%s" % [
+				str(viewport_size),
+				section_id,
+				str(content_min_size),
+				str(content_size)
+			]
+		)
+
+	var expected_section_panel: Control = null
+	match section_id:
+		"home":
+			expected_section_panel = ui.get_node_or_null(HOME_PANEL_PATH) as Control
+		"market":
+			expected_section_panel = ui.get_node_or_null(MARKET_PANEL_PATH) as Control
+		"company":
+			expected_section_panel = ui.get_node_or_null(DETAILS_PANEL_PATH) as Control
+		_:
+			pass
+	if expected_section_panel == null or not expected_section_panel.is_visible_in_tree():
+		failures.append(
+			"Monitor-first: panel de seccion no visible en %s section=%s" % [str(viewport_size), section_id]
+		)
+		return
+
+	var main_margin := ui.get_node_or_null(MAIN_MARGIN_PATH) as Control
+	var header_bar := ui.get_node_or_null(HEADER_BAR_PATH) as Control
+	var body_split := ui.get_node_or_null(BODY_SPLIT_PATH) as Control
+	var bottom_panel := ui.get_node_or_null(BOTTOM_PANEL_PATH) as Control
+	if main_margin == null or header_bar == null or body_split == null or bottom_panel == null:
+		failures.append(
+			"Monitor-first: nodos base faltantes para validar bounds globales en section=%s" % section_id
+		)
+		return
+
+	var safe_rect_global := monitor_overlay.get_global_rect()
+	var controls_to_check: Array[Control] = [
+		main_margin,
+		header_bar,
+		body_split,
+		bottom_panel,
+		expected_section_panel
+	]
+	for control in controls_to_check:
+		if control == null or not control.is_visible_in_tree():
+			continue
+		var control_rect := control.get_global_rect()
+		if not _rect_is_inside_with_tolerance(control_rect, safe_rect_global, 1.2):
+			failures.append(
+				"Monitor-first: overflow real en %s section=%s node=%s rect=%s safe=%s" % [
+					str(viewport_size),
+					section_id,
+					control.name,
+					str(control_rect),
+					str(safe_rect_global)
+				]
+			)
+
+
+func _rect_is_inside_with_tolerance(inner: Rect2, outer: Rect2, tolerance: float) -> bool:
+	if inner.position.x < outer.position.x - tolerance:
+		return false
+	if inner.position.y < outer.position.y - tolerance:
+		return false
+	if inner.end.x > outer.end.x + tolerance:
+		return false
+	if inner.end.y > outer.end.y + tolerance:
+		return false
+	return true
+
+
+func _resize_root_and_wait(viewport_size: Vector2i) -> void:
+	get_root().size = viewport_size
+	await process_frame
+	await process_frame
+
+
+func _pulse_resize_for_section(target_size: Vector2i) -> void:
+	var pulse_width := maxi(640, target_size.x - 1)
+	if pulse_width == target_size.x:
+		pulse_width = target_size.x + 1
+	var pulse_size := Vector2i(pulse_width, target_size.y)
+	await _resize_root_and_wait(pulse_size)
+	await _resize_root_and_wait(target_size)
