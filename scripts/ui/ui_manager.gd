@@ -1086,6 +1086,7 @@ func _update_market_table() -> void:
 			_row_name_min_width_runtime,
 			_row_price_min_width_runtime,
 			_row_change_min_width_runtime,
+			_market_card_min_height_runtime,
 			_on_company_selected,
 			_on_company_info_requested
 		)
