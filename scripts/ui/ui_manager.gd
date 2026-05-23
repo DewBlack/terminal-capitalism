@@ -274,6 +274,7 @@ func _ready() -> void:
 	if _market_scroll != null:
 		_market_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		_market_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_build_market_preview_panel()
 	_setup_diegetic_layout()
 	_ui_feedback_controller = UI_FEEDBACK_CONTROLLER.new()
 	add_child(_ui_feedback_controller)
@@ -392,6 +393,7 @@ func refresh_all_ui(status_message: String = "") -> void:
 	_update_news_panel()
 	_update_market_table()
 	_update_selected_company_details()
+	_update_market_preview()
 	_update_home_dashboard()
 	_update_selection_context()
 	_update_trade_action_state()
@@ -1476,6 +1478,7 @@ func _on_ui_resized() -> void:
 	var row_profile_changed := _apply_monitor_compaction()
 	if row_profile_changed and _run_manager != null and _market_manager != null and _player_portfolio != null:
 		_update_market_table()
+	_update_market_preview()
 	_apply_diegetic_layout()
 	if _tutorial_overlay_controller == null:
 		return
@@ -1826,6 +1829,7 @@ func _build_market_preview_panel() -> void:
 			market_vbox.move_child(existing_panel, scroll_index)
 
 	_market_preview_panel = existing_panel
+	_market_preview_panel.visible = false
 	_market_preview_title = _market_preview_panel.get_node_or_null("PreviewVBox/PreviewTitle") as Label
 	_market_preview_chart = _market_preview_panel.get_node_or_null("PreviewVBox/PreviewChart") as PriceChart
 	if _market_preview_chart != null:
