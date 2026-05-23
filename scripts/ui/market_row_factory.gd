@@ -64,8 +64,11 @@ static func build_company_row(
 
 	var top_row := HBoxContainer.new()
 	top_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	top_row.size_flags_stretch_ratio = 1.1 if density_scale < 1.2 else 1.2
 	top_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top_row.add_theme_constant_override("separation", top_row_gap)
+	top_row.custom_minimum_size = Vector2(0, _scaled_int(30, density_scale, 28, 52))
 	row_vbox.add_child(top_row)
 
 	var badge := _build_company_logo_badge(company, badge_side, density_scale)
@@ -77,6 +80,7 @@ static func build_company_row(
 	ticker_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ticker_label.text = str(row_model.get("ticker_text", company.ticker))
 	ticker_label.add_theme_font_size_override("font_size", ticker_font_size)
+	ticker_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	ticker_label.add_theme_color_override(
 		"font_color",
 		UI_THEME_TOKENS.TEXT_ACCENT if bool(row_model.get("is_selected", false)) else UI_THEME_TOKENS.TEXT_PRIMARY
@@ -89,6 +93,7 @@ static func build_company_row(
 	price_label.text = str(row_model.get("price_text", "$0.00"))
 	price_label.add_theme_font_size_override("font_size", price_font_size)
 	price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	price_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	top_row.add_child(price_label)
 
 	var change_label := Label.new()
@@ -97,14 +102,18 @@ static func build_company_row(
 	change_label.text = str(row_model.get("change_text", "+0.00%"))
 	change_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	change_label.add_theme_font_size_override("font_size", change_font_size)
+	change_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	change_label.add_theme_color_override("font_color", row_model.get("change_color", UI_THEME_TOKENS.TEXT_TERTIARY))
 	top_row.add_child(change_label)
 
 	var name_label := Label.new()
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	name_label.size_flags_stretch_ratio = 1.15 if density_scale < 1.25 else 1.35
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	name_label.max_lines_visible = 3 if density_scale >= 1.2 else 2
+	name_label.max_lines_visible = 4 if density_scale >= 1.35 else (3 if density_scale >= 1.15 else 2)
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.text = str(row_model.get("name_text", company.name))
 	name_label.add_theme_font_size_override("font_size", name_font_size)
 	name_label.add_theme_color_override("font_color", UI_THEME_TOKENS.TEXT_SECONDARY)
@@ -113,9 +122,12 @@ static func build_company_row(
 	if bool(row_model.get("owned_visible", false)):
 		var owned_label := Label.new()
 		owned_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		owned_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		owned_label.size_flags_stretch_ratio = 0.9
 		owned_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		owned_label.text = str(row_model.get("owned_text", ""))
 		owned_label.add_theme_font_size_override("font_size", owned_font_size)
+		owned_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		owned_label.add_theme_color_override("font_color", Color(0.67, 0.89, 0.73, 0.95))
 		row_vbox.add_child(owned_label)
 
