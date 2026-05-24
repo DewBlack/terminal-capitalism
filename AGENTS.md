@@ -71,6 +71,11 @@ Al terminar una tarea:
 - Abrir PR inmediatamente despues del cierre exitoso:
   - desde la rama `chat/...` hacia `dev`
   - incluyendo resumen de cambios, validaciones ejecutadas y referencia a la issue (`Closes #<numero>`).
+- Al informar el cierre al usuario, incluir siempre una seccion breve de validacion en build:
+  - que cambios deberia notar en el juego o UI
+  - donde mirar dentro de la build
+  - que comportamiento confirma que la tarea esta hecha
+  - que senales indicarian una regresion o que falta algo
 
 ### Regla para trabajo no contemplado
 
