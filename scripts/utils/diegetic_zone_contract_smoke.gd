@@ -9,6 +9,8 @@ const NEWSPAPER_CONTENT_PATH := NodePath("DeskDocs/NewspaperZone/NewsRuntime/New
 const INVOICE_RUNTIME_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime")
 const CALENDAR_ZONE_PATH := NodePath("DeskDocs/CalendarZone")
 const CALENDAR_RUNTIME_PATH := NodePath("DeskDocs/CalendarZone/CalendarRuntime")
+const CALENDAR_TEXTURE_PATH := NodePath("DeskDocs/CalendarZone/CalendarTexture")
+const CALENDAR_GRID_PATH := NodePath("DeskDocs/CalendarZone/CalendarRuntime/CalendarVBox/DayGrid")
 const INVOICE_CRITICAL_DOC_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel")
 const INVOICE_DEBT_PATH := NodePath(
 	"DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/InvoiceDocumentPanel/DocumentMargin/DocumentVBox/DocumentSlots/DebtSlotPanel/SlotMargin/SlotVBox/DebtRiskLabel"
@@ -60,6 +62,8 @@ func _run_smoke() -> void:
 	var invoice_runtime := ui.get_node_or_null(INVOICE_RUNTIME_PATH) as Control
 	var calendar_zone := ui.get_node_or_null(CALENDAR_ZONE_PATH) as Control
 	var calendar_runtime := ui.get_node_or_null(CALENDAR_RUNTIME_PATH) as Control
+	var calendar_texture := ui.get_node_or_null(CALENDAR_TEXTURE_PATH) as TextureRect
+	var calendar_grid := ui.get_node_or_null(CALENDAR_GRID_PATH) as GridContainer
 	var critical_document_panel := ui.get_node_or_null(INVOICE_CRITICAL_DOC_PATH) as PanelContainer
 	var debt_label := ui.get_node_or_null(INVOICE_DEBT_PATH) as Label
 	var invoice_label := ui.get_node_or_null(INVOICE_PREVIEW_PATH) as Label
@@ -84,6 +88,10 @@ func _run_smoke() -> void:
 		failures.append("No se encontro CalendarZone en escritorio diegetico.")
 	if calendar_runtime == null:
 		failures.append("No se encontro CalendarRuntime en escritorio diegetico.")
+	if calendar_texture == null:
+		failures.append("No se encontro CalendarTexture para hoja de calendario.")
+	if calendar_grid == null:
+		failures.append("No se encontro DayGrid del calendario diegetico.")
 	if critical_document_panel == null:
 		failures.append("No se encontro CriticalDocumentPanel en zona de factura/documentos.")
 	if debt_label == null:
@@ -113,6 +121,15 @@ func _run_smoke() -> void:
 		failures.append("InvoiceRuntime no esta visible en factura/documentos.")
 	if calendar_runtime != null and not _is_visible_in_tree(calendar_runtime):
 		failures.append("CalendarRuntime no esta visible en escritorio diegetico.")
+	if calendar_texture != null and calendar_texture.texture == null:
+		failures.append("CalendarTexture no tiene textura dedicada cargada.")
+	if calendar_grid != null:
+		if calendar_grid.get_child_count() != 30:
+			failures.append("DayGrid del calendario debe tener 30 celdas visuales.")
+		for child in calendar_grid.get_children():
+			if not (child is Control and child.has_method("apply_day")):
+				failures.append("DayGrid contiene una celda no visual o sin estado aplicable.")
+				break
 	if day_label != null and _is_visible_in_tree(day_label):
 		failures.append("DayLabel sigue visible cuando calendario diegetico esta activo.")
 	if critical_document_panel != null and _is_visible_in_tree(critical_document_panel):
