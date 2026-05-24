@@ -4,6 +4,10 @@ extends RefCounted
 const UI_FORMAT_HELPER := preload("res://scripts/ui/ui_format_helper.gd")
 
 const DEFAULT_DEBT_LIMIT := 1000.0
+const SUMMARY_MAX_CHARS := 96
+const AMOUNTS_MAX_CHARS := 112
+const DEBT_MAX_CHARS := 108
+const RISK_MAX_CHARS := 120
 
 
 static func build_empty_model() -> Dictionary:
@@ -15,6 +19,7 @@ static func build_empty_model() -> Dictionary:
 		"risk_text": "Riesgo: Bajo. Sin alertas.",
 		"continue_text": "Confirmar factura",
 		"state": "normal",
+		"severity": "ok",
 		"state_color": Color(0.74, 0.90, 0.78, 0.92),
 		"risk_color": Color(0.73, 0.93, 0.76)
 	}
@@ -34,23 +39,28 @@ static func build_model(week_index: int, recap_data: Dictionary, debt_snapshot: 
 	var risk_label := str(debt_snapshot.get("risk_label", _risk_label_for_usage(debt_usage_ratio)))
 	var risk_hint := str(debt_snapshot.get("risk_hint", _risk_hint_for_label(risk_label)))
 	var state := _style_state_for_usage(debt_usage_ratio)
+	var summary_text := "Cobro aplicado hoy. Actividad semanal: %s." % activity_label
+	var amounts_text := "Base: %s | Actividad: %s | Total: %s" % [
+		UI_FORMAT_HELPER.money(base_weekly_expense),
+		UI_FORMAT_HELPER.money(inactivity_surcharge),
+		UI_FORMAT_HELPER.money(charged_amount)
+	]
+	var debt_text := "Deuda tras cobro: %s / %s (uso %.0f%%)" % [
+		UI_FORMAT_HELPER.money(debt_value),
+		UI_FORMAT_HELPER.money(debt_limit),
+		clampf(debt_usage_ratio * 100.0, 0.0, 999.0)
+	]
+	var risk_text := "Riesgo: %s. %s" % [risk_label, risk_hint]
 
 	return {
 		"title": "Factura Semanal %d" % week_index,
-		"summary_text": "Cobro aplicado hoy. Actividad semanal: %s." % activity_label,
-		"amounts_text": "Base: %s | Actividad: %s | Total: %s" % [
-			UI_FORMAT_HELPER.money(base_weekly_expense),
-			UI_FORMAT_HELPER.money(inactivity_surcharge),
-			UI_FORMAT_HELPER.money(charged_amount)
-		],
-		"debt_text": "Deuda tras cobro: %s / %s (uso %.0f%%)" % [
-			UI_FORMAT_HELPER.money(debt_value),
-			UI_FORMAT_HELPER.money(debt_limit),
-			clampf(debt_usage_ratio * 100.0, 0.0, 999.0)
-		],
-		"risk_text": "Riesgo: %s. %s" % [risk_label, risk_hint],
+		"summary_text": _trim_slot_text(summary_text, SUMMARY_MAX_CHARS),
+		"amounts_text": _trim_slot_text(amounts_text, AMOUNTS_MAX_CHARS),
+		"debt_text": _trim_slot_text(debt_text, DEBT_MAX_CHARS),
+		"risk_text": _trim_slot_text(risk_text, RISK_MAX_CHARS),
 		"continue_text": "Confirmar factura",
 		"state": state,
+		"severity": _severity_for_state(state),
 		"state_color": _state_color_for_state(state),
 		"risk_color": _risk_color_for_usage(debt_usage_ratio)
 	}
@@ -102,3 +112,21 @@ static func _risk_hint_for_label(risk_label: String) -> String:
 			return "Todavia hay margen, pero vigila el proximo cobro."
 		_:
 			return "Sin alertas inmediatas."
+
+
+static func _trim_slot_text(raw_text: String, max_chars: int) -> String:
+	var clean_text := raw_text.strip_edges()
+	if clean_text.length() <= max_chars:
+		return clean_text
+	var safe_chars := maxi(1, max_chars - 3)
+	return "%s..." % clean_text.substr(0, safe_chars).rstrip(" ,.:;")
+
+
+static func _severity_for_state(state: String) -> String:
+	match state:
+		"critical":
+			return "critical"
+		"warning":
+			return "warning"
+		_:
+			return "ok"
