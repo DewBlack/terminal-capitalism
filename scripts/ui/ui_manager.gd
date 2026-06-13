@@ -829,8 +829,18 @@ func _update_calendar_view(current_day: int, max_days: int, week_index: int) -> 
 			day_state = str(DIEGETIC_CALENDAR_DAY_CELL.STATE_PAST)
 		elif day_number == safe_day:
 			day_state = str(DIEGETIC_CALENDAR_DAY_CELL.STATE_CURRENT)
+		var day_marker := _calendar_marker_for_day(day_number)
 		if day_cell.has_method("apply_day"):
-			day_cell.call("apply_day", day_number, day_state)
+			day_cell.call("apply_day", day_number, day_state, day_marker)
+
+
+func _calendar_marker_for_day(day_number: int) -> String:
+	var day_in_week := ((maxi(1, day_number) - 1) % 7) + 1
+	if day_in_week == 7:
+		return str(DIEGETIC_CALENDAR_DAY_CELL.MARKER_CHARGE)
+	if day_in_week == 6:
+		return str(DIEGETIC_CALENDAR_DAY_CELL.MARKER_WEEKEND)
+	return str(DIEGETIC_CALENDAR_DAY_CELL.MARKER_NONE)
 
 
 func _update_finance_ledger_view(cash_value: float, debt_value: float, debt_limit: float) -> void:
@@ -2265,7 +2275,12 @@ func _build_calendar_runtime_zone() -> void:
 		for day in range(1, CALENDAR_DAYS + 1):
 			var day_cell := DIEGETIC_CALENDAR_DAY_CELL.new() as Control
 			day_cell.name = "Day%02d" % day
-			day_cell.call("apply_day", day, str(DIEGETIC_CALENDAR_DAY_CELL.STATE_FUTURE))
+			day_cell.call(
+				"apply_day",
+				day,
+				str(DIEGETIC_CALENDAR_DAY_CELL.STATE_FUTURE),
+				_calendar_marker_for_day(day)
+			)
 			day_grid.add_child(day_cell)
 
 		calendar_header.add_child(calendar_title)
