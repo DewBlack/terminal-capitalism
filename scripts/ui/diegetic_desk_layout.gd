@@ -11,12 +11,12 @@ const MONITOR_FRAME_RECT_REF := Rect2(Vector2(684.0, 108.0), Vector2(536.0, 402.
 # Zonas diegeticas alrededor del monitor (desktop)
 const NEWSPAPER_RECT_REF := Rect2(Vector2(225.0, 665.0), Vector2(470.0, 380.0))
 const INVOICE_RECT_REF := Rect2(Vector2(1260.0, 700.0), Vector2(360.0, 320.0))
-const CALENDAR_RECT_REF := Rect2(Vector2(1340.0, 18.0), Vector2(255.0, 165.0))
+const CALENDAR_RECT_REF := Rect2(Vector2(410.0, 34.0), Vector2(330.0, 230.0))
 const END_DAY_RECT_REF := Rect2(Vector2(815.0, 978.0), Vector2(290.0, 46.0))
 
 const MIN_CONTENT_SCALE := 0.45
 const MIN_DOC_SIZE := Vector2(240.0, 210.0)
-const MIN_CALENDAR_SIZE := Vector2(180.0, 120.0)
+const MIN_CALENDAR_SIZE := Vector2(250.0, 174.0)
 const MIN_END_DAY_SIZE := Vector2(230.0, 42.0)
 
 var _root: Control

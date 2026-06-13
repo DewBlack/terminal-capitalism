@@ -814,9 +814,9 @@ func _update_calendar_view(current_day: int, max_days: int, week_index: int) -> 
 		return
 	var safe_max_days := clampi(max_days, 1, CALENDAR_DAYS)
 	var safe_day := clampi(current_day, 1, safe_max_days)
-	_calendar_title_label.text = "RUN / %02d-%02d" % [safe_day, safe_max_days]
+	_calendar_title_label.text = "CALENDARIO"
 	if _calendar_week_label != null:
-		_calendar_week_label.text = "SEMANA %d" % maxi(1, week_index)
+		_calendar_week_label.text = "D%02d / S%d" % [safe_day, maxi(1, week_index)]
 	for index in range(_calendar_day_cells.size()):
 		var day_cell := _calendar_day_cells[index]
 		if day_cell == null:
@@ -2201,49 +2201,67 @@ func _build_calendar_runtime_zone() -> void:
 		calendar_runtime.name = "CalendarRuntime"
 		calendar_runtime.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		calendar_runtime.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		calendar_runtime.add_theme_constant_override("margin_left", 9)
-		calendar_runtime.add_theme_constant_override("margin_top", 7)
-		calendar_runtime.add_theme_constant_override("margin_right", 9)
-		calendar_runtime.add_theme_constant_override("margin_bottom", 7)
+		calendar_runtime.add_theme_constant_override("margin_left", 16)
+		calendar_runtime.add_theme_constant_override("margin_top", 13)
+		calendar_runtime.add_theme_constant_override("margin_right", 16)
+		calendar_runtime.add_theme_constant_override("margin_bottom", 13)
 
 		var calendar_vbox := VBoxContainer.new()
 		calendar_vbox.name = "CalendarVBox"
 		calendar_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		calendar_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		calendar_vbox.add_theme_constant_override("separation", 3)
+		calendar_vbox.add_theme_constant_override("separation", 7)
 
 		var calendar_header := HBoxContainer.new()
 		calendar_header.name = "CalendarHeader"
 		calendar_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		calendar_header.add_theme_constant_override("separation", 5)
+		calendar_header.custom_minimum_size = Vector2(0, 25)
+		calendar_header.add_theme_constant_override("separation", 8)
 
 		var calendar_title := Label.new()
 		calendar_title.name = "CalendarTitle"
 		calendar_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		calendar_title.add_theme_font_size_override("font_size", 13)
-		calendar_title.add_theme_color_override("font_color", Color(0.23, 0.12, 0.08, 0.96))
-		calendar_title.text = "RUN / 01-30"
+		calendar_title.add_theme_font_size_override("font_size", 15)
+		calendar_title.add_theme_color_override("font_color", Color(0.99, 0.93, 0.78, 0.98))
+		calendar_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		calendar_title.text = "CALENDARIO"
 
 		var week_label := Label.new()
 		week_label.name = "WeekStamp"
+		week_label.custom_minimum_size = Vector2(72, 0)
 		week_label.add_theme_font_size_override("font_size", 11)
-		week_label.add_theme_color_override("font_color", Color(0.24, 0.27, 0.42, 0.92))
+		week_label.add_theme_color_override("font_color", Color(0.99, 0.91, 0.70, 0.92))
 		week_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		week_label.text = "SEMANA 1"
+		week_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		week_label.text = "D01 / S1"
 
 		var divider := ColorRect.new()
 		divider.name = "CalendarDivider"
-		divider.custom_minimum_size = Vector2(0, 2)
+		divider.custom_minimum_size = Vector2(0, 1)
 		divider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		divider.color = Color(0.55, 0.19, 0.12, 0.58)
+		divider.color = Color(0.55, 0.19, 0.12, 0.34)
+
+		var weekday_grid := GridContainer.new()
+		weekday_grid.name = "WeekdayGrid"
+		weekday_grid.columns = 7
+		weekday_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		weekday_grid.add_theme_constant_override("h_separation", 5)
+		var weekday_names := ["L", "M", "X", "J", "V", "S", "D"]
+		for weekday_name in weekday_names:
+			var weekday_label := Label.new()
+			weekday_label.text = weekday_name
+			weekday_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			weekday_label.add_theme_font_size_override("font_size", 10)
+			weekday_label.add_theme_color_override("font_color", Color(0.42, 0.30, 0.18, 0.82))
+			weekday_grid.add_child(weekday_label)
 
 		var day_grid := GridContainer.new()
 		day_grid.name = "DayGrid"
-		day_grid.columns = 6
+		day_grid.columns = 7
 		day_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		day_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		day_grid.add_theme_constant_override("h_separation", 4)
-		day_grid.add_theme_constant_override("v_separation", 3)
+		day_grid.add_theme_constant_override("h_separation", 5)
+		day_grid.add_theme_constant_override("v_separation", 5)
 		for day in range(1, CALENDAR_DAYS + 1):
 			var day_cell := DIEGETIC_CALENDAR_DAY_CELL.new() as Control
 			day_cell.name = "Day%02d" % day
@@ -2254,6 +2272,7 @@ func _build_calendar_runtime_zone() -> void:
 		calendar_header.add_child(week_label)
 		calendar_vbox.add_child(calendar_header)
 		calendar_vbox.add_child(divider)
+		calendar_vbox.add_child(weekday_grid)
 		calendar_vbox.add_child(day_grid)
 		calendar_runtime.add_child(calendar_vbox)
 		_calendar_zone.add_child(calendar_runtime)

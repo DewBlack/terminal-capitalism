@@ -25,14 +25,14 @@ func _ensure_built() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
-	custom_minimum_size = Vector2(26, 19)
+	custom_minimum_size = Vector2(31, 23)
 
 	var margin := MarginContainer.new()
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	margin.add_theme_constant_override("margin_left", 2)
-	margin.add_theme_constant_override("margin_top", 1)
-	margin.add_theme_constant_override("margin_right", 2)
-	margin.add_theme_constant_override("margin_bottom", 1)
+	margin.add_theme_constant_override("margin_left", 3)
+	margin.add_theme_constant_override("margin_top", 2)
+	margin.add_theme_constant_override("margin_right", 3)
+	margin.add_theme_constant_override("margin_bottom", 2)
 	add_child(margin)
 
 	_day_label = Label.new()
@@ -59,10 +59,10 @@ func _ensure_built() -> void:
 
 func _apply_state_style(state: String) -> void:
 	var style := StyleBoxFlat.new()
-	style.corner_radius_top_left = 3
-	style.corner_radius_top_right = 3
-	style.corner_radius_bottom_left = 3
-	style.corner_radius_bottom_right = 3
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
 	style.border_width_left = 1
 	style.border_width_top = 1
 	style.border_width_right = 1
@@ -71,23 +71,23 @@ func _apply_state_style(state: String) -> void:
 	var text_color := Color(0.19, 0.15, 0.10, 0.92)
 	match state:
 		STATE_DISABLED:
-			style.bg_color = Color(0.57, 0.52, 0.42, 0.22)
+			style.bg_color = Color(0.57, 0.52, 0.42, 0.18)
 			style.border_color = Color(0.42, 0.36, 0.28, 0.24)
 			text_color = Color(0.42, 0.36, 0.28, 0.42)
 		STATE_PAST:
-			style.bg_color = Color(0.82, 0.71, 0.55, 0.72)
-			style.border_color = Color(0.55, 0.26, 0.16, 0.55)
+			style.bg_color = Color(0.88, 0.80, 0.64, 0.58)
+			style.border_color = Color(0.52, 0.32, 0.18, 0.36)
 			text_color = Color(0.42, 0.19, 0.13, 0.80)
 		STATE_CURRENT:
-			style.bg_color = Color(0.96, 0.78, 0.32, 0.94)
-			style.border_color = Color(0.25, 0.39, 0.69, 0.95)
+			style.bg_color = Color(0.98, 0.82, 0.35, 0.96)
+			style.border_color = Color(0.20, 0.36, 0.68, 0.95)
 			text_color = Color(0.08, 0.16, 0.31, 0.98)
 			style.border_width_left = 2
 			style.border_width_top = 2
 			style.border_width_right = 2
 			style.border_width_bottom = 2
 		_:
-			style.bg_color = Color(0.98, 0.94, 0.80, 0.64)
+			style.bg_color = Color(0.99, 0.94, 0.80, 0.78)
 			style.border_color = Color(0.52, 0.43, 0.28, 0.38)
 
 	add_theme_stylebox_override("panel", style)
