@@ -12,7 +12,7 @@ const MARKER_CHARGE := "charge"
 var _day_label: Label = null
 var _strike_line: ColorRect = null
 var _past_mark_label: Label = null
-var _event_label: Label = null
+var _charge_circle: PanelContainer = null
 
 
 func apply_day(day_number: int, state: String, marker: String = MARKER_NONE) -> void:
@@ -21,7 +21,7 @@ func apply_day(day_number: int, state: String, marker: String = MARKER_NONE) -> 
 	_day_label.text = "%02d" % safe_day
 	_strike_line.visible = false
 	_past_mark_label.visible = state == STATE_PAST
-	_apply_event_marker(marker)
+	_charge_circle.visible = marker == MARKER_CHARGE
 	tooltip_text = _tooltip_for_state(safe_day, state, marker)
 	_apply_state_style(state, marker)
 
@@ -74,17 +74,26 @@ func _ensure_built() -> void:
 	_past_mark_label.visible = false
 	add_child(_past_mark_label)
 
-	_event_label = Label.new()
-	_event_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_event_label.anchor_left = 0.52
-	_event_label.anchor_top = 0.0
-	_event_label.anchor_right = 1.0
-	_event_label.anchor_bottom = 0.45
-	_event_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_event_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	_event_label.add_theme_font_size_override("font_size", 8)
-	_event_label.add_theme_color_override("font_color", Color(0.33, 0.18, 0.10, 0.86))
-	add_child(_event_label)
+	_charge_circle = PanelContainer.new()
+	_charge_circle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_charge_circle.anchor_left = 0.12
+	_charge_circle.anchor_top = 0.03
+	_charge_circle.anchor_right = 0.88
+	_charge_circle.anchor_bottom = 0.97
+	_charge_circle.visible = false
+	var charge_style := StyleBoxFlat.new()
+	charge_style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
+	charge_style.border_color = Color(0.08, 0.22, 0.76, 0.86)
+	charge_style.border_width_left = 2
+	charge_style.border_width_top = 2
+	charge_style.border_width_right = 2
+	charge_style.border_width_bottom = 2
+	charge_style.corner_radius_top_left = 999
+	charge_style.corner_radius_top_right = 999
+	charge_style.corner_radius_bottom_left = 999
+	charge_style.corner_radius_bottom_right = 999
+	_charge_circle.add_theme_stylebox_override("panel", charge_style)
+	add_child(_charge_circle)
 
 
 func _apply_state_style(state: String, marker: String) -> void:
@@ -118,30 +127,18 @@ func _apply_state_style(state: String, marker: String) -> void:
 			style.border_width_bottom = 2
 		_:
 			if marker == MARKER_WEEKEND:
-				style.bg_color = Color(0.88, 0.91, 0.86, 0.76)
-				style.border_color = Color(0.32, 0.43, 0.34, 0.42)
+				style.bg_color = Color(0.78, 0.88, 0.98, 0.78)
+				style.border_color = Color(0.23, 0.42, 0.68, 0.46)
+				text_color = Color(0.08, 0.20, 0.38, 0.92)
 			elif marker == MARKER_CHARGE:
-				style.bg_color = Color(0.97, 0.88, 0.68, 0.86)
-				style.border_color = Color(0.62, 0.35, 0.18, 0.58)
+				style.bg_color = Color(0.99, 0.94, 0.80, 0.78)
+				style.border_color = Color(0.52, 0.43, 0.28, 0.38)
 			else:
 				style.bg_color = Color(0.99, 0.94, 0.80, 0.78)
 				style.border_color = Color(0.52, 0.43, 0.28, 0.38)
 
 	add_theme_stylebox_override("panel", style)
 	_day_label.add_theme_color_override("font_color", text_color)
-
-
-func _apply_event_marker(marker: String) -> void:
-	match marker:
-		MARKER_CHARGE:
-			_event_label.text = "$"
-			_event_label.visible = true
-		MARKER_WEEKEND:
-			_event_label.text = "OFF"
-			_event_label.visible = true
-		_:
-			_event_label.text = ""
-			_event_label.visible = false
 
 
 func _tooltip_for_state(day_number: int, state: String, marker: String) -> String:

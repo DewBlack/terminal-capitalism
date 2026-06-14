@@ -146,9 +146,9 @@ text = "Zona factura y documentos"
 
 [node name="CalendarZone" type="PanelContainer" parent="DeskDocs"]
 layout_mode = 0
-offset_left = 320.0
+offset_left = 260.0
 offset_top = 34.0
-offset_right = 650.0
+offset_right = 590.0
 offset_bottom = 264.0
 mouse_filter = 2
 self_modulate = Color(0.980392, 0.968627, 0.886275, 0.72)
