@@ -114,6 +114,7 @@ var _invoice_runtime_alerts_slot_panel: PanelContainer = null
 var _invoice_runtime_events_slot_panel: PanelContainer = null
 var _invoice_runtime_cash_ledger_label: Label = null
 var _invoice_runtime_debt_ledger_label: Label = null
+var _invoice_runtime_debt_risk_summary_label: Label = null
 var _invoice_runtime_weekly_panel: PanelContainer = null
 var _invoice_runtime_weekly_title: Label = null
 var _invoice_runtime_weekly_summary: Label = null
@@ -132,6 +133,7 @@ var _last_critical_document_id: String = ""
 var _zone_contract_enabled: bool = false
 var _zone_contract_active: bool = false
 var _calendar_contract_active: bool = false
+var _finance_contract_active: bool = false
 var _crt_shader_material: ShaderMaterial = null
 var _row_name_min_width_runtime: float = ROW_NAME_MIN_WIDTH
 var _row_price_min_width_runtime: float = ROW_PRICE_MIN_WIDTH
@@ -847,35 +849,48 @@ func _update_finance_ledger_view(cash_value: float, debt_value: float, debt_limi
 	var debt_usage_ratio := debt_value / maxf(1.0, debt_limit)
 	var cash_text := "$%.2f" % cash_value
 	var debt_text := "$%.2f" % debt_value
+	var debt_usage_percent := clampf(debt_usage_ratio * 100.0, 0.0, 999.0)
+	var debt_risk_text := "Riesgo bajo. Deuda con margen."
+	var debt_risk_color := Color(0.18, 0.29, 0.15)
+	if debt_usage_ratio >= 0.95:
+		debt_risk_text = "Riesgo critico. Casi sin margen."
+		debt_risk_color = Color(0.85, 0.23, 0.20)
+	elif debt_usage_ratio >= 0.75:
+		debt_risk_text = "Riesgo alto. Ajusta posiciones."
+		debt_risk_color = Color(0.78, 0.50, 0.14)
+	elif debt_usage_ratio >= 0.45:
+		debt_risk_text = "Riesgo medio. Vigila exposicion."
+		debt_risk_color = Color(0.62, 0.44, 0.16)
 	if _invoice_runtime_cash_ledger_label != null:
 		_invoice_runtime_cash_ledger_label.text = "Caja %s" % cash_text
 	if _invoice_runtime_debt_ledger_label != null:
 		_invoice_runtime_debt_ledger_label.text = "Deuda %s (%.0f%%)" % [
 			debt_text,
-			clampf(debt_usage_ratio * 100.0, 0.0, 999.0)
+			debt_usage_percent
 		]
 		_invoice_runtime_debt_ledger_label.remove_theme_color_override("font_color")
-		if debt_usage_ratio >= 0.95:
-			_invoice_runtime_debt_ledger_label.add_theme_color_override("font_color", Color(0.85, 0.23, 0.20))
-		elif debt_usage_ratio >= 0.75:
-			_invoice_runtime_debt_ledger_label.add_theme_color_override("font_color", Color(0.78, 0.50, 0.14))
-		else:
-			_invoice_runtime_debt_ledger_label.add_theme_color_override("font_color", Color(0.18, 0.29, 0.15))
+		_invoice_runtime_debt_ledger_label.add_theme_color_override("font_color", debt_risk_color)
+	if _invoice_runtime_debt_risk_summary_label != null:
+		_invoice_runtime_debt_risk_summary_label.text = "%s Uso actual %.0f%% del limite." % [
+			debt_risk_text,
+			debt_usage_percent
+		]
+		_invoice_runtime_debt_risk_summary_label.remove_theme_color_override("font_color")
+		_invoice_runtime_debt_risk_summary_label.add_theme_color_override("font_color", debt_risk_color)
 
 
 func _apply_header_visibility_contract() -> void:
-	var show_monitor_header := not _calendar_contract_active
+	var show_day_fallback := not _calendar_contract_active
+	var show_finance_fallback := not _finance_contract_active
+	var show_monitor_header := show_day_fallback or show_finance_fallback
 	if _header_bar != null:
 		_header_bar.visible = show_monitor_header
-	if not show_monitor_header:
-		return
-	var use_diegetic_day_and_finance := _calendar_contract_active
 	if _day_label != null:
-		_day_label.visible = not use_diegetic_day_and_finance
+		_day_label.visible = show_monitor_header and show_day_fallback
 	if _cash_label != null:
-		_cash_label.visible = not use_diegetic_day_and_finance
+		_cash_label.visible = show_monitor_header and show_finance_fallback
 	if _debt_label != null:
-		_debt_label.visible = not use_diegetic_day_and_finance
+		_debt_label.visible = show_monitor_header and show_finance_fallback
 
 
 func _sync_desk_end_day_button_state() -> void:
@@ -1909,6 +1924,40 @@ func _build_invoice_runtime_zone() -> void:
 		invoice_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		invoice_vbox.add_theme_constant_override("separation", 6)
 
+		var ledger_panel := PanelContainer.new()
+		ledger_panel.name = "LedgerPanel"
+		ledger_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ledger_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		var ledger_style := StyleBoxFlat.new()
+		ledger_style.bg_color = Color(0.95, 0.93, 0.84, 0.88)
+		ledger_style.border_color = Color(0.43, 0.34, 0.20, 0.76)
+		ledger_style.border_width_left = 1
+		ledger_style.border_width_top = 1
+		ledger_style.border_width_right = 1
+		ledger_style.border_width_bottom = 1
+		ledger_style.corner_radius_top_left = 5
+		ledger_style.corner_radius_top_right = 5
+		ledger_style.corner_radius_bottom_left = 5
+		ledger_style.corner_radius_bottom_right = 5
+		ledger_panel.add_theme_stylebox_override("panel", ledger_style)
+
+		var ledger_margin := MarginContainer.new()
+		ledger_margin.name = "LedgerMargin"
+		ledger_margin.add_theme_constant_override("margin_left", 7)
+		ledger_margin.add_theme_constant_override("margin_top", 5)
+		ledger_margin.add_theme_constant_override("margin_right", 7)
+		ledger_margin.add_theme_constant_override("margin_bottom", 5)
+
+		var ledger_vbox := VBoxContainer.new()
+		ledger_vbox.name = "LedgerVBox"
+		ledger_vbox.add_theme_constant_override("separation", 3)
+
+		var ledger_title := Label.new()
+		ledger_title.name = "LedgerTitle"
+		ledger_title.add_theme_font_size_override("font_size", 12)
+		ledger_title.text = "Hoja de caja y deuda"
+
 		var ledger_row := HBoxContainer.new()
 		ledger_row.name = "LedgerRow"
 		ledger_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1926,8 +1975,18 @@ func _build_invoice_runtime_zone() -> void:
 		_configure_text_slot_label(debt_ledger_label, 13, 2)
 		debt_ledger_label.text = "Deuda $0.00 (0%)"
 
+		var debt_risk_summary_label := Label.new()
+		debt_risk_summary_label.name = "DebtRiskSummaryLabel"
+		_configure_text_slot_label(debt_risk_summary_label, 12, 2)
+		debt_risk_summary_label.text = "Riesgo bajo. Deuda con margen."
+
 		ledger_row.add_child(cash_ledger_label)
 		ledger_row.add_child(debt_ledger_label)
+		ledger_vbox.add_child(ledger_title)
+		ledger_vbox.add_child(ledger_row)
+		ledger_vbox.add_child(debt_risk_summary_label)
+		ledger_margin.add_child(ledger_vbox)
+		ledger_panel.add_child(ledger_margin)
 
 		var weekly_invoice_panel := PanelContainer.new()
 		weekly_invoice_panel.name = "WeeklyInvoicePanel"
@@ -2147,15 +2206,16 @@ func _build_invoice_runtime_zone() -> void:
 		document_vbox.add_child(slots_vbox)
 		document_margin.add_child(document_vbox)
 		document_panel.add_child(document_margin)
-		invoice_vbox.add_child(ledger_row)
+		invoice_vbox.add_child(ledger_panel)
 		invoice_vbox.add_child(weekly_invoice_panel)
 		invoice_vbox.add_child(critical_document_panel)
 		invoice_vbox.add_child(document_panel)
 		invoice_runtime_margin.add_child(invoice_vbox)
 		_invoice_zone.add_child(invoice_runtime_margin)
 	_invoice_runtime = invoice_runtime_margin
-	_invoice_runtime_cash_ledger_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/LedgerRow/CashLedgerLabel") as Label
-	_invoice_runtime_debt_ledger_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/LedgerRow/DebtLedgerLabel") as Label
+	_invoice_runtime_cash_ledger_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/LedgerPanel/LedgerMargin/LedgerVBox/LedgerRow/CashLedgerLabel") as Label
+	_invoice_runtime_debt_ledger_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/LedgerPanel/LedgerMargin/LedgerVBox/LedgerRow/DebtLedgerLabel") as Label
+	_invoice_runtime_debt_risk_summary_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/LedgerPanel/LedgerMargin/LedgerVBox/DebtRiskSummaryLabel") as Label
 	_invoice_runtime_weekly_panel = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel") as PanelContainer
 	_invoice_runtime_weekly_title = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceTitle") as Label
 	_invoice_runtime_weekly_summary = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceSummary") as Label
@@ -2476,6 +2536,7 @@ func _apply_zone_contract() -> void:
 		and _is_document_zone_ready(_invoice_zone, _invoice_runtime)
 	_zone_contract_active = contract_active
 	_calendar_contract_active = contract_active and _is_calendar_zone_available()
+	_finance_contract_active = contract_active and _is_finance_zone_available()
 	var targets := {
 		"enabled": contract_active,
 		"news_panel": _news_panel,
@@ -2496,13 +2557,21 @@ func _apply_zone_contract() -> void:
 func _is_document_zone_ready(zone: Control, runtime_zone: Control) -> bool:
 	if zone == null or runtime_zone == null:
 		return false
-	return zone.is_visible_in_tree() and runtime_zone.is_visible_in_tree()
+	return zone.is_visible_in_tree()
 
 
 func _is_calendar_zone_available() -> bool:
 	if _calendar_zone == null or _calendar_runtime == null:
 		return false
 	return _calendar_zone.is_visible_in_tree()
+
+
+func _is_finance_zone_available() -> bool:
+	if _invoice_zone == null:
+		return false
+	if _invoice_runtime_cash_ledger_label == null or _invoice_runtime_debt_ledger_label == null:
+		return false
+	return _invoice_zone.is_visible_in_tree()
 
 
 func _apply_diegetic_shell_styles() -> void:

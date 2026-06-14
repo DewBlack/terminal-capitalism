@@ -4,9 +4,12 @@ const GAME_SCREEN_VISUAL_WIP := preload("res://scenes/game/game_screen_visual_wi
 const MONITOR_LAYOUT_CONTRACT := preload("res://scripts/ui/monitor_layout_contract.gd")
 const NEWS_PANEL_PATH := NodePath("MainMargin/MainVBox/BodySplit/NewsPanel")
 const FEEDBACK_PANEL_PATH := NodePath("MainMargin/MainVBox/FeedbackPanel")
+const CASH_LABEL_PATH := NodePath("MainMargin/MainVBox/HeaderBar/CashLabel")
+const DEBT_LABEL_PATH := NodePath("MainMargin/MainVBox/HeaderBar/DebtLabel")
 const NEWSPAPER_RUNTIME_PATH := NodePath("DeskDocs/NewspaperZone/NewsRuntime")
 const NEWSPAPER_CONTENT_PATH := NodePath("DeskDocs/NewspaperZone/NewsRuntime/NewsVBox/NewsScroll/NewsContent")
 const INVOICE_RUNTIME_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime")
+const INVOICE_LEDGER_SUMMARY_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime/InvoiceVBox/LedgerPanel/LedgerMargin/LedgerVBox/DebtRiskSummaryLabel")
 const CALENDAR_ZONE_PATH := NodePath("DeskDocs/CalendarZone")
 const CALENDAR_RUNTIME_PATH := NodePath("DeskDocs/CalendarZone/CalendarRuntime")
 const CALENDAR_TEXTURE_PATH := NodePath("DeskDocs/CalendarZone/CalendarTexture")
@@ -57,9 +60,12 @@ func _run_smoke() -> void:
 
 	var news_panel := ui.get_node_or_null(NEWS_PANEL_PATH) as Control
 	var feedback_panel := ui.get_node_or_null(FEEDBACK_PANEL_PATH) as Control
+	var cash_label := ui.get_node_or_null(CASH_LABEL_PATH) as Label
+	var header_debt_label := ui.get_node_or_null(DEBT_LABEL_PATH) as Label
 	var newspaper_runtime := ui.get_node_or_null(NEWSPAPER_RUNTIME_PATH) as Control
 	var newspaper_content := ui.get_node_or_null(NEWSPAPER_CONTENT_PATH) as VBoxContainer
 	var invoice_runtime := ui.get_node_or_null(INVOICE_RUNTIME_PATH) as Control
+	var invoice_ledger_summary := ui.get_node_or_null(INVOICE_LEDGER_SUMMARY_PATH) as Label
 	var calendar_zone := ui.get_node_or_null(CALENDAR_ZONE_PATH) as Control
 	var calendar_runtime := ui.get_node_or_null(CALENDAR_RUNTIME_PATH) as Control
 	var calendar_texture := ui.get_node_or_null(CALENDAR_TEXTURE_PATH) as TextureRect
@@ -78,12 +84,18 @@ func _run_smoke() -> void:
 		failures.append("No se encontro NewsPanel en monitor.")
 	if feedback_panel == null:
 		failures.append("No se encontro FeedbackPanel en monitor.")
+	if cash_label == null:
+		failures.append("No se encontro CashLabel de fallback en monitor.")
+	if header_debt_label == null:
+		failures.append("No se encontro DebtLabel de fallback en monitor.")
 	if newspaper_runtime == null:
 		failures.append("No se encontro NewsRuntime en zona de periodico.")
 	if newspaper_content == null:
 		failures.append("No se encontro NewsContent en zona de periodico.")
 	if invoice_runtime == null:
 		failures.append("No se encontro InvoiceRuntime en zona de factura/documentos.")
+	if invoice_ledger_summary == null:
+		failures.append("No se encontro DebtRiskSummaryLabel en ledger diegetico.")
 	if calendar_zone == null:
 		failures.append("No se encontro CalendarZone en escritorio diegetico.")
 	if calendar_runtime == null:
@@ -115,6 +127,10 @@ func _run_smoke() -> void:
 		failures.append("NewsPanel sigue visible en monitor (debe estar oculto).")
 	if _is_visible_in_tree(feedback_panel):
 		failures.append("FeedbackPanel sigue visible en monitor (debe estar oculto).")
+	if cash_label != null and _is_visible_in_tree(cash_label):
+		failures.append("CashLabel sigue visible con ledger diegetico activo.")
+	if header_debt_label != null and _is_visible_in_tree(header_debt_label):
+		failures.append("DebtLabel sigue visible con ledger diegetico activo.")
 	if newspaper_runtime != null and not _is_visible_in_tree(newspaper_runtime):
 		failures.append("NewsRuntime no esta visible en periodico.")
 	if invoice_runtime != null and not _is_visible_in_tree(invoice_runtime):
@@ -172,6 +188,26 @@ func _run_smoke() -> void:
 		if _is_visible_in_tree(day_label):
 			failures.append("DayLabel no se oculta tras restaurar CalendarZone.")
 
+	if invoice_runtime != null and cash_label != null and header_debt_label != null:
+		var invoice_zone := invoice_runtime.get_parent() as Control
+		if invoice_zone == null:
+			failures.append("No se pudo resolver el parent de InvoiceRuntime para simular fallback financiero.")
+		else:
+			invoice_zone.visible = false
+			ui.call("_apply_zone_contract")
+			await process_frame
+			if not _is_visible_in_tree(cash_label):
+				failures.append("Fallback roto: CashLabel no vuelve cuando falta InvoiceZone.")
+			if not _is_visible_in_tree(header_debt_label):
+				failures.append("Fallback roto: DebtLabel no vuelve cuando falta InvoiceZone.")
+			invoice_zone.visible = true
+			ui.call("_apply_zone_contract")
+			await process_frame
+			if _is_visible_in_tree(cash_label):
+				failures.append("CashLabel no se oculta tras restaurar InvoiceZone.")
+			if _is_visible_in_tree(header_debt_label):
+				failures.append("DebtLabel no se oculta tras restaurar InvoiceZone.")
+
 	if news_panel != null and feedback_panel != null and newspaper_runtime != null and invoice_runtime != null:
 		var monitor_has_non_operational := _is_visible_in_tree(news_panel) or _is_visible_in_tree(feedback_panel)
 		var docs_has_content := _is_visible_in_tree(newspaper_runtime) or _is_visible_in_tree(invoice_runtime)
@@ -193,6 +229,10 @@ func _run_smoke() -> void:
 				failures.append("Fallback roto: NewsRuntime sigue visible en arbol con zona padre oculta.")
 			if day_label != null and not _is_visible_in_tree(day_label):
 				failures.append("Fallback roto: DayLabel no vuelve durante fallback de periodico.")
+			if cash_label != null and not _is_visible_in_tree(cash_label):
+				failures.append("Fallback roto: CashLabel no vuelve durante fallback de periodico.")
+			if header_debt_label != null and not _is_visible_in_tree(header_debt_label):
+				failures.append("Fallback roto: DebtLabel no vuelve durante fallback de periodico.")
 			if monitor_end_day_button != null and not _is_visible_in_tree(monitor_end_day_button):
 				failures.append("Fallback roto: EndDayButton de monitor no vuelve cuando falta zona diegetica.")
 			if desk_end_day_button != null and _is_visible_in_tree(desk_end_day_button):
