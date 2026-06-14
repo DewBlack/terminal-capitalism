@@ -31,6 +31,7 @@ const UI_HOTKEY_INPUT_CONTROLLER := preload("res://scripts/ui/ui_hotkey_input_co
 const UI_MODAL_LOCKS_CONTROLLER := preload("res://scripts/ui/ui_modal_locks_controller.gd")
 const WEEKLY_INVOICE_PRESENTER := preload("res://scripts/ui/weekly_invoice_presenter.gd")
 const DIEGETIC_DOCUMENT_PRESENTER := preload("res://scripts/ui/diegetic_document_presenter.gd")
+const DIEGETIC_CALENDAR_DAY_CELL := preload("res://scripts/ui/diegetic_calendar_day_cell.gd")
 const TUTORIAL_OVERLAY_CONTROLLER := preload("res://scripts/ui/tutorial_overlay_controller.gd")
 const TUTORIAL_TARGET_RECT_RESOLVER := preload("res://scripts/ui/tutorial_target_rect_resolver.gd")
 const UI_THEME_TOKENS := preload("res://scripts/ui/ui_theme_tokens.gd")
@@ -62,6 +63,7 @@ const DESK_COMPUTER_PROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_b
 const MONITOR_FRAME_TEXTURE_PATH := "res://art/placeholder/desk/crt_monitor_frame_v1.png"
 const MONITOR_OVERLAY_TEXTURE_PATH := "res://art/placeholder/desk/crt_screen_overlay_v1.png"
 const INVOICE_TEXTURE_PATH := "res://art/placeholder/weekly/invoice_sheet_v1.png"
+const CALENDAR_TEXTURE_PATH := "res://art/placeholder/docs/calendar_sheet_v1.png"
 const CALENDAR_DAYS := 30
 
 var _run_manager: RunManager
@@ -99,7 +101,8 @@ var _newspaper_total_pages: int = 1
 var _calendar_zone: PanelContainer = null
 var _calendar_runtime: Control = null
 var _calendar_title_label: Label = null
-var _calendar_day_labels: Array[Label] = []
+var _calendar_week_label: Label = null
+var _calendar_day_cells: Array[Control] = []
 var _desk_end_day_button: Button = null
 var _invoice_runtime_debt_risk_label: Label = null
 var _invoice_runtime_invoice_label: Label = null
@@ -215,6 +218,7 @@ var _market_preview_chart: PriceChart = null
 @onready var _newspaper_texture: TextureRect = get_node_or_null("DeskDocs/NewspaperZone/NewspaperTexture") as TextureRect
 @onready var _invoice_zone: PanelContainer = get_node_or_null("DeskDocs/InvoiceZone") as PanelContainer
 @onready var _invoice_texture: TextureRect = get_node_or_null("DeskDocs/InvoiceZone/InvoiceTexture") as TextureRect
+@onready var _calendar_texture: TextureRect = get_node_or_null("DeskDocs/CalendarZone/CalendarTexture") as TextureRect
 @onready var _toast_panel: PanelContainer = $ToastPanel
 @onready var _toast_label: Label = $ToastPanel/ToastMargin/ToastLabel
 @onready var _tutorial_overlay = $TutorialOverlay
@@ -806,29 +810,37 @@ func _collect_newspaper_pages(news_model: Dictionary) -> Array[Dictionary]:
 
 
 func _update_calendar_view(current_day: int, max_days: int, week_index: int) -> void:
-	if _calendar_title_label == null or _calendar_day_labels.is_empty():
+	if _calendar_title_label == null or _calendar_day_cells.is_empty():
 		return
 	var safe_max_days := clampi(max_days, 1, CALENDAR_DAYS)
 	var safe_day := clampi(current_day, 1, safe_max_days)
-	_calendar_title_label.text = "Dia %02d/%02d - S%d" % [safe_day, safe_max_days, maxi(1, week_index)]
-	for index in range(_calendar_day_labels.size()):
-		var day_label := _calendar_day_labels[index]
-		if day_label == null:
+	_calendar_title_label.text = "CALENDARIO"
+	if _calendar_week_label != null:
+		_calendar_week_label.text = "D%02d / S%d" % [safe_day, maxi(1, week_index)]
+	for index in range(_calendar_day_cells.size()):
+		var day_cell := _calendar_day_cells[index]
+		if day_cell == null:
 			continue
 		var day_number := index + 1
-		day_label.remove_theme_color_override("font_color")
+		var day_state := str(DIEGETIC_CALENDAR_DAY_CELL.STATE_FUTURE)
 		if day_number > safe_max_days:
-			day_label.text = "--"
-			day_label.add_theme_color_override("font_color", Color(0.48, 0.44, 0.39, 0.62))
+			day_state = str(DIEGETIC_CALENDAR_DAY_CELL.STATE_DISABLED)
 		elif day_number < safe_day:
-			day_label.text = "X%02d" % day_number
-			day_label.add_theme_color_override("font_color", Color(0.44, 0.24, 0.18, 0.96))
+			day_state = str(DIEGETIC_CALENDAR_DAY_CELL.STATE_PAST)
 		elif day_number == safe_day:
-			day_label.text = "[%02d]" % day_number
-			day_label.add_theme_color_override("font_color", Color(0.18, 0.31, 0.54, 0.98))
-		else:
-			day_label.text = "%02d" % day_number
-			day_label.add_theme_color_override("font_color", Color(0.19, 0.16, 0.13, 0.90))
+			day_state = str(DIEGETIC_CALENDAR_DAY_CELL.STATE_CURRENT)
+		var day_marker := _calendar_marker_for_day(day_number)
+		if day_cell.has_method("apply_day"):
+			day_cell.call("apply_day", day_number, day_state, day_marker)
+
+
+func _calendar_marker_for_day(day_number: int) -> String:
+	var day_in_week := ((maxi(1, day_number) - 1) % 7) + 1
+	if day_in_week == 7:
+		return str(DIEGETIC_CALENDAR_DAY_CELL.MARKER_CHARGE)
+	if day_in_week == 6:
+		return str(DIEGETIC_CALENDAR_DAY_CELL.MARKER_WEEKEND)
+	return str(DIEGETIC_CALENDAR_DAY_CELL.MARKER_NONE)
 
 
 func _update_finance_ledger_view(cash_value: float, debt_value: float, debt_limit: float) -> void:
@@ -2199,46 +2211,95 @@ func _build_calendar_runtime_zone() -> void:
 		calendar_runtime.name = "CalendarRuntime"
 		calendar_runtime.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		calendar_runtime.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		calendar_runtime.add_theme_constant_override("margin_left", 10)
-		calendar_runtime.add_theme_constant_override("margin_top", 8)
-		calendar_runtime.add_theme_constant_override("margin_right", 10)
-		calendar_runtime.add_theme_constant_override("margin_bottom", 8)
+		calendar_runtime.add_theme_constant_override("margin_left", 16)
+		calendar_runtime.add_theme_constant_override("margin_top", 13)
+		calendar_runtime.add_theme_constant_override("margin_right", 16)
+		calendar_runtime.add_theme_constant_override("margin_bottom", 13)
 
 		var calendar_vbox := VBoxContainer.new()
 		calendar_vbox.name = "CalendarVBox"
-		calendar_vbox.add_theme_constant_override("separation", 4)
+		calendar_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		calendar_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		calendar_vbox.add_theme_constant_override("separation", 7)
+
+		var calendar_header := HBoxContainer.new()
+		calendar_header.name = "CalendarHeader"
+		calendar_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		calendar_header.custom_minimum_size = Vector2(0, 25)
+		calendar_header.add_theme_constant_override("separation", 8)
 
 		var calendar_title := Label.new()
 		calendar_title.name = "CalendarTitle"
-		calendar_title.add_theme_font_size_override("font_size", 13)
-		calendar_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		calendar_title.text = "Dia 01/30 - S1"
+		calendar_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		calendar_title.add_theme_font_size_override("font_size", 15)
+		calendar_title.add_theme_color_override("font_color", Color(0.99, 0.93, 0.78, 0.98))
+		calendar_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		calendar_title.text = "CALENDARIO"
+
+		var week_label := Label.new()
+		week_label.name = "WeekStamp"
+		week_label.custom_minimum_size = Vector2(72, 0)
+		week_label.add_theme_font_size_override("font_size", 11)
+		week_label.add_theme_color_override("font_color", Color(0.99, 0.91, 0.70, 0.92))
+		week_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		week_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		week_label.text = "D01 / S1"
+
+		var divider := ColorRect.new()
+		divider.name = "CalendarDivider"
+		divider.custom_minimum_size = Vector2(0, 1)
+		divider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		divider.color = Color(0.55, 0.19, 0.12, 0.34)
+
+		var weekday_grid := GridContainer.new()
+		weekday_grid.name = "WeekdayGrid"
+		weekday_grid.columns = 7
+		weekday_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		weekday_grid.add_theme_constant_override("h_separation", 5)
+		var weekday_names := ["L", "M", "X", "J", "V", "S", "D"]
+		for weekday_name in weekday_names:
+			var weekday_label := Label.new()
+			weekday_label.text = weekday_name
+			weekday_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			weekday_label.add_theme_font_size_override("font_size", 10)
+			weekday_label.add_theme_color_override("font_color", Color(0.42, 0.30, 0.18, 0.82))
+			weekday_grid.add_child(weekday_label)
 
 		var day_grid := GridContainer.new()
 		day_grid.name = "DayGrid"
-		day_grid.columns = 6
+		day_grid.columns = 7
 		day_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		day_grid.add_theme_constant_override("h_separation", 4)
-		day_grid.add_theme_constant_override("v_separation", 2)
+		day_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		day_grid.add_theme_constant_override("h_separation", 5)
+		day_grid.add_theme_constant_override("v_separation", 5)
 		for day in range(1, CALENDAR_DAYS + 1):
-			var day_label := Label.new()
-			day_label.name = "Day%02d" % day
-			day_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			day_label.text = "%02d" % day
-			day_grid.add_child(day_label)
+			var day_cell := DIEGETIC_CALENDAR_DAY_CELL.new() as Control
+			day_cell.name = "Day%02d" % day
+			day_cell.call(
+				"apply_day",
+				day,
+				str(DIEGETIC_CALENDAR_DAY_CELL.STATE_FUTURE),
+				_calendar_marker_for_day(day)
+			)
+			day_grid.add_child(day_cell)
 
-		calendar_vbox.add_child(calendar_title)
+		calendar_header.add_child(calendar_title)
+		calendar_header.add_child(week_label)
+		calendar_vbox.add_child(calendar_header)
+		calendar_vbox.add_child(divider)
+		calendar_vbox.add_child(weekday_grid)
 		calendar_vbox.add_child(day_grid)
 		calendar_runtime.add_child(calendar_vbox)
 		_calendar_zone.add_child(calendar_runtime)
 	_calendar_runtime = calendar_runtime
-	_calendar_title_label = _calendar_zone.get_node_or_null("CalendarRuntime/CalendarVBox/CalendarTitle") as Label
-	_calendar_day_labels.clear()
+	_calendar_title_label = _calendar_zone.get_node_or_null("CalendarRuntime/CalendarVBox/CalendarHeader/CalendarTitle") as Label
+	_calendar_week_label = _calendar_zone.get_node_or_null("CalendarRuntime/CalendarVBox/CalendarHeader/WeekStamp") as Label
+	_calendar_day_cells.clear()
 	var day_grid_node := _calendar_zone.get_node_or_null("CalendarRuntime/CalendarVBox/DayGrid") as GridContainer
 	if day_grid_node != null:
 		for child in day_grid_node.get_children():
-			if child is Label:
-				_calendar_day_labels.append(child as Label)
+			if child is Control and child.has_method("apply_day"):
+				_calendar_day_cells.append(child as Control)
 
 
 func _build_desk_end_day_surface() -> void:
@@ -2556,6 +2617,9 @@ func _apply_diegetic_artwork() -> void:
 		_newspaper_zone.visible = true
 	if _invoice_zone != null:
 		_invoice_zone.visible = invoice_loaded
+	var calendar_loaded := _assign_png_texture(_calendar_texture, CALENDAR_TEXTURE_PATH)
+	if _calendar_texture != null:
+		_calendar_texture.visible = calendar_loaded
 
 
 func _assign_png_texture(target: TextureRect, png_path: String) -> bool:
