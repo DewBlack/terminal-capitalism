@@ -38,7 +38,7 @@ static func _state_for_latest_entry(entry: String) -> String:
 	var normalized := entry.to_lower()
 	if normalized.contains("derrota") or normalized.contains("quiebra"):
 		return STATE_CRITICAL
-	if normalized.contains("fusion") or normalized.contains("factura semanal") or normalized.contains("riesgo"):
+	if normalized.contains("fusion") or normalized.contains("cobro semanal") or normalized.contains("riesgo"):
 		return STATE_WARNING
 	return STATE_OK
 

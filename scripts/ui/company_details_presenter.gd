@@ -27,12 +27,12 @@ static func build_company_model(
 	movement_reason_max_chars: int,
 	history_visible: bool
 ) -> Dictionary:
+	var _unused_company_tags_visible := company_tags_visible
 	var position_value := float(position_amount) * company.current_price
 	var primary_sector := company.sectors[0] if not company.sectors.is_empty() else "sin sector"
 	var details_lines := [
 		"%s" % company.name,
 		"Sector: %s" % primary_sector,
-		"Tags: %s" % UI_FORMAT_HELPER.compact_tag_line(company.tags, company_tags_visible),
 		"Precio: %s | Cambio hoy: %s" % [
 			UI_FORMAT_HELPER.money(company.current_price),
 			UI_FORMAT_HELPER.percent(company.last_daily_change)

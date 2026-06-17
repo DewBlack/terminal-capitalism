@@ -13,7 +13,7 @@ const STATE_CRITICAL := "critical"
 static func build_empty_model() -> Dictionary:
 	return {
 		"risk_text": "Sin datos de deuda.",
-		"invoice_text": "Sin datos de factura semanal.",
+		"invoice_text": "Sin datos de cobro semanal.",
 		"alerts_text": "Sin alertas operativas.",
 		"risk_state": STATE_OK,
 		"invoice_state": STATE_OK,
@@ -72,7 +72,7 @@ static func build_model(
 		activity_progress_ratio,
 		grace_week
 	)
-	var invoice_text := "Documento de factura semanal: %s (%s base + %s actividad, x%.2f). Proximo cobro %s. Actividad: %s%s. Notional semanal: %s / %s (umbral medio %s, avance %.0f%%)." % [
+	var invoice_text := "Cobro semanal previsto: %s (%s base + %s actividad, x%.2f). Proximo cobro %s. Actividad: %s%s. Notional semanal: %s / %s (umbral medio %s, avance %.0f%%)." % [
 		UI_FORMAT_HELPER.money(estimated_charge),
 		UI_FORMAT_HELPER.money(base_expense),
 		UI_FORMAT_HELPER.money(estimated_surcharge),

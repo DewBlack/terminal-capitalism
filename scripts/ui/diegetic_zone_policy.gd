@@ -7,7 +7,7 @@ func apply_visual_contract(targets: Dictionary) -> void:
 	_set_visible(targets.get("news_panel", null), not contract_enabled)
 	_set_visible(targets.get("feedback_panel", null), not contract_enabled)
 	_set_visible(targets.get("newspaper_runtime", null), contract_enabled)
-	_set_visible(targets.get("invoice_runtime", null), contract_enabled)
+	_set_visible(targets.get("sticky_notes_board", null), contract_enabled)
 
 
 func collect_contract_violations(targets: Dictionary) -> Array[String]:
@@ -18,20 +18,20 @@ func collect_contract_violations(targets: Dictionary) -> Array[String]:
 	var news_panel := targets.get("news_panel", null) as Control
 	var feedback_panel := targets.get("feedback_panel", null) as Control
 	var newspaper_runtime := targets.get("newspaper_runtime", null) as Control
-	var invoice_runtime := targets.get("invoice_runtime", null) as Control
+	var sticky_notes_board := targets.get("sticky_notes_board", null) as Control
 
 	if newspaper_runtime == null:
 		violations.append("Falta zona de periodico diegetico.")
-	if invoice_runtime == null:
-		violations.append("Falta zona de factura/documentos diegeticos.")
+	if sticky_notes_board == null:
+		violations.append("Falta tablero de post-its diegetico.")
 	if news_panel != null and news_panel.visible:
 		violations.append("El monitor sigue mostrando panel de noticias.")
 	if feedback_panel != null and feedback_panel.visible:
 		violations.append("El monitor sigue mostrando feedback semanal/eventos.")
 	if news_panel != null and news_panel.visible and newspaper_runtime != null and newspaper_runtime.visible:
 		violations.append("Noticias duplicadas entre monitor y periodico.")
-	if feedback_panel != null and feedback_panel.visible and invoice_runtime != null and invoice_runtime.visible:
-		violations.append("Factura/eventos duplicados entre monitor y documento.")
+	if feedback_panel != null and feedback_panel.visible and sticky_notes_board != null and sticky_notes_board.visible:
+		violations.append("Avisos duplicados entre monitor y post-its.")
 	return violations
 
 

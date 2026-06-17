@@ -32,7 +32,7 @@ En entornos sin binario local, usar los resultados de CI y documentarlo en el re
 
 ### Reglas base
 - El monitor es la capa operativa principal y debe quedar siempre dentro del safe rect CRT.
-- `DeskDocs` (periodico/factura/calendario) es una capa separada de contenido narrativo/administrativo.
+- `DeskDocs` (periodico/post-its/calendario) es una capa separada de contenido narrativo/administrativo.
 - No se admite duplicacion simultanea de contenido narrativo entre monitor y documentos.
 - La app interna debe usar variantes por seccion (`home`, `market`, `company`) sin romper navegabilidad.
 
@@ -59,7 +59,7 @@ No se permite:
 | Fin de dia | Pulsar `End Day` en estado operativo | Avanza dia, procesa mercado y no queda UI bloqueada | `PASS`/`FAIL` |
 | Tutorial locks | Ejecutar flujo con tutorial activo | Locks y desbloqueos ocurren en orden, sin perder control operativo | `PASS`/`FAIL` |
 | Lectura de noticias | Revisar `DeskDocs/NewspaperZone` | Noticias visibles en periodico, no duplicadas en monitor operativo | `PASS`/`FAIL` |
-| Lectura de factura semanal | Forzar/alcanzar cierre semanal | Factura y riesgo de deuda visibles en documento diegetico | `PASS`/`FAIL` |
+| Cierre semanal | Forzar/alcanzar cierre semanal | Resumen de cierre visible y avisos relevantes como post-its descartables | `PASS`/`FAIL` |
 | Eventos criticos | Disparar evento de quiebra/fusion si aplica | Documento de evento aparece en escritorio, sin duplicacion operativa | `PASS`/`FAIL` |
 | Overflow monitor 1920x1080 | Recorrer `home`, `market`, `company` | Sin desbordes fuera del safe rect CRT | `PASS`/`FAIL` |
 | Overflow monitor 1366x768 | Recorrer `home`, `market`, `company` | Sin desbordes fuera del safe rect CRT | `PASS`/`FAIL` |
@@ -68,9 +68,10 @@ No se permite:
 
 | Zona | Debe mostrar | No debe mostrar |
 | --- | --- | --- |
-| Monitor operativo | Seleccion, buy/sell, cantidad, end-day, estado operativo breve | Noticias, factura semanal completa, documentos de evento |
+| Monitor operativo | Seleccion, buy/sell, cantidad, end-day, estado operativo breve | Noticias, cierre semanal completo, documentos de evento |
 | Periodico (`DeskDocs/NewspaperZone`) | Noticias del dia e historico | Controles de trading |
-| Factura/documentos (`DeskDocs/InvoiceZone`) | Factura semanal, riesgo de deuda, documentos de evento | Noticias duplicadas o panel de trading |
+| Post-its (`DeskDocs/StickyNotesBoard`) | Avisos recientes movibles y descartables | Noticias duplicadas o panel de trading |
+| Documentos criticos (`DeskDocs/InvoiceZone`) | Documentos de evento solo cuando hagan falta | Cobro semanal persistente |
 
 Regla de bloqueo: si hay duplicacion simultanea entre monitor y escritorio diegetico del mismo contenido narrativo/administrativo, el PR queda en `NO GO`.
 

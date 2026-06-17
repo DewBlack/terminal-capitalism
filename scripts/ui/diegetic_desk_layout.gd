@@ -9,7 +9,7 @@ const MONITOR_SAFE_RECT_REF := Rect2(Vector2(718.0, 132.0), Vector2(470.0, 360.0
 const MONITOR_FRAME_RECT_REF := Rect2(Vector2(684.0, 108.0), Vector2(536.0, 402.0))
 
 # Zonas diegeticas alrededor del monitor (desktop)
-const NEWSPAPER_RECT_REF := Rect2(Vector2(225.0, 665.0), Vector2(470.0, 380.0))
+const NEWSPAPER_RECT_REF := Rect2(Vector2(145.0, 610.0), Vector2(560.0, 420.0))
 const INVOICE_RECT_REF := Rect2(Vector2(1260.0, 700.0), Vector2(360.0, 320.0))
 const CALENDAR_RECT_REF := Rect2(Vector2(260.0, 34.0), Vector2(330.0, 230.0))
 const END_DAY_RECT_REF := Rect2(Vector2(815.0, 978.0), Vector2(290.0, 46.0))

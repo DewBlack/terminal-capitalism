@@ -7,6 +7,7 @@ const FEEDBACK_PANEL_PATH := NodePath("MainMargin/MainVBox/FeedbackPanel")
 const NEWSPAPER_RUNTIME_PATH := NodePath("DeskDocs/NewspaperZone/NewsRuntime")
 const NEWSPAPER_CONTENT_PATH := NodePath("DeskDocs/NewspaperZone/NewsRuntime/NewsVBox/NewsScroll/NewsContent")
 const INVOICE_RUNTIME_PATH := NodePath("DeskDocs/InvoiceZone/InvoiceRuntime")
+const STICKY_NOTES_BOARD_PATH := NodePath("DeskDocs/StickyNotesBoard")
 const CALENDAR_ZONE_PATH := NodePath("DeskDocs/CalendarZone")
 const CALENDAR_RUNTIME_PATH := NodePath("DeskDocs/CalendarZone/CalendarRuntime")
 const CALENDAR_TEXTURE_PATH := NodePath("DeskDocs/CalendarZone/CalendarTexture")
@@ -60,6 +61,7 @@ func _run_smoke() -> void:
 	var newspaper_runtime := ui.get_node_or_null(NEWSPAPER_RUNTIME_PATH) as Control
 	var newspaper_content := ui.get_node_or_null(NEWSPAPER_CONTENT_PATH) as VBoxContainer
 	var invoice_runtime := ui.get_node_or_null(INVOICE_RUNTIME_PATH) as Control
+	var sticky_notes_board := ui.get_node_or_null(STICKY_NOTES_BOARD_PATH) as Control
 	var calendar_zone := ui.get_node_or_null(CALENDAR_ZONE_PATH) as Control
 	var calendar_runtime := ui.get_node_or_null(CALENDAR_RUNTIME_PATH) as Control
 	var calendar_texture := ui.get_node_or_null(CALENDAR_TEXTURE_PATH) as TextureRect
@@ -83,7 +85,9 @@ func _run_smoke() -> void:
 	if newspaper_content == null:
 		failures.append("No se encontro NewsContent en zona de periodico.")
 	if invoice_runtime == null:
-		failures.append("No se encontro InvoiceRuntime en zona de factura/documentos.")
+		failures.append("No se encontro InvoiceRuntime tecnico para documentos criticos.")
+	if sticky_notes_board == null:
+		failures.append("No se encontro StickyNotesBoard para avisos diegeticos.")
 	if calendar_zone == null:
 		failures.append("No se encontro CalendarZone en escritorio diegetico.")
 	if calendar_runtime == null:
@@ -93,13 +97,13 @@ func _run_smoke() -> void:
 	if calendar_grid == null:
 		failures.append("No se encontro DayGrid del calendario diegetico.")
 	if critical_document_panel == null:
-		failures.append("No se encontro CriticalDocumentPanel en zona de factura/documentos.")
+		failures.append("No se encontro CriticalDocumentPanel en zona tecnica de documentos.")
 	if debt_label == null:
-		failures.append("No se encontro DebtRiskLabel en zona de factura.")
+		failures.append("No se encontro DebtRiskLabel en zona tecnica de documentos.")
 	if invoice_label == null:
-		failures.append("No se encontro InvoicePreviewLabel en zona de factura.")
+		failures.append("No se encontro InvoicePreviewLabel en zona tecnica de documentos.")
 	if alerts_label == null:
-		failures.append("No se encontro AlertsLabel en zona de factura.")
+		failures.append("No se encontro AlertsLabel en zona tecnica de documentos.")
 	if event_log_label == null:
 		failures.append("No se encontro EventLogLabel en documento diegetico.")
 	if day_label == null:
@@ -117,8 +121,10 @@ func _run_smoke() -> void:
 		failures.append("FeedbackPanel sigue visible en monitor (debe estar oculto).")
 	if newspaper_runtime != null and not _is_visible_in_tree(newspaper_runtime):
 		failures.append("NewsRuntime no esta visible en periodico.")
-	if invoice_runtime != null and not _is_visible_in_tree(invoice_runtime):
-		failures.append("InvoiceRuntime no esta visible en factura/documentos.")
+	if invoice_runtime != null and _is_visible_in_tree(invoice_runtime):
+		failures.append("InvoiceRuntime inicia visible aunque el cobro semanal persistente debe estar quitado.")
+	if sticky_notes_board != null and not _is_visible_in_tree(sticky_notes_board):
+		failures.append("StickyNotesBoard no esta visible para avisos diegeticos.")
 	if calendar_runtime != null and not _is_visible_in_tree(calendar_runtime):
 		failures.append("CalendarRuntime no esta visible en escritorio diegetico.")
 	if calendar_texture != null and calendar_texture.texture == null:
@@ -138,6 +144,13 @@ func _run_smoke() -> void:
 		failures.append("DeskEndDayButton debe estar visible cuando el contrato diegetico esta activo.")
 	if monitor_end_day_button != null and _is_visible_in_tree(monitor_end_day_button):
 		failures.append("EndDayButton de monitor sigue visible pese a control diegetico activo.")
+
+	if sticky_notes_board != null and sticky_notes_board.has_method("get_visible_note_count"):
+		ui.set_event_log_entries(["Aviso de prueba: revisar deuda antes del cierre."])
+		await process_frame
+		var visible_note_count := int(sticky_notes_board.call("get_visible_note_count"))
+		if visible_note_count <= 0:
+			failures.append("StickyNotesBoard no crea post-its desde el log de eventos.")
 
 	await _validate_compaction_reacts_to_resize(ui, failures)
 	await _validate_monitor_first_layout(ui, failures)
@@ -172,9 +185,9 @@ func _run_smoke() -> void:
 		if _is_visible_in_tree(day_label):
 			failures.append("DayLabel no se oculta tras restaurar CalendarZone.")
 
-	if news_panel != null and feedback_panel != null and newspaper_runtime != null and invoice_runtime != null:
+	if news_panel != null and feedback_panel != null and newspaper_runtime != null and sticky_notes_board != null:
 		var monitor_has_non_operational := _is_visible_in_tree(news_panel) or _is_visible_in_tree(feedback_panel)
-		var docs_has_content := _is_visible_in_tree(newspaper_runtime) or _is_visible_in_tree(invoice_runtime)
+		var docs_has_content := _is_visible_in_tree(newspaper_runtime) or _is_visible_in_tree(sticky_notes_board)
 		if monitor_has_non_operational and docs_has_content:
 			failures.append("Se detecto duplicacion entre monitor y documentos diegeticos.")
 		# Si una zona diegetica desaparece (p. ej. fallo de textura en export), debe volver el fallback monitor.
@@ -191,6 +204,8 @@ func _run_smoke() -> void:
 				failures.append("Fallback roto: FeedbackPanel no vuelve cuando falta zona diegetica.")
 			if _is_visible_in_tree(newspaper_runtime):
 				failures.append("Fallback roto: NewsRuntime sigue visible en arbol con zona padre oculta.")
+			if _is_visible_in_tree(sticky_notes_board):
+				failures.append("Fallback roto: StickyNotesBoard sigue visible con contrato diegetico caido.")
 			if day_label != null and not _is_visible_in_tree(day_label):
 				failures.append("Fallback roto: DayLabel no vuelve durante fallback de periodico.")
 			if monitor_end_day_button != null and not _is_visible_in_tree(monitor_end_day_button):
@@ -395,6 +410,8 @@ func _assert_section_inside_monitor(
 			expected_section_panel = ui.get_node_or_null(MARKET_PANEL_PATH) as Control
 		"company":
 			expected_section_panel = ui.get_node_or_null(DETAILS_PANEL_PATH) as Control
+			if expected_section_panel == null or not expected_section_panel.is_visible_in_tree():
+				expected_section_panel = ui.get_node_or_null(MARKET_PANEL_PATH) as Control
 		_:
 			pass
 	if expected_section_panel == null or not expected_section_panel.is_visible_in_tree():

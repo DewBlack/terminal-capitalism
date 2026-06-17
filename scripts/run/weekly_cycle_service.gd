@@ -124,7 +124,7 @@ static func process_weekly_expense_day(
 		_money(run_manager.weekly_expense),
 		_money(inactivity_surcharge)
 	]
-	var event_log_entry := "D%02d | Factura semanal cobrada: %s (%s base + %s actividad). Deuda actual: %s." % [
+	var event_log_entry := "D%02d | Cobro semanal aplicado: %s (%s base + %s actividad). Deuda actual: %s." % [
 		run_manager.current_day,
 		_money(charged_amount),
 		_money(run_manager.weekly_expense),
@@ -231,7 +231,7 @@ static func build_debt_feedback_snapshot(
 		risk_hint = "Te queda poco margen. Una semana floja puede bloquear compras."
 	elif debt_usage_ratio >= RUN_BALANCE_CONFIG.DEBT_RISK_MEDIUM_THRESHOLD:
 		risk_label = "Medio"
-		risk_hint = "Aun hay margen, pero vigila la factura semanal."
+		risk_hint = "Aun hay margen, pero vigila el cobro semanal."
 	var day_in_week := ((_safe_day(run_manager.current_day) - 1) % maxi(1, run_manager.days_per_week)) + 1
 	var days_until_charge := maxi(1, run_manager.days_per_week) - day_in_week
 	return {

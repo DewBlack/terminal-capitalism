@@ -145,7 +145,7 @@ static func build_company_row(
 	var name_label := Label.new()
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	name_label.size_flags_stretch_ratio = 1.35
+	name_label.size_flags_stretch_ratio = 1.8
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_label.max_lines_visible = 2
@@ -165,19 +165,6 @@ static func build_company_row(
 	sector_label.add_theme_font_size_override("font_size", meta_font_size)
 	sector_label.add_theme_color_override("font_color", Color(0.70, 0.80, 0.90, 0.90))
 	info_vbox.add_child(sector_label)
-
-	var tags_label := Label.new()
-	tags_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tags_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	tags_label.size_flags_stretch_ratio = 1.0
-	tags_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tags_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tags_label.max_lines_visible = 3 if density_scale >= 1.2 else 2
-	tags_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	tags_label.text = str(row_model.get("tags_text", "Tags: -"))
-	tags_label.add_theme_font_size_override("font_size", meta_font_size)
-	tags_label.add_theme_color_override("font_color", Color(0.60, 0.73, 0.86, 0.90))
-	info_vbox.add_child(tags_label)
 
 	var owned_panel := PanelContainer.new()
 	owned_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -282,7 +269,7 @@ static func _build_band_style(bg_color: Color, density_scale: float, corner_radi
 
 
 static func _resolve_density_scale(row_card_min_height: float) -> float:
-	return clampf(row_card_min_height / 110.0, 1.0, 1.55)
+	return clampf(row_card_min_height / 110.0, 0.78, 1.55)
 
 
 static func _scaled_int(base_value: int, scale: float, min_value: int, max_value: int) -> int:

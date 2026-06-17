@@ -22,11 +22,13 @@ func build_profile(content_size: Vector2, section_id: String, zone_contract_enab
 	var profile := {
 		"compact": compact,
 		"cramped": cramped,
+		"hide_details_panel": zone_contract_enabled,
 		"show_quick_quantity_buttons": false,
 		"show_status_label": false,
 		"show_selection_label": false,
 		"selection_min_width": 0.0,
 		"quantity_min_width": 72.0 if compact else 84.0,
+		"center_split_separation": 0 if zone_contract_enabled else (6 if cramped else 10),
 		"bottom_bar_separation": 6 if compact else 10,
 		"app_nav_separation": 4 if compact else 6,
 		"home_nav_min_width": 68.0 if compact else 80.0,
@@ -35,18 +37,18 @@ func build_profile(content_size: Vector2, section_id: String, zone_contract_enab
 		"button_label_mode": "compact" if cramped else "full",
 		"trade_button_min_width": 96.0 if cramped else 126.0,
 		"end_day_button_min_width": 84.0 if cramped else 114.0,
-		"market_panel_min_width": 270.0 if cramped else 300.0,
-		"details_panel_min_width": 270.0 if cramped else 300.0,
+		"market_panel_min_width": 226.0 if zone_contract_enabled else (270.0 if cramped else 300.0),
+		"details_panel_min_width": 0.0 if zone_contract_enabled else (270.0 if cramped else 300.0),
 		"home_charts_min_height": 112.0 if cramped else (132.0 if compact else 164.0),
 		"home_holdings_min_height": 56.0 if cramped else (70.0 if compact else 90.0),
 		"home_holdings_max_lines": 4 if cramped else (6 if compact else 9),
-		"row_name_min_width": 74.0 if cramped else 96.0,
-		"row_price_min_width": 60.0 if cramped else 72.0,
-		"row_change_min_width": 56.0 if cramped else 66.0,
+		"row_name_min_width": 58.0 if zone_contract_enabled else (74.0 if cramped else 96.0),
+		"row_price_min_width": 52.0 if zone_contract_enabled else (60.0 if cramped else 72.0),
+		"row_change_min_width": 46.0 if zone_contract_enabled else (56.0 if cramped else 66.0),
 		"market_header_max_lines": 1,
 		"market_cards_columns": 1,
-		"market_card_min_height": 112.0 if cramped else 126.0,
-		"market_preview_min_height": 96.0 if cramped else 124.0
+		"market_card_min_height": 84.0 if zone_contract_enabled else (112.0 if cramped else 126.0),
+		"market_preview_min_height": 78.0 if zone_contract_enabled else (96.0 if cramped else 124.0)
 	}
 
 	match section_id:
@@ -54,9 +56,11 @@ func build_profile(content_size: Vector2, section_id: String, zone_contract_enab
 			profile["show_status_label"] = not cramped
 			profile["show_quick_quantity_buttons"] = false
 		APP_SECTION_MARKET:
-			profile["market_panel_min_width"] = 276.0 if cramped else 312.0
+			if not zone_contract_enabled:
+				profile["market_panel_min_width"] = 276.0 if cramped else 312.0
 		APP_SECTION_COMPANY:
-			profile["details_panel_min_width"] = 280.0 if cramped else 310.0
+			if not zone_contract_enabled:
+				profile["details_panel_min_width"] = 280.0 if cramped else 310.0
 		_:
 			pass
 

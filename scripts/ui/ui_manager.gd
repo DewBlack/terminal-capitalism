@@ -29,7 +29,6 @@ const UI_TRADE_ACTION_CONTROLLER := preload("res://scripts/ui/ui_trade_action_co
 const UI_MARKET_SELECTION_CONTROLLER := preload("res://scripts/ui/ui_market_selection_controller.gd")
 const UI_HOTKEY_INPUT_CONTROLLER := preload("res://scripts/ui/ui_hotkey_input_controller.gd")
 const UI_MODAL_LOCKS_CONTROLLER := preload("res://scripts/ui/ui_modal_locks_controller.gd")
-const WEEKLY_INVOICE_PRESENTER := preload("res://scripts/ui/weekly_invoice_presenter.gd")
 const DIEGETIC_DOCUMENT_PRESENTER := preload("res://scripts/ui/diegetic_document_presenter.gd")
 const DIEGETIC_CALENDAR_DAY_CELL := preload("res://scripts/ui/diegetic_calendar_day_cell.gd")
 const TUTORIAL_OVERLAY_CONTROLLER := preload("res://scripts/ui/tutorial_overlay_controller.gd")
@@ -37,6 +36,8 @@ const TUTORIAL_TARGET_RECT_RESOLVER := preload("res://scripts/ui/tutorial_target
 const UI_THEME_TOKENS := preload("res://scripts/ui/ui_theme_tokens.gd")
 const DIEGETIC_DESK_LAYOUT := preload("res://scripts/ui/diegetic_desk_layout.gd")
 const DIEGETIC_ZONE_POLICY := preload("res://scripts/ui/diegetic_zone_policy.gd")
+const DIEGETIC_DRAG_CONTROLLER := preload("res://scripts/ui/diegetic_drag_controller.gd")
+const DIEGETIC_STICKY_NOTES_BOARD := preload("res://scripts/ui/diegetic_sticky_notes_board.gd")
 const MONITOR_LAYOUT_CONTRACT := preload("res://scripts/ui/monitor_layout_contract.gd")
 const CRT_MONITOR_SHADER := preload("res://shaders/crt_monitor.gdshader")
 const WEEK_LABEL_MAX_CHARS := 180
@@ -62,7 +63,6 @@ const DESK_BACKDROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_bg_v1.
 const DESK_COMPUTER_PROP_TEXTURE_PATH := "res://art/placeholder/desk/desk_base_bg_v1.png"
 const MONITOR_FRAME_TEXTURE_PATH := "res://art/placeholder/desk/crt_monitor_frame_v1.png"
 const MONITOR_OVERLAY_TEXTURE_PATH := "res://art/placeholder/desk/crt_screen_overlay_v1.png"
-const INVOICE_TEXTURE_PATH := "res://art/placeholder/weekly/invoice_sheet_v1.png"
 const CALENDAR_TEXTURE_PATH := "res://art/placeholder/docs/calendar_sheet_v1.png"
 const CALENDAR_DAYS := 30
 
@@ -84,6 +84,7 @@ var _modal_locks_controller = null
 var _tutorial_overlay_controller = null
 var _tutorial_target_rect_resolver = null
 var _diegetic_desk_layout = null
+var _diegetic_drag_controller = null
 var _zone_policy = null
 var _monitor_layout_contract = null
 var _tutorial_state: Dictionary = {"active": false}
@@ -114,13 +115,6 @@ var _invoice_runtime_alerts_slot_panel: PanelContainer = null
 var _invoice_runtime_events_slot_panel: PanelContainer = null
 var _invoice_runtime_cash_ledger_label: Label = null
 var _invoice_runtime_debt_ledger_label: Label = null
-var _invoice_runtime_weekly_panel: PanelContainer = null
-var _invoice_runtime_weekly_title: Label = null
-var _invoice_runtime_weekly_summary: Label = null
-var _invoice_runtime_weekly_amounts: Label = null
-var _invoice_runtime_weekly_debt: Label = null
-var _invoice_runtime_weekly_risk: Label = null
-var _invoice_runtime_weekly_continue_button: Button = null
 var _invoice_runtime_critical_document_panel: PanelContainer = null
 var _invoice_runtime_critical_stamp: Label = null
 var _invoice_runtime_critical_title: Label = null
@@ -214,6 +208,7 @@ var _market_preview_chart: PriceChart = null
 @onready var _monitor_overlay: Control = get_node_or_null("MonitorOverlay") as Control
 @onready var _monitor_overlay_texture: TextureRect = get_node_or_null("MonitorOverlay/MonitorOverlayTexture") as TextureRect
 @onready var _desk_docs: Control = get_node_or_null("DeskDocs") as Control
+@onready var _sticky_notes_board: Control = get_node_or_null("DeskDocs/StickyNotesBoard") as Control
 @onready var _newspaper_zone: PanelContainer = get_node_or_null("DeskDocs/NewspaperZone") as PanelContainer
 @onready var _newspaper_texture: TextureRect = get_node_or_null("DeskDocs/NewspaperZone/NewspaperTexture") as TextureRect
 @onready var _invoice_zone: PanelContainer = get_node_or_null("DeskDocs/InvoiceZone") as PanelContainer
@@ -238,6 +233,7 @@ var _market_preview_chart: PriceChart = null
 
 func _ready() -> void:
 	_build_diegetic_runtime_zones()
+	_build_sticky_notes_board()
 	_resolve_content_targets()
 	_zone_policy = DIEGETIC_ZONE_POLICY.new()
 	_monitor_layout_contract = MONITOR_LAYOUT_CONTRACT.new()
@@ -269,8 +265,6 @@ func _ready() -> void:
 	_back_to_menu_button.pressed.connect(_on_back_to_menu_pressed)
 	if _weekly_recap_continue_button != null:
 		_weekly_recap_continue_button.pressed.connect(_on_weekly_recap_continue_pressed)
-	if _invoice_runtime_weekly_continue_button != null:
-		_invoice_runtime_weekly_continue_button.pressed.connect(_on_weekly_recap_continue_pressed)
 	if _invoice_runtime_critical_continue_button != null:
 		_invoice_runtime_critical_continue_button.pressed.connect(_on_critical_document_continue_pressed)
 	resized.connect(_on_ui_resized)
@@ -312,9 +306,6 @@ func _ready() -> void:
 		_quantity_plus_twenty_five_button,
 		_quantity_max_button
 	)
-	var weekly_invoice_visibility_callback := Callable()
-	if _invoice_runtime_weekly_panel != null:
-		weekly_invoice_visibility_callback = Callable(self, "_set_weekly_invoice_visibility")
 	var critical_document_visibility_callback := Callable()
 	if _invoice_runtime_critical_document_panel != null:
 		critical_document_visibility_callback = Callable(self, "_set_critical_document_visibility")
@@ -330,8 +321,8 @@ func _ready() -> void:
 		_weekly_recap_title,
 		_weekly_recap_body,
 		Callable(self, "_set_action_buttons_enabled"),
-		_invoice_runtime_weekly_panel,
-		weekly_invoice_visibility_callback,
+		null,
+		Callable(),
 		_invoice_runtime_critical_document_panel,
 		critical_document_visibility_callback,
 		Callable(self, "_apply_critical_document_model")
@@ -442,7 +433,7 @@ func set_event_log_entries(entries: Array[String]) -> void:
 	if _ui_feedback_controller == null:
 		return
 	_ui_feedback_controller.set_event_log_entries(entries)
-	_sync_critical_document_from_event_log(entries)
+	_sync_sticky_notes_from_event_log(entries)
 
 
 func set_debt_feedback_snapshot(snapshot: Dictionary) -> void:
@@ -527,12 +518,8 @@ func show_weekly_recap(
 ) -> void:
 	if _modal_locks_controller == null:
 		return
-	var invoice_model := WEEKLY_INVOICE_PRESENTER.build_model(
-		week_index,
-		weekly_recap_data,
-		debt_feedback_snapshot
-	)
-	_apply_weekly_invoice_model(invoice_model)
+	var _unused_weekly_recap_data := weekly_recap_data
+	var _unused_debt_feedback_snapshot := debt_feedback_snapshot
 	_modal_locks_controller.show_weekly_recap(
 		week_index,
 		summary_text,
@@ -547,49 +534,13 @@ func hide_weekly_recap() -> void:
 	_modal_locks_controller.hide_weekly_recap()
 
 
-func _apply_weekly_invoice_model(invoice_model: Dictionary) -> void:
-	if _invoice_runtime_weekly_title != null:
-		_invoice_runtime_weekly_title.text = str(invoice_model.get("title", "Factura Semanal"))
-	if _invoice_runtime_weekly_summary != null:
-		_invoice_runtime_weekly_summary.text = str(invoice_model.get("summary_text", ""))
-	if _invoice_runtime_weekly_amounts != null:
-		_invoice_runtime_weekly_amounts.text = str(invoice_model.get("amounts_text", ""))
-	if _invoice_runtime_weekly_debt != null:
-		_invoice_runtime_weekly_debt.text = str(invoice_model.get("debt_text", ""))
-	if _invoice_runtime_weekly_risk != null:
-		_invoice_runtime_weekly_risk.text = str(invoice_model.get("risk_text", ""))
-		_invoice_runtime_weekly_risk.remove_theme_color_override("font_color")
-		_invoice_runtime_weekly_risk.add_theme_color_override(
-			"font_color",
-			invoice_model.get("risk_color", Color(0.73, 0.93, 0.76))
-		)
-	if _invoice_runtime_weekly_continue_button != null:
-		_invoice_runtime_weekly_continue_button.text = str(invoice_model.get("continue_text", "Confirmar factura"))
-	if _invoice_runtime_weekly_panel != null:
-		var panel_style := StyleBoxFlat.new()
-		panel_style.bg_color = invoice_model.get("state_color", Color(0.74, 0.90, 0.78, 0.92))
-		panel_style.border_color = Color(0.21, 0.32, 0.21, 0.80)
-		panel_style.border_width_left = 2
-		panel_style.border_width_top = 2
-		panel_style.border_width_right = 2
-		panel_style.border_width_bottom = 2
-		panel_style.corner_radius_top_left = 8
-		panel_style.corner_radius_top_right = 8
-		panel_style.corner_radius_bottom_left = 8
-		panel_style.corner_radius_bottom_right = 8
-		_invoice_runtime_weekly_panel.add_theme_stylebox_override("panel", panel_style)
-	_update_desk_props_alert_state()
-
-
-func _set_weekly_invoice_visibility(visible: bool) -> void:
-	if _invoice_runtime_weekly_panel == null:
-		return
-	_invoice_runtime_weekly_panel.visible = visible
-
-
 func _set_critical_document_visibility(visible: bool) -> void:
 	if _invoice_runtime_critical_document_panel == null:
 		return
+	if _invoice_zone != null:
+		_invoice_zone.visible = visible
+	if _invoice_runtime != null:
+		_invoice_runtime.visible = visible
 	_invoice_runtime_critical_document_panel.visible = visible
 
 
@@ -656,6 +607,12 @@ func _sync_critical_document_from_event_log(entries: Array[String]) -> void:
 		return
 	_last_critical_document_id = document_id
 	_modal_locks_controller.show_critical_document(document_model)
+
+
+func _sync_sticky_notes_from_event_log(entries: Array[String]) -> void:
+	if _sticky_notes_board == null or not _sticky_notes_board.has_method("set_entries"):
+		return
+	_sticky_notes_board.call("set_entries", entries)
 
 
 func _connect_manager_signals() -> void:
@@ -914,11 +871,12 @@ func _normalize_app_section(section_id: String) -> String:
 func _apply_app_section_visibility() -> void:
 	var show_home := _active_app_section == APP_SECTION_HOME
 	var show_market_workspace := _active_app_section == APP_SECTION_MARKET
+	var use_compact_market_workspace := show_market_workspace and _zone_contract_enabled
 
 	if _home_panel != null:
 		_home_panel.visible = show_home
 
-	# La experiencia app usa una sola seccion principal; noticias/factura viven fuera del monitor.
+	# La experiencia app usa una sola seccion principal; noticias y avisos viven fuera del monitor.
 	if _news_panel != null:
 		_news_panel.visible = false
 	if _feedback_panel != null:
@@ -929,7 +887,7 @@ func _apply_app_section_visibility() -> void:
 	if _market_panel != null:
 		_market_panel.visible = show_market_workspace
 	if _details_panel != null:
-		_details_panel.visible = show_market_workspace
+		_details_panel.visible = show_market_workspace and not use_compact_market_workspace
 
 	_update_app_nav_buttons()
 	_apply_header_visibility_contract()
@@ -1011,6 +969,9 @@ func _apply_monitor_compaction() -> bool:
 		_market_panel.custom_minimum_size = Vector2(float(profile.get("market_panel_min_width", 300.0)), 0)
 	if _details_panel != null:
 		_details_panel.custom_minimum_size = Vector2(float(profile.get("details_panel_min_width", 300.0)), 0)
+		_details_panel.visible = _active_app_section == APP_SECTION_MARKET and not bool(profile.get("hide_details_panel", false))
+	if _center_split != null:
+		_center_split.add_theme_constant_override("separation", int(profile.get("center_split_separation", 8 if compact else 10)))
 	if _market_rows is GridContainer:
 		var market_rows_grid := _market_rows as GridContainer
 		market_rows_grid.columns = int(profile.get("market_cards_columns", 1))
@@ -1492,7 +1453,6 @@ func _are_actions_locked() -> bool:
 		return _modal_locks_controller.are_actions_locked()
 	return _upgrade_choice_panel.visible \
 		or _weekly_recap_panel.visible \
-		or (_invoice_runtime_weekly_panel != null and _invoice_runtime_weekly_panel.visible) \
 		or (_invoice_runtime_critical_document_panel != null and _invoice_runtime_critical_document_panel.visible) \
 		or _end_run_panel.visible
 
@@ -1867,6 +1827,26 @@ func _build_diegetic_runtime_zones() -> void:
 	_build_desk_end_day_surface()
 
 
+func _build_sticky_notes_board() -> void:
+	if _desk_docs == null:
+		return
+	if _sticky_notes_board == null:
+		_sticky_notes_board = DIEGETIC_STICKY_NOTES_BOARD.new()
+		_sticky_notes_board.name = "StickyNotesBoard"
+		_sticky_notes_board.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_sticky_notes_board.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		_sticky_notes_board.grow_vertical = Control.GROW_DIRECTION_BOTH
+		_sticky_notes_board.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_sticky_notes_board.z_index = 40
+		_desk_docs.add_child(_sticky_notes_board)
+	_sticky_notes_board.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_sticky_notes_board.offset_left = 0.0
+	_sticky_notes_board.offset_top = 0.0
+	_sticky_notes_board.offset_right = 0.0
+	_sticky_notes_board.offset_bottom = 0.0
+	_sticky_notes_board.move_to_front()
+
+
 func _build_newspaper_runtime_zone() -> void:
 	if _newspaper_zone == null:
 		return
@@ -1928,73 +1908,6 @@ func _build_invoice_runtime_zone() -> void:
 
 		ledger_row.add_child(cash_ledger_label)
 		ledger_row.add_child(debt_ledger_label)
-
-		var weekly_invoice_panel := PanelContainer.new()
-		weekly_invoice_panel.name = "WeeklyInvoicePanel"
-		weekly_invoice_panel.visible = false
-		weekly_invoice_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-
-		var weekly_invoice_style := StyleBoxFlat.new()
-		weekly_invoice_style.bg_color = Color(0.74, 0.90, 0.78, 0.78)
-		weekly_invoice_style.border_color = Color(0.21, 0.32, 0.21, 0.66)
-		weekly_invoice_style.border_width_left = 1
-		weekly_invoice_style.border_width_top = 1
-		weekly_invoice_style.border_width_right = 1
-		weekly_invoice_style.border_width_bottom = 1
-		weekly_invoice_style.corner_radius_top_left = 5
-		weekly_invoice_style.corner_radius_top_right = 5
-		weekly_invoice_style.corner_radius_bottom_left = 5
-		weekly_invoice_style.corner_radius_bottom_right = 5
-		weekly_invoice_panel.add_theme_stylebox_override("panel", weekly_invoice_style)
-
-		var weekly_invoice_margin := MarginContainer.new()
-		weekly_invoice_margin.name = "WeeklyInvoiceMargin"
-		weekly_invoice_margin.add_theme_constant_override("margin_left", 8)
-		weekly_invoice_margin.add_theme_constant_override("margin_top", 6)
-		weekly_invoice_margin.add_theme_constant_override("margin_right", 8)
-		weekly_invoice_margin.add_theme_constant_override("margin_bottom", 6)
-
-		var weekly_invoice_vbox := VBoxContainer.new()
-		weekly_invoice_vbox.name = "WeeklyInvoiceVBox"
-		weekly_invoice_vbox.add_theme_constant_override("separation", 3)
-
-		var weekly_invoice_title := Label.new()
-		weekly_invoice_title.name = "WeeklyInvoiceTitle"
-		weekly_invoice_title.add_theme_font_size_override("font_size", 15)
-		weekly_invoice_title.text = "Factura Semanal"
-
-		var weekly_invoice_summary := Label.new()
-		weekly_invoice_summary.name = "WeeklyInvoiceSummary"
-		_configure_text_slot_label(weekly_invoice_summary, 12, 2)
-		weekly_invoice_summary.text = "Sin cobro semanal pendiente."
-
-		var weekly_invoice_amounts := Label.new()
-		weekly_invoice_amounts.name = "WeeklyInvoiceAmounts"
-		_configure_text_slot_label(weekly_invoice_amounts, 12, 2)
-		weekly_invoice_amounts.text = "Base: $0.00 | Actividad: $0.00 | Total: $0.00"
-
-		var weekly_invoice_debt := Label.new()
-		weekly_invoice_debt.name = "WeeklyInvoiceDebt"
-		_configure_text_slot_label(weekly_invoice_debt, 12, 2)
-		weekly_invoice_debt.text = "Deuda: $0.00 / $1000.00 (uso 0%)."
-
-		var weekly_invoice_risk := Label.new()
-		weekly_invoice_risk.name = "WeeklyInvoiceRisk"
-		_configure_text_slot_label(weekly_invoice_risk, 12, 2)
-		weekly_invoice_risk.text = "Riesgo: Bajo. Sin alertas."
-
-		var weekly_invoice_continue_button := Button.new()
-		weekly_invoice_continue_button.name = "WeeklyInvoiceContinueButton"
-		weekly_invoice_continue_button.text = "Confirmar factura"
-
-		weekly_invoice_vbox.add_child(weekly_invoice_title)
-		weekly_invoice_vbox.add_child(weekly_invoice_summary)
-		weekly_invoice_vbox.add_child(weekly_invoice_amounts)
-		weekly_invoice_vbox.add_child(weekly_invoice_debt)
-		weekly_invoice_vbox.add_child(weekly_invoice_risk)
-		weekly_invoice_vbox.add_child(weekly_invoice_continue_button)
-		weekly_invoice_margin.add_child(weekly_invoice_vbox)
-		weekly_invoice_panel.add_child(weekly_invoice_margin)
 
 		var critical_document_panel := PanelContainer.new()
 		critical_document_panel.name = "CriticalDocumentPanel"
@@ -2066,6 +1979,7 @@ func _build_invoice_runtime_zone() -> void:
 
 		var document_panel := PanelContainer.new()
 		document_panel.name = "InvoiceDocumentPanel"
+		document_panel.visible = false
 		document_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		document_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		document_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2087,12 +2001,12 @@ func _build_invoice_runtime_zone() -> void:
 		var document_title := Label.new()
 		document_title.name = "DocumentTitle"
 		document_title.add_theme_font_size_override("font_size", 14)
-		document_title.text = "Documento Operativo"
+		document_title.text = "Archivo tecnico"
 
 		var document_subtitle := Label.new()
 		document_subtitle.name = "DocumentSubtitle"
 		_configure_text_slot_label(document_subtitle, 11, 1)
-		document_subtitle.text = "Slots auditables: resumen, deuda, alertas y eventos."
+		document_subtitle.text = "Canal interno de fallback; los avisos viven como post-its."
 
 		var slots_vbox := VBoxContainer.new()
 		slots_vbox.name = "DocumentSlots"
@@ -2112,11 +2026,11 @@ func _build_invoice_runtime_zone() -> void:
 
 		var invoice_slot := _create_invoice_document_slot(
 			"InvoiceSlotPanel",
-			"Factura semanal",
+			"Cobro semanal",
 			"InvoicePreviewLabel",
 			12,
 			3,
-			"Factura semanal estimada."
+			"Cobro semanal estimado."
 		)
 		var invoice_slot_panel := invoice_slot.get("panel") as PanelContainer
 
@@ -2148,7 +2062,6 @@ func _build_invoice_runtime_zone() -> void:
 		document_margin.add_child(document_vbox)
 		document_panel.add_child(document_margin)
 		invoice_vbox.add_child(ledger_row)
-		invoice_vbox.add_child(weekly_invoice_panel)
 		invoice_vbox.add_child(critical_document_panel)
 		invoice_vbox.add_child(document_panel)
 		invoice_runtime_margin.add_child(invoice_vbox)
@@ -2156,13 +2069,6 @@ func _build_invoice_runtime_zone() -> void:
 	_invoice_runtime = invoice_runtime_margin
 	_invoice_runtime_cash_ledger_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/LedgerRow/CashLedgerLabel") as Label
 	_invoice_runtime_debt_ledger_label = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/LedgerRow/DebtLedgerLabel") as Label
-	_invoice_runtime_weekly_panel = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel") as PanelContainer
-	_invoice_runtime_weekly_title = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceTitle") as Label
-	_invoice_runtime_weekly_summary = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceSummary") as Label
-	_invoice_runtime_weekly_amounts = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceAmounts") as Label
-	_invoice_runtime_weekly_debt = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceDebt") as Label
-	_invoice_runtime_weekly_risk = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceRisk") as Label
-	_invoice_runtime_weekly_continue_button = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/WeeklyInvoicePanel/WeeklyInvoiceMargin/WeeklyInvoiceVBox/WeeklyInvoiceContinueButton") as Button
 	_invoice_runtime_critical_document_panel = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel") as PanelContainer
 	_invoice_runtime_critical_stamp = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalStampLabel") as Label
 	_invoice_runtime_critical_title = _invoice_zone.get_node_or_null("InvoiceRuntime/InvoiceVBox/CriticalDocumentPanel/CriticalDocumentMargin/CriticalDocumentVBox/CriticalTitleLabel") as Label
@@ -2458,14 +2364,7 @@ func _resolve_content_targets() -> void:
 		_news_history_button = _newspaper_runtime_history_button
 		_news_content = _newspaper_runtime_content
 
-	if _invoice_runtime_debt_risk_label != null:
-		_debt_risk_label = _invoice_runtime_debt_risk_label
-	if _invoice_runtime_invoice_label != null:
-		_invoice_preview_label = _invoice_runtime_invoice_label
-	if _invoice_runtime_event_log_label != null:
-		_event_log_label = _invoice_runtime_event_log_label
-
-	_zone_contract_enabled = _newspaper_runtime != null and _invoice_runtime != null
+	_zone_contract_enabled = _newspaper_runtime != null and _sticky_notes_board != null
 
 
 func _apply_zone_contract() -> void:
@@ -2473,7 +2372,7 @@ func _apply_zone_contract() -> void:
 		return
 	var contract_active := _zone_contract_enabled \
 		and _is_document_zone_ready(_newspaper_zone, _newspaper_runtime) \
-		and _is_document_zone_ready(_invoice_zone, _invoice_runtime)
+		and _sticky_notes_board != null
 	_zone_contract_active = contract_active
 	_calendar_contract_active = contract_active and _is_calendar_zone_available()
 	var targets := {
@@ -2481,6 +2380,7 @@ func _apply_zone_contract() -> void:
 		"news_panel": _news_panel,
 		"feedback_panel": _feedback_panel,
 		"newspaper_runtime": _newspaper_runtime,
+		"sticky_notes_board": _sticky_notes_board,
 		"invoice_runtime": _invoice_runtime
 	}
 	_zone_policy.apply_visual_contract(targets)
@@ -2612,11 +2512,13 @@ func _apply_diegetic_artwork() -> void:
 	if _newspaper_texture != null:
 		_newspaper_texture.texture = null
 		_newspaper_texture.visible = false
-	var invoice_loaded := _assign_png_texture(_invoice_texture, INVOICE_TEXTURE_PATH)
+	if _invoice_texture != null:
+		_invoice_texture.texture = null
+		_invoice_texture.visible = false
 	if _newspaper_zone != null:
 		_newspaper_zone.visible = true
 	if _invoice_zone != null:
-		_invoice_zone.visible = invoice_loaded
+		_invoice_zone.visible = false
 	var calendar_loaded := _assign_png_texture(_calendar_texture, CALENDAR_TEXTURE_PATH)
 	if _calendar_texture != null:
 		_calendar_texture.visible = calendar_loaded
@@ -2641,6 +2543,15 @@ func _assign_png_texture(target: TextureRect, png_path: String) -> bool:
 func _apply_diegetic_layout() -> void:
 	if _diegetic_desk_layout != null:
 		_diegetic_desk_layout.apply_layout()
+	if _sticky_notes_board != null:
+		_sticky_notes_board.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_sticky_notes_board.offset_left = 0.0
+		_sticky_notes_board.offset_top = 0.0
+		_sticky_notes_board.offset_right = 0.0
+		_sticky_notes_board.offset_bottom = 0.0
+		_sticky_notes_board.move_to_front()
+	if _diegetic_drag_controller != null and _diegetic_drag_controller.has_method("apply_offsets_after_layout"):
+		_diegetic_drag_controller.call("apply_offsets_after_layout")
 
 
 func get_monitor_layout_debug_snapshot() -> Dictionary:
@@ -2691,7 +2602,7 @@ func _tutorial_blocked_hint_message(fallback: String) -> String:
 
 
 func _setup_diegetic_layout() -> void:
-	if _monitor_frame == null or _monitor_overlay == null or _newspaper_zone == null or _invoice_zone == null:
+	if _monitor_frame == null or _monitor_overlay == null or _newspaper_zone == null:
 		return
 	_monitor_frame.clip_contents = true
 	if _main_margin != null:
@@ -2707,4 +2618,13 @@ func _setup_diegetic_layout() -> void:
 		_calendar_zone,
 		_desk_end_day_button
 	)
+	_setup_diegetic_dragging()
 	_apply_diegetic_layout()
+
+
+func _setup_diegetic_dragging() -> void:
+	if _diegetic_drag_controller == null:
+		_diegetic_drag_controller = DIEGETIC_DRAG_CONTROLLER.new()
+	_diegetic_drag_controller.setup(self)
+	_diegetic_drag_controller.register_item("newspaper", _newspaper_zone)
+	_diegetic_drag_controller.register_item("calendar", _calendar_zone)

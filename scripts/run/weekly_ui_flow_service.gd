@@ -29,7 +29,7 @@ static func build_flow(
 			),
 			"weekly_recap_data": weekly_recap_data.duplicate(true),
 			"show_weekly_upgrade_choices": false,
-			"status_suffix": " Revisa la factura semanal.",
+			"status_suffix": " Revisa el cierre semanal.",
 			"should_return_early": true
 		}
 
