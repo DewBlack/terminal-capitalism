@@ -147,7 +147,7 @@ func show_weekly_recap(
 	if _weekly_recap_panel != null:
 		_weekly_recap_panel.visible = true
 	if _weekly_recap_title != null:
-		_weekly_recap_title.text = "Documento Semanal %d" % week_index
+		_weekly_recap_title.text = "Cierre semanal %d" % week_index
 	if _weekly_recap_body != null:
 		_weekly_recap_body.text = summary_text
 	_apply_action_lock_state()

@@ -239,7 +239,7 @@ text = "Deuda actual, limite y margen."
 [node name="InvoicePreviewLabel" type="Label" parent="MainMargin/MainVBox/FeedbackPanel/FeedbackSplit/DebtPanel/DebtVBox"]
 layout_mode = 2
 autowrap_mode = 3
-text = "Factura semanal estimada."
+text = "Cobro semanal estimado."
 
 [node name="EventLogPanel" type="PanelContainer" parent="MainMargin/MainVBox/FeedbackPanel/FeedbackSplit"]
 layout_mode = 2

@@ -114,7 +114,7 @@ func _apply_debt_feedback_model(debt_model: Dictionary) -> void:
 			debt_model.get("risk_color", Color(0.18, 0.31, 0.21))
 		)
 	if _invoice_preview_label != null:
-		_invoice_preview_label.text = str(debt_model.get("invoice_text", "Sin datos de factura semanal."))
+		_invoice_preview_label.text = str(debt_model.get("invoice_text", "Sin datos de cobro semanal."))
 		_invoice_preview_label.remove_theme_color_override("font_color")
 		_invoice_preview_label.add_theme_color_override(
 			"font_color",

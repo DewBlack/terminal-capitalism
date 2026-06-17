@@ -69,6 +69,7 @@ static func _build_history_articles(history_entries: Array) -> Array[Dictionary]
 		var description := str(entry.get("description", ""))
 		articles.append({
 			"kind": "history",
+			"section": "Hemeroteca",
 			"kicker": "Hemeroteca D%02d" % day_value,
 			"title": title,
 			"deck": "Revision del cierre del dia y sus implicaciones.",
@@ -88,6 +89,7 @@ static func _build_headline_articles(latest_headlines: Array) -> Array[Dictionar
 		var trace_text := _build_trace_text(news_event)
 		articles.append({
 			"kind": "headline",
+			"section": _build_section(news_event),
 			"kicker": _build_kicker(news_event),
 			"title": str(news_event.title),
 			"deck": _build_deck(news_event),
@@ -107,6 +109,7 @@ static func _build_run_context_article(run_context: Dictionary) -> Dictionary:
 	context_lines.append("Objetivos semanales: %s" % str(run_context.get("weekly_objective_context", "sin objetivos activos")))
 	return {
 		"kind": "briefing",
+		"section": "Apertura",
 		"kicker": "Apertura de run",
 		"title": "Briefing de contexto",
 		"deck": "Panorama previo al primer cierre.",
@@ -128,7 +131,23 @@ static func _build_kicker(news_event) -> String:
 		impacted_tickers.append(clean_ticker)
 	if impacted_tickers.is_empty():
 		return "Mercado"
-	return "Radar: %s" % ", ".join(impacted_tickers)
+	return "Empresas citadas: %s" % ", ".join(impacted_tickers)
+
+
+static func _build_section(news_event) -> String:
+	if news_event == null:
+		return "Mercado"
+	var positive_tags_count := 0
+	for _tag in news_event.positive_tags:
+		positive_tags_count += 1
+	var negative_tags_count := 0
+	for _tag in news_event.negative_tags:
+		negative_tags_count += 1
+	if positive_tags_count > negative_tags_count:
+		return "Optimismo"
+	if negative_tags_count > positive_tags_count:
+		return "Riesgo"
+	return "Mercado"
 
 
 static func _build_deck(news_event) -> String:
@@ -143,17 +162,9 @@ static func _build_deck(news_event) -> String:
 static func _build_trace_text(news_event) -> String:
 	if news_event == null:
 		return ""
-	var segments: Array[String] = []
 	if not news_event.trace_affected_tickers.is_empty():
-		segments.append("Impacto: %s" % ", ".join(news_event.trace_affected_tickers))
-	if not news_event.trace_causal_tags.is_empty():
-		var readable_tags: Array[String] = []
-		for tag_id in news_event.trace_causal_tags:
-			readable_tags.append(str(tag_id).replace("_", " "))
-		segments.append("Tags: %s" % ", ".join(readable_tags))
-	if segments.is_empty():
-		return ""
-	return "Traza -> %s" % " | ".join(segments)
+		return "Seguimiento: %s" % ", ".join(news_event.trace_affected_tickers)
+	return ""
 
 
 static func _build_signal_hint(news_event) -> String:
@@ -171,12 +182,12 @@ static func _build_signal_hint(news_event) -> String:
 	var positive_score := _tag_score(news_event, positive_tags, 0.024)
 	var negative_score := _tag_score(news_event, negative_tags, 0.026)
 	if positive_score <= 0.0 and negative_score <= 0.0:
-		return "Movimiento de sesgo neutro o poco definido."
+		return "Los operadores buscan una lectura clara antes del cierre."
 	if positive_score > negative_score * 1.15:
-		return "Sesgo editorial: potencialmente alcista."
+		return "Los operadores reciben la noticia con tono optimista."
 	if negative_score > positive_score * 1.15:
-		return "Sesgo editorial: potencialmente bajista."
-	return "Sesgo editorial: mixto o volatil."
+		return "El mercado lee la noticia con cautela."
+	return "El impacto podria variar entre empresas expuestas."
 
 
 static func _build_accent_color(news_event) -> Color:

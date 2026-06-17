@@ -16,6 +16,7 @@ const TIGHT_WIDTH := 360.0
 @onready var _page_label: Label = $NewsVBox/PagerRow/NewsPageLabel
 @onready var _news_scroll: ScrollContainer = $NewsVBox/NewsScroll
 @onready var _news_content: VBoxContainer = $NewsVBox/NewsScroll/NewsContent
+@onready var _edition_strip: PanelContainer = $NewsVBox/NewsScroll/NewsContent/EditionStrip
 @onready var _edition_label: Label = $NewsVBox/NewsScroll/NewsContent/EditionStrip/EditionMargin/EditionRow/NewsEditionLabel
 @onready var _edition_badge_label: Label = $NewsVBox/NewsScroll/NewsContent/EditionStrip/EditionMargin/EditionRow/NewsEditionBadge
 @onready var _kicker_label: Label = $NewsVBox/NewsScroll/NewsContent/HeadlineBlock/PageKickerLabel
@@ -27,13 +28,17 @@ const TIGHT_WIDTH := 360.0
 @onready var _body_left_label: Label = $NewsVBox/NewsScroll/NewsContent/BodyColumns/BodyLeftLabel
 @onready var _body_right_label: Label = $NewsVBox/NewsScroll/NewsContent/BodyColumns/BodyRightLabel
 @onready var _trace_label: Label = $NewsVBox/NewsScroll/NewsContent/TraceLabel
+@onready var _page_footer: HBoxContainer = $NewsVBox/NewsScroll/NewsContent/PageFooter
 @onready var _page_hint_label: Label = $NewsVBox/NewsScroll/NewsContent/PageFooter/PageHintLabel
 
 var _generated_image_texture: Texture2D = null
+var _last_page_index := -1
+var _page_turn_tween: Tween = null
 
 
 func _ready() -> void:
 	resized.connect(_on_resized)
+	_apply_clean_newspaper_styles()
 	_apply_generated_image_slot_style()
 	_apply_generated_image_slot_visibility()
 	_apply_responsive_layout(_history_button.text if _history_button != null else "")
@@ -85,26 +90,35 @@ func apply_page(
 	var history_button_text := str(news_model.get("history_button_text", "Ver historico"))
 	if _history_button != null:
 		_history_button.text = history_button_text
-	if _edition_label != null:
-		_edition_label.text = str(news_model.get("edition_text", "Edicion diaria"))
-	if _edition_badge_label != null:
-		_edition_badge_label.text = "ARCHIVO" if bool(news_model.get("history_mode", false)) else "LIVE"
 	_apply_responsive_layout(history_button_text)
 
 	var safe_total_pages := maxi(total_pages, 1)
 	var safe_page := clampi(current_page, 0, safe_total_pages - 1)
+	var page_changed := _last_page_index != safe_page
+	var section := str(page_model.get("section", "Mercado")).strip_edges()
+	if section.is_empty():
+		section = "Mercado"
+	var edition_text := str(news_model.get("edition_text", "Edicion diaria")).strip_edges()
+	if edition_text.is_empty():
+		edition_text = "Edicion diaria"
+	if _edition_label != null:
+		_edition_label.text = "%s - %s" % [edition_text, section]
+	if _edition_badge_label != null:
+		_edition_badge_label.text = "ARCHIVO" if bool(news_model.get("history_mode", false)) else "DIA"
 	if _page_label != null:
-		_page_label.text = "%d/%d" % [safe_page + 1, safe_total_pages]
+		_page_label.text = "Hoja %d/%d" % [safe_page + 1, safe_total_pages]
 	if _page_prev_button != null:
 		_page_prev_button.disabled = safe_page <= 0
+		_page_prev_button.text = "<"
 	if _page_next_button != null:
 		_page_next_button.disabled = safe_page >= safe_total_pages - 1
+		_page_next_button.text = ">"
 
 	var kicker := str(page_model.get("kicker", "Titular")).strip_edges()
 	if kicker.is_empty():
 		kicker = "Titular"
 	if _kicker_label != null:
-		_kicker_label.text = "Pagina %d - %s" % [safe_page + 1, kicker]
+		_kicker_label.text = "%s - Pagina %d - %s" % [section.to_upper(), safe_page + 1, kicker]
 
 	if _headline_label != null:
 		_headline_label.text = str(page_model.get("title", "Sin titular"))
@@ -125,17 +139,57 @@ func apply_page(
 	var trace_text := str(page_model.get("trace_text", "")).strip_edges()
 	if _trace_label != null:
 		_trace_label.text = trace_text
-		_trace_label.visible = not trace_text.is_empty()
+		_trace_label.visible = not trace_text.is_empty() and not trace_text.to_lower().contains("tag")
 
 	var clean_next_title := next_title.strip_edges()
 	if _page_hint_label != null:
 		if clean_next_title.is_empty():
-			_page_hint_label.text = "Ultima pagina de esta edicion."
+			_page_hint_label.text = "Fin de edicion."
 		else:
-			_page_hint_label.text = "Siguiente: %s" % clean_next_title
+			_page_hint_label.text = "Pasa pagina: %s" % clean_next_title
 
 	if _news_scroll != null:
 		_news_scroll.scroll_vertical = 0
+	if page_changed:
+		_animate_page_turn(safe_page)
+
+
+func _apply_clean_newspaper_styles() -> void:
+	if _edition_strip != null:
+		var edition_style := StyleBoxFlat.new()
+		edition_style.bg_color = Color(0.18, 0.14, 0.10, 0.90)
+		edition_style.border_color = Color(0.44, 0.33, 0.20, 0.55)
+		edition_style.border_width_bottom = 2
+		edition_style.corner_radius_top_left = 3
+		edition_style.corner_radius_top_right = 3
+		_edition_strip.add_theme_stylebox_override("panel", edition_style)
+	if _edition_label != null:
+		_edition_label.add_theme_color_override("font_color", Color(0.94, 0.88, 0.74, 0.96))
+	if _edition_badge_label != null:
+		_edition_badge_label.add_theme_color_override("font_color", Color(0.98, 0.79, 0.39, 0.96))
+	if _page_footer != null:
+		var footer_style := StyleBoxFlat.new()
+		footer_style.bg_color = Color(0.36, 0.29, 0.19, 0.12)
+		footer_style.border_color = Color(0.44, 0.33, 0.20, 0.36)
+		footer_style.border_width_top = 1
+		_page_footer.add_theme_stylebox_override("panel", footer_style)
+	if _generated_image_hint != null:
+		_generated_image_hint.text = "Espacio para imagen editorial"
+
+
+func _animate_page_turn(page_index: int) -> void:
+	if _news_content == null:
+		return
+	if _page_turn_tween != null and _page_turn_tween.is_running():
+		_page_turn_tween.kill()
+	var direction := -1.0 if _last_page_index >= 0 and page_index < _last_page_index else 1.0
+	_last_page_index = page_index
+	_news_content.modulate = Color(1.0, 1.0, 1.0, 0.34)
+	_news_content.position.x = direction * 18.0
+	_page_turn_tween = create_tween()
+	_page_turn_tween.set_parallel(true)
+	_page_turn_tween.tween_property(_news_content, "modulate:a", 1.0, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_page_turn_tween.tween_property(_news_content, "position:x", 0.0, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 func _apply_generated_image_slot_style() -> void:
@@ -206,7 +260,7 @@ func _apply_responsive_layout(history_button_base_text: String) -> void:
 		_page_next_button.custom_minimum_size = Vector2(24 if compact else 28, 0)
 		_page_next_button.add_theme_font_size_override("font_size", int(round(12.0 * scale)))
 	if _page_label != null:
-		_page_label.custom_minimum_size = Vector2(52 if compact else 70, 0)
+		_page_label.custom_minimum_size = Vector2(76 if compact else 94, 0)
 		_page_label.add_theme_font_size_override("font_size", int(round(11.0 * scale)))
 
 	if _edition_label != null:
@@ -220,7 +274,7 @@ func _apply_responsive_layout(history_button_base_text: String) -> void:
 	if _deck_label != null:
 		_deck_label.add_theme_font_size_override("font_size", int(round(13.0 * scale)))
 	if _generated_image_frame != null:
-		_generated_image_frame.custom_minimum_size = Vector2(0, round(96.0 * scale))
+		_generated_image_frame.custom_minimum_size = Vector2(0, round(118.0 * scale))
 	if _generated_image_hint != null:
 		_generated_image_hint.add_theme_font_size_override("font_size", int(round(11.0 * scale)))
 	if _body_left_label != null:
