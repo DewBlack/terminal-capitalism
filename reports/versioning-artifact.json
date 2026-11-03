@@ -1,0 +1,19 @@
+{
+  "runtime_version": "0.0.29-alpha.0",
+  "runtime_version_code": null,
+  "application_id": null,
+  "version": "0.0.29-alpha.0",
+  "version_code": null,
+  "file": "index.pck",
+  "sha256": "d4e0a27e3397f497e6564ff4f17f61cccf5ec60d855aa4cecc8035b8b196d3ad",
+  "bytes": 34221880,
+  "schema": 1,
+  "product": "capitalismo-terminal",
+  "commit": "756f0cba97309ae913db05c91286fde889f4ee8a",
+  "source_dirty": false,
+  "reservation_id": null,
+  "platform": "web",
+  "channel": "local",
+  "environment": "web",
+  "publishable": false
+}

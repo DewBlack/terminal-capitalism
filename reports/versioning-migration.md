@@ -30,3 +30,7 @@
 El entorno permitió importación, ejecución nativa con renderizado y export Web. No se ejecutó esta Web en un navegador; ese gate sigue pendiente, incluida la persistencia del navegador. No se afirma QA de teléfono, Play ni iOS; no hay adaptador móvil en este proyecto. Ningún tag, release, merge o publicación fue creado por la migración. La rama y PR conservan el flujo del repositorio.
 
 La reversión es una PR que revierta los commits de la migración; no reescribe releases históricas ni datos del jugador. La prueba/exportación local no autoriza publicación.
+
+## Artefacto final de prueba
+
+Web exportada del commit `756f0cba97309ae913db05c91286fde889f4ee8a` con fuente limpia. El PCK contiene versión `0.0.29-alpha.0`, tamaño 34221880 bytes y SHA-256 `d4e0a27e3397f497e6564ff4f17f61cccf5ec60d855aa4cecc8035b8b196d3ad`. Manifiesto: [versioning-artifact.json](versioning-artifact.json). Se ejecutó además la prueba de Ajustes desde ese PCK mediante `godot --headless --main-pack <index.pck> --script res://scripts/utils/version_settings_smoke.gd`: PASS (es/en y actualización en memoria). `promotion-verify` pasó sin modificar los bytes; no realizó una promoción real. Artefacto y checksums completos conservados fuera del checkout temporal en Backups, `versioning-migration-2026-11-03/personal/terminal-capitalism/web`.
