@@ -14,6 +14,8 @@ jobs:
       fail-fast: false
       matrix:
         smoke:
+          - name: Installed Version Settings
+            script: scripts/utils/version_settings_smoke.gd
           - name: Parse Smoke
             script: scripts/utils/script_parse_smoke.gd
           - name: Weekly Balance Smoke

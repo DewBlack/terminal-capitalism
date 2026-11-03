@@ -133,3 +133,8 @@ Workflow CI:
 Secrets usados:
 - `GH_TOKEN`
 - `ITCHIO_TOKEN`
+
+
+## Versionado de producto y Ajustes
+
+Seguir la [política central de studio](https://github.com/pallobbygames/studio/blob/039e84d5e8a71fb897b5ed14365993e56012322c/docs/VERSIONING.md) y la [integración local](docs/release_versioning.md). La fuente única es `application/config/version` en `project.godot`. Toda build debe mostrar automáticamente su versión instalada en Ajustes, sin depender de red; validar fuente, PCK e interfaz y no incrementar por compilar o editar documentación. Cambiar la política exige actualizar studio y revisar las plantillas/proyectos afectados.

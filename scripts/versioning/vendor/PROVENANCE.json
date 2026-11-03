@@ -1,0 +1,7 @@
+{
+  "package": "semver",
+  "version": "3.0.4",
+  "source": "https://pypi.org/project/semver/3.0.4/",
+  "wheel_sha256": "9c824d87ba7f7ab4a1890799cec8596f15c1241cb473404ea1cb0c55e4b04746",
+  "license": "BSD-3-Clause"
+}

@@ -46,6 +46,31 @@ text = "Nueva Run (Visual WIP)"
 layout_mode = 2
 text = "Tutorial Guiado"
 
+[node name="SettingsButton" type="Button" parent="CenterContainer/MenuVBox"]
+layout_mode = 2
+text = "Ajustes"
+
 [node name="QuitButton" type="Button" parent="CenterContainer/MenuVBox"]
 layout_mode = 2
 text = "Salir"
+
+[node name="SettingsDialog" type="AcceptDialog" parent="."]
+title = "Ajustes"
+min_size = Vector2i(320, 160)
+
+[node name="SettingsVBox" type="VBoxContainer" parent="SettingsDialog"]
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 404.0
+offset_bottom = 120.0
+theme_override_constants/separation = 20
+
+[node name="Information" type="Label" parent="SettingsDialog/SettingsVBox"]
+layout_mode = 2
+text = "Información del juego"
+horizontal_alignment = 1
+
+[node name="VersionLabel" type="Label" parent="SettingsDialog/SettingsVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1

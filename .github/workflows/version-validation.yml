@@ -1,0 +1,15 @@
+name: Version consistency
+on:
+  pull_request:
+  push:
+    branches: [dev]
+permissions:
+  contents: read
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/versioning/version.py check --release
+      - run: python3 scripts/versioning/version.py sync --dry-run
+      - run: python3 -m unittest discover -s scripts/versioning/tests -v

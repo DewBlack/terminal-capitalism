@@ -1,0 +1,7 @@
+[gd_resource type="Translation" format=3]
+
+[resource]
+locale = "es"
+messages = {
+"Version %s": "Versión %s"
+}

@@ -1,0 +1,22 @@
+{
+  "files": {
+    "android_counter.py": "b12daa216e56a4cbb1eb962e4188764842cc1824dc5ab5e6348be2e6a0a238c0",
+    "godot_runtime.py": "e8e97c711e08467ae1ef9980ae14a7bf083fc9bf2125343044d17fd0b9b0ffd3",
+    "install_bundletool.py": "aa6fd7ba7ca9444350163992b0c494a16960d22f4746eaed1e091449a78dbcf4",
+    "tests/test_android_counter.py": "8dc65943e3c9cf5e5e05c2425b592c5e3d6cf63eb4a47eb9ab78a906312d5d98",
+    "tests/test_version.py": "78cf1b8cc86423f75b28ae7fbb4e43d347611530b722861d461b0ff798c89049",
+    "update_tools.py": "4f3ed908092bbe434e9ad7b1abfb8ccd090cdf33b25b3f62c5b7fbd68f006f08",
+    "vendor/PROVENANCE.json": "4e99a4723d52803888dfd7cd2b9dad7d1c2353628010750551094c5e16b2628f",
+    "vendor/SEMVER-LICENSE.txt": "cc10179de9ced8655d7765bd3a8ac46438a61e663de7cf1c48d502d2baf9f3d5",
+    "vendor/semver/__about__.py": "a6b434cb74b7b13f41c8dd4240fae4ac016bf73affe496af60ca73b4f8ed51fd",
+    "vendor/semver/__init__.py": "451063ea4bae61a098e41f602f1c04d21ee6781c2ead811b7d0667bfbb7590a3",
+    "vendor/semver/__main__.py": "9ac50bab82dbd0057c2b8aee9619b4173cc93bca0c0afe761a37131b6b7c8b0b",
+    "vendor/semver/_deprecated.py": "38e5fe01e698f90a892b6810184f2974913187fd774cffbd012640920a829ade",
+    "vendor/semver/_types.py": "f807dacd98279a631eed6b614b1fccfb0d410a7ab674f166cac8e6b533a6d687",
+    "vendor/semver/cli.py": "1f0be99ea70df791b7388354e1c2e0a2e4470ad5a146cb8a8217e13d6b4639ec",
+    "vendor/semver/py.typed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "vendor/semver/version.py": "8e963809189c13aa43d07f9a7679c4a90fa68d1911b4c63d5d23edead9de68bf",
+    "version.py": "ca4eae51fea49d2e8422149b994c9e25575aee977d47fbb19836361196541e20"
+  },
+  "schema": 1
+}
